@@ -1,6 +1,6 @@
 #pragma once
 #include "proto/core/meta.hh"
-#include "proto/core/containers/DynamicArray.hh"
+#include "proto/core/containers/Array.hh"
 #include "proto/core/memory/common.hh"
 
 // this system do not know what it is yet, excuse it
@@ -95,7 +95,7 @@ namespace proto {
         char filepath[PROTO_ASSET_MAX_PATH_LEN];
         bool is_cached = false;
         void * cached;
-        DynamicArray<AssetHandle> deps;
+        Array<AssetHandle> deps;
         //        u32 reference_count;
     };
 

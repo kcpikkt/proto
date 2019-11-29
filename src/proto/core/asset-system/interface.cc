@@ -38,7 +38,7 @@ AssetHandle create_asset(AssetContext * asset_context,
     AssetContext & ctx = *asset_context;
     AssetRegistry & reg = ctx.assets;
 
-    DynamicArray<AssetMetadata> * insert_arr = nullptr;
+    Array<AssetMetadata> * insert_arr = nullptr;
     switch(type) {
     case AssetType<Mesh>::index:     { insert_arr = &reg.meshes;   } break;
     case AssetType<Material>::index: { insert_arr = &reg.materials;} break;
@@ -150,7 +150,7 @@ void destroy_asset(AssetHandle handle){
     return destroy_asset(context, handle);
 }
 
-//void get_deps_rec(DynamicArray<AssetHandle> & depslist,
+//void get_deps_rec(Array<AssetHandle> & depslist,
 //                  AssetHandle handle)
 //{
 //    assert(handle); //TODO(kacper): err msg, softfail
@@ -170,7 +170,7 @@ void destroy_asset(AssetHandle handle){
 
 //}
 
-void get_deps_rec(DynamicArray<AssetHandle> & depslist,
+void get_deps_rec(Array<AssetHandle> & depslist,
                   AssetHandle handle)
 {
     assert(handle); //TODO(kacper): err msg, softfail
@@ -200,7 +200,7 @@ T * get_asset(AssetContext * asset_context,
     AssetContext & ctx = *asset_context;
 
     static_assert(meta::is_base_of_v<Asset, T>);
-    DynamicArray<T> * lookup_arr = nullptr;
+    Array<T> * lookup_arr = nullptr;
 
     /*  */ if constexpr(meta::is_same_v<T, Mesh>) {
         lookup_arr =  &ctx.meshes;
@@ -238,7 +238,7 @@ AssetMetadata * get_metadata(AssetContext * asset_context,
     AssetContext & ctx = *asset_context;
     AssetRegistry & reg = ctx.assets;
 
-    DynamicArray<AssetMetadata> * lookup_arr = nullptr;
+    Array<AssetMetadata> * lookup_arr = nullptr;
     switch(handle.type) {
     case AssetType<Mesh>::index:     { lookup_arr = &reg.meshes;    } break;
     case AssetType<Material>::index: { lookup_arr = &reg.materials; } break;

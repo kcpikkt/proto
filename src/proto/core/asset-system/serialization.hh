@@ -65,7 +65,7 @@ namespace serialization {
     //    //              double lookup
     //};
 
-    using Savelist = DynamicArray<AssetHandle>;
+    using Savelist = Array<AssetHandle>;
 
     int create_asset_tree_savelist_rec (Savelist& savelist,
                                         AssetHandle handle);

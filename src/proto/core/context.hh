@@ -41,7 +41,7 @@ namespace proto {
             AssetHandle texture = invalid_asset_handle;
             u32 gl_tex_unit;
         };
-        DynamicArray<TextureSlot> texture_slots;
+        Array<TextureSlot> texture_slots;
         // temp
         u64 texture_slots_index = 0;
 
@@ -54,9 +54,9 @@ namespace proto {
     struct AssetContext {
         AssetRegistry assets;
         memory::LinkedListAllocator asset_metadata_allocator;
-        DynamicArray<Mesh> meshes;
-        DynamicArray<Material> materials;
-        DynamicArray<Texture> textures;
+        Array<Mesh> meshes;
+        Array<Material> materials;
+        Array<Texture> textures;
         memory::LinkedListAllocator gp_texture_allocator;
 
         StringArena asset_paths;

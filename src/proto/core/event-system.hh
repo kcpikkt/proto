@@ -1,5 +1,5 @@
 #pragma once
-#include "proto/core/containers/DynamicArray.hh"
+#include "proto/core/containers/Array.hh"
 #include "proto/core/memory/common.hh"
 
 namespace proto {
@@ -39,7 +39,7 @@ struct Channel {
         Sink<EventType> * sink;
         EventType mask;
     };
-    DynamicArray<SinkRecord> sinks;
+    Array<SinkRecord> sinks;
     memory::Allocator * _allocator;
     
     void init(size_t init_sink_cap, memory::Allocator * allocator) {

@@ -4,7 +4,7 @@
 #include "proto/core/memory/common.hh"
 #include "proto/core/util/algo.hh"
 #include "proto/core/debug/logging.hh"
-#include "proto/core/containers/DynamicArray.hh"
+#include "proto/core/containers/Array.hh"
 #include "proto/core/util/parsing.hh"
 #include "proto/core/asset-system/common.hh"
 #include "proto/core/graphics/Material.hh"
@@ -42,9 +42,9 @@ struct Mesh : Asset {
     // TODO(kacper): is on gpu
     memory::Allocator * _allocator;
 
-    proto::DynamicArray<Vertex> vertices;
-    proto::DynamicArray<u32> indices;
-    proto::DynamicArray<Span> spans;
+    proto::Array<Vertex> vertices;
+    proto::Array<u32> indices;
+    proto::Array<Span> spans;
 
     u64 serialized_vertices_size() {
         return vertices.size() * sizeof(decltype(vertices)::DataType);
