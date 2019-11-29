@@ -3,7 +3,7 @@
 #include "proto/core/context.hh"
 #include "proto/core/asset-system/common.hh"
 #include "proto/core/memory/common.hh"
-#include "proto/core/containers/DynamicArray.hh"
+#include "proto/core/containers/Array.hh"
 
 namespace proto {
     struct AssetContext;
@@ -51,7 +51,7 @@ namespace proto {
     void destroy_asset(AssetContext * asset_context,
                        AssetHandle handle); 
 
-    void get_deps_rec(DynamicArray<AssetHandle> & depslist,
+    void get_deps_rec(Array<AssetHandle> & depslist,
                       AssetHandle handle);
 
     void add_dependency(AssetMetadata * dependant,

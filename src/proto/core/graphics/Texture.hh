@@ -1,6 +1,6 @@
 #pragma once
 #include "proto/core/debug.hh"
-#include "proto/core/containers/DynamicArray.hh"
+#include "proto/core/containers/Array.hh"
 #include "proto/core/memory/common.hh"
 #include "proto/core/graphics/common.hh"
 

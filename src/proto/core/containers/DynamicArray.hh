@@ -5,7 +5,7 @@
 
 namespace proto {
     template<typename T>
-    struct DynamicArray {
+    struct Array {
         using DataType = T;
 
         size_t _capacity = 0;
@@ -65,7 +65,7 @@ namespace proto {
             return _data;
         }
 
-        ~DynamicArray() {
+        ~Array() {
             //if(is_initialized && _data) {
             //    assert(_allocator);
             //    _allocator->free(_data);

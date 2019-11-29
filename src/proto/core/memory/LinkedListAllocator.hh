@@ -2,6 +2,7 @@
 #include "proto/core/common.hh"
 #include "proto/core/common/types.hh"
 #include "proto/core/debug/logging.hh"
+#include "proto/core/debug/markers.hh"
 #include "proto/core/memory/common.hh"
 #include "proto/core/meta.hh"
 

@@ -1,14 +1,14 @@
 #pragma once
 #include "proto/core/debug.hh"
 #include "proto/core/memory/common.hh"
-#include "proto/core/containers/DynamicArray.hh"
+#include "proto/core/containers/Array.hh"
 #include "proto/core/util/StringView.hh"
 #include "proto/core/common/types.hh"
 
 namespace proto {
 
     //struct StaticStringArena {
-    //    DynamicArray<StringView> _views;
+    //    Array<StringView> _views;
     //    const char * _data = nullptr;
     //    u64 _size = 0;
     //    memory::Allocator * _allocator;
@@ -51,7 +51,7 @@ namespace proto {
     //};
 ////TODO(kacper): add reusing strings
 struct StringArena {
-    DynamicArray<StringView> _views;
+    Array<StringView> _views;
     char * _data = nullptr;
     const char * _cursor = nullptr;
     u64 _size = 0;

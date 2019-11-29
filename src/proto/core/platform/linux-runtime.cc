@@ -129,6 +129,8 @@ void * clientlib_h;
 int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** argv){
 
     proto::context = &_context;
+
+    return 0;
     /***************************************************************
      * RUNTIME SETUP
      */

@@ -455,11 +455,11 @@ namespace proto{
 
 // SAVE POSITIONS/NORMALS/INDICES
 
-        DynamicArray<vec3> positions;
+        Array<vec3> positions;
         positions.init_resize(point_count, &context->memory);
-        DynamicArray<vec3> normals;
+        Array<vec3> normals;
         normals.init_resize(normal_count, &context->memory);
-        DynamicArray<vec2> uvs;
+        Array<vec2> uvs;
         uvs.init_resize(uv_count, &context->memory);
 
         size_t point_index = 0;
@@ -524,7 +524,7 @@ namespace proto{
             }
         };
 
-        DynamicArray<_VertexIndexSet> index_sets;
+        Array<_VertexIndexSet> index_sets;
         if(optimize_for_space)
             index_sets.init(point_count * 2, allocator);
         else 
