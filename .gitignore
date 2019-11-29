@@ -1,0 +1,9 @@
+res/*
+obj/*
+bin/*
+vendor/*
+proto.config
+proto.creator*
+proto.files
+proto.includes
+.vs/
