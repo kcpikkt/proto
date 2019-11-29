@@ -1,0 +1,6 @@
+#pragma once
+
+#define PROTO_VERSION_MAJOR 0
+#define PROTO_VERSION_MINOR 0
+#define PROTO_VERSION_BUILD 0
+#define PROTO_VERSION_REVISION 0

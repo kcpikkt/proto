@@ -1,0 +1,105 @@
+#pragma once
+
+#include "proto/core/platform/macros.hh"
+
+#if defined(PROTO_PLATFORM_WINDOWS)
+# include "proto/core/platform/windows-context.hh"
+# include "proto/core/platform/windows-clock.hh"
+#else
+# include "proto/core/platform/linux-context.hh"
+# include "proto/core/platform/linux-clock.hh"
+#endif
+
+#include "proto/core/graphics/Mesh.hh"
+#include "proto/core/graphics/Texture.hh"
+#include "proto/core/graphics/Material.hh"
+#include "proto/core/memory/LinkedListAllocator.hh"
+#include "proto/core/memory/StringArena.hh"
+#include "proto/core/event-system.hh"
+#include "proto/core/asset-system/common.hh"
+#include "proto/core/asset-system/AssetRegistry.hh"
+#include "proto/core/input.hh"
+
+namespace proto {
+    // context is all global state of the engine
+    // NOTE(kacper):
+    // since it inherits platform specific variables it perhaps should
+    // be under 'platform' namespace but it is meant to be used too often
+    // and those variables are not supposed to be touched by the client anyway
+
+    // it is split into few contexts that are inherited by one final one
+    // this is because there are some cases when its handy to have
+    // temporary context or oftentimes only a specific part of it
+
+#if defined(PROTO_OPENGL)
+    //NOTE(kacper): Context ofc in proto, not OpenGL, sense of the word,
+    //              (though in both cases they mean more or less the same thing)
+    //              it therefore is not supposed to reflect OpenGL context but
+    //              rather just store whatever OpenGL-specific data we need to.
+    struct OpenGLContext {
+        struct TextureSlot {
+            AssetHandle texture = invalid_asset_handle;
+            u32 gl_tex_unit;
+        };
+        DynamicArray<TextureSlot> texture_slots;
+        // temp
+        u64 texture_slots_index = 0;
+
+        AssetHandle default_ambient_map;
+        AssetHandle default_diffuse_map;
+        AssetHandle default_specular_map;
+    };
+#endif
+
+    struct AssetContext {
+        AssetRegistry assets;
+        memory::LinkedListAllocator asset_metadata_allocator;
+        DynamicArray<Mesh> meshes;
+        DynamicArray<Material> materials;
+        DynamicArray<Texture> textures;
+        memory::LinkedListAllocator gp_texture_allocator;
+
+        StringArena asset_paths;
+    };
+
+    struct Context :
+        AssetContext,
+
+#   if defined(PROTO_OPENGL)
+        OpenGLContext,
+#   endif
+
+#   if defined(PROTO_PLATFORM_WINDOWS)
+        platform::WindowsContext
+#   else
+        platform::LinuxContext
+#   endif
+    {
+        memory::LinkedListAllocator memory;
+        memory::LinkedListAllocator gp_file_buffering_allocator;
+        memory::LinkedListAllocator gp_string_allocator;
+        memory::LinkedListAllocator gp_debug_strings_allocator;
+        StringArena cmdline;
+
+        int count = 0;
+        proto::ivec2 window_size;
+
+        StringView clientlib_path;
+        char * cwd_path = nullptr;
+        char * exe_path = nullptr;
+
+        Channel<KeyEvent> key_input_channel;
+        Channel<MouseEvent> mouse_input_channel;
+
+        //AssetRegistry assets;
+        // assets;
+
+        bool exit_sig = false;
+#    if defined(PROTO_PLATFORM_WINDOWS)
+        platform::WindowsClockImpl clock;
+#    else
+        platform::LinuxClockImpl clock;
+#    endif
+ 
+    };
+}

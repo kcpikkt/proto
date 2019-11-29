@@ -1,0 +1,46 @@
+#pragma once
+#include "proto/core/common.hh"
+#include "proto/core/memory/common.hh"
+#include "proto/core/meta.hh"
+
+namespace proto::memory
+{
+    struct linked_list_allocator
+    {
+        void * _first = nullptr;
+        void * _last = nullptr;
+
+        void * _arena = nullptr;
+        size_t _size = 0;
+        size_t _used = 0;
+        size_t _alloc_count = 0;
+        size_t _min_block_size = 32; // FIXME
+        size_t _min_alloc_size = 32; // FIXME
+
+        struct header {
+            constexpr static byte FREE = 1;
+
+            byte flags = 0;
+            void * next;
+            void * next_in_mem;
+            size_t size;
+        };
+
+        void * raw();
+
+        int init(size_t init_size);
+
+        void * alloc(size_t requested_size, size_t alignment);
+
+
+
+        header * get_header(void * addr);
+
+    };
+}
+
+namespace proto::meta {
+    template<>
+    struct is_allocator<proto::memory::linked_list_allocator> : true_t {};
+}
+
