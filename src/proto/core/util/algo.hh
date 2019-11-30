@@ -29,7 +29,7 @@ inline HigherPrecType clamp(A val, B minval = 0.0f, B maxval = 1.0f) {
 
 
 constexpr inline size_t next_multiple(size_t of, size_t val) {
-    return val + (val % of);
+    return val + (of - (val % of));
 }
 
 } // namespace proto

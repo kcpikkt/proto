@@ -1,34 +1,36 @@
 #pragma once
 #include "proto/core/util/Bitfield.hh"
 #include "proto/core/common/types.hh"
+#include "proto/core/debug/assert.hh"
+#include "proto/core/common.hh"
 
 namespace proto {
 
 template<typename T>
-struct DataholderCRTP {
+struct DataholderCRTP  {
     Bitfield<u8> flags;
-    constexpr static u8 _initialized_bit       = 1;
-    constexpr static u8 _moved_bit             = 2;
-    constexpr static u8 _shallow_destroyed_bit = 4;
-    constexpr static u8 _deep_destroyed_bit    = 8;
+    constexpr static u8 _initialized_bit       = BIT(1);
+    constexpr static u8 _moved_bit             = BIT(2);
+    constexpr static u8 _shallow_destroyed_bit = BIT(3);
+    constexpr static u8 _deep_destroyed_bit    = BIT(4);
 
     inline bool is_moved() { return flags.check(_moved_bit); }
     inline bool is_initialized() { return flags.check(_initialized_bit); }
 
     //NOTE(kacper): remember to forward;
-    void move(T&& other) {
-        init_base(true);
+    void dataholder_move(T&& other) {
+        dataholder_init(true);
         flags = other.flags;
         other.flags.set(_moved_bit);
     }
 
-    void copy(const T& other) {
-        init_base(true);
+    void dataholder_copy(const T& other) {
+        dataholder_init(true);
         flags = other.flags;
     }
 
     // call that in every init/constructor/assignment
-    void init_base([[maybe_unused]] bool assignment = false) {
+    void dataholder_init([[maybe_unused]] bool assignment = false) {
         assert(!flags.check(_initialized_bit) || assignment);
         flags.set(_initialized_bit);
     }
@@ -52,10 +54,19 @@ struct DataholderCRTP {
 
     // stick it in the dtor
     void destroy() {
-        assert(flags.check(_initialized_bit));
-        _destroy_shallow();
-        if(!is_moved())
-            _destroy_deep();
+        if(flags.check(_initialized_bit)) {
+            _destroy_shallow();
+            if(!is_moved())
+                _destroy_deep();
+        } else {
+            if constexpr(meta::is_base_of_v<debug::Marker, T>) {
+                log_debug_marker(debug::category::main,
+                                 (*static_cast<T*>(this)));
+            }
+            debug_warn(debug::category::main,
+                       "destructor called on unitialized dataholder object, ",
+                       "no destruction performed.");
+        }
     }
 
     ~DataholderCRTP() {

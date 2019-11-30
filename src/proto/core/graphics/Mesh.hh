@@ -8,6 +8,7 @@
 #include "proto/core/util/parsing.hh"
 #include "proto/core/asset-system/common.hh"
 #include "proto/core/graphics/Material.hh"
+#include "proto/core/DataholderCRTP.hh"
 #include <unistd.h>
 namespace proto {
 
@@ -31,7 +32,7 @@ struct serialization::AssetHeader<Mesh> {
     u64 spans_size;
 };
 
-struct Mesh : Asset {
+struct Mesh : Asset, DataholderCRTP<Mesh>{
     struct Span {
         u32 begin_index;
         u32 index_count;
@@ -83,11 +84,9 @@ struct Mesh : Asset {
         return ret;
     }
 
-
     //FIXME(kacper);
     void init(memory::Allocator * allocator){
         assert(allocator);
-        debug_info(1,"ok");
         _allocator = allocator;
         vertices.init(_allocator);
         indices.init(_allocator);
@@ -96,17 +95,16 @@ struct Mesh : Asset {
         glGenVertexArrays(1, &VAO);
         glGenBuffers     (1, &VBO);
         glGenBuffers     (1, &EBO);
+        dataholder_init();
     }
-    int destroy() {
-        vertices.destroy();
-        indices.destroy();
-        spans.destroy();
-
+    void destroy_shallow() {
         glDeleteVertexArrays(1, &VAO);
         glDeleteBuffers     (1, &VBO);
         glDeleteBuffers     (1, &EBO);
+    }
 
-        return 0;
+    void destroy_deep() {
+
     }
 
     void init(size_t vertices_cap,

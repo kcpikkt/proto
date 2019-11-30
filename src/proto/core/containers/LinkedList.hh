@@ -3,7 +3,7 @@
 namespace proto {
 
     template<typename T>
-    struct linked_list {
+    struct LinkedList {
         struct node {
             node * prev;
             node * next;
@@ -14,7 +14,7 @@ namespace proto {
         node * first = nullptr;
         node * last =  nullptr;
 
-        ~linked_list() {
+        ~LinkedList() {
             clear();
         }
         void clear() {

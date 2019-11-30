@@ -354,18 +354,29 @@ namespace ser = proto::serialization;
 
 Texture tex;
 
+Array<int> test() {
+    Array<int> ret;
+    ret.init_resize(10,&context->memory);
+    vardump(ret.size());
+    return ret;
+}
+
+#include "proto/core/containers/StringArena.hh"
+
 PROTO_INIT {
 
     ctx = proto::context;
     ctx->exit_sig = true;
 
-    /*
+    Array<int> testarr;
+    testarr.init(&ctx->memory);
+    testarr.reserve(100);
+
+    //   auto handle = parse_asset_file_rec("crytek-sponza/sponza.obj", ctx);
     key_input_sink.init(ctx->key_input_channel, key_callback);
     mouse_input_sink.init(ctx->mouse_input_channel, mouse_callback);
 
-    auto handle = parse_asset_file_rec("crytek-sponza/sponza.obj", ctx);
-    //auto handle = parse_asset_file_rec("teapot.obj", ctx);
-    //ser::save_asset(handle, "res/savedsponza.past");
+    /*
     StringArena filepaths;
     filepaths.init(100,&context->memory);
     sys::ls(filepaths, "res/");
@@ -376,9 +387,11 @@ PROTO_INIT {
     io::flush();
     */
 
+    //auto handle = parse_asset_file_rec("teapot.obj", ctx);
+    //ser::save_asset(handle, "res/savedteapot.past");
+    //ser::load_asset("res/savedteapot.past");
 
     //destroy_asset(handle);
-    //serialization::load_asset("res/savedteapot.past");
     //serialization::load_asset("res/savedsponza.past");
     //Mesh * sponza = get_asset<Mesh>(handle);
     //assert(sponza);
@@ -390,6 +403,7 @@ PROTO_INIT {
     //        vardump(mesh.spans[0].begin_index);
     //    }
 
+    ser::load_asset("res/savedteapot.past");
  
     //MemBuffer sponza_buffer =
     //    serialization::serialize_asset(sponza, &context->memory);

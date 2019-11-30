@@ -92,6 +92,7 @@ namespace serialization {
 
         serialize_specific_asset_to_buffer (asset, asset_buffer); 
 
+        vardump(main_header.data_offset);
         return buffer;
     }
 
@@ -109,9 +110,9 @@ namespace serialization {
         u8 * spans_ptr = mesh_header_ptr + mesh_header.spans_offset;
 
         memcpy(mesh_header_ptr, &mesh_header, sizeof(AssetHeader<Mesh>));
-        memcpy(vertices_ptr, mesh->vertices.raw(), mesh_header.vertices_size);
-        memcpy(indices_ptr,  mesh->indices.raw(),  mesh_header.indices_size);
-        memcpy(spans_ptr,    mesh->spans.raw(),    mesh_header.spans_size);
+        memcpy(vertices_ptr, (void*)mesh->vertices.raw(), mesh_header.vertices_size);
+        memcpy(indices_ptr,  (void*)mesh->indices.raw(),  mesh_header.indices_size);
+        memcpy(spans_ptr,    (void*)mesh->spans.raw(),    mesh_header.spans_size);
     }
  
     template<>
@@ -137,7 +138,7 @@ namespace serialization {
     template<>
     void deserialize_specific_asset_buffer<Mesh>(Mesh * mesh, MemBuffer buffer) {
         AssetHeader<Mesh> mesh_header;
-        u64 mesh_header_size = sizeof(AssetFileHeader);
+        u64 mesh_header_size = sizeof(AssetHeader<Mesh>);
         memcpy(&mesh_header, buffer.data, mesh_header_size);
 
         u8 * vertices_ptr = buffer.data8 + mesh_header.vertices_offset;
@@ -343,7 +344,7 @@ namespace serialization {
 
 
     AssetHandle load_asset_dir(const char * path,
-                           AssetContext * context)
+                               AssetContext * context)
     {
         return invalid_asset_handle;
     }

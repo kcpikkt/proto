@@ -130,7 +130,7 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
 
     proto::context = &_context;
 
-    return 0;
+
     /***************************************************************
      * RUNTIME SETUP
      */
@@ -299,13 +299,12 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
     /***************************************************************
      * CONTEXT INITIALIZATION
      */
+    // MEMORY
     namespace mem = proto::memory;
 
     u64 _mem_size = mem::gigabytes(2);
     void * _mem = malloc(_mem_size);
     assert(!_context.memory.init(_mem, _mem_size));
-
-    _context.texture_slots.init_resize(32, &_context.memory);
 
     _context.gp_string_allocator
         .init(&_context.memory, mem::megabytes(5));
@@ -322,20 +321,36 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
     _context.asset_metadata_allocator
         .init(&_context.memory, mem::megabytes(50));
 
-
     _context.key_input_channel.init(100, &_context.memory);
     _context.mouse_input_channel.init(100, &_context.memory);
 
+    // INITS
+    // OpenGLContext
+    set_debug_marker(_context.meshes, "context.texture_slots",
+                     "local reflection of OpenGL texture units binding");
+    _context.texture_slots.init_resize(32, &_context.memory);
+
+    // AssetContext
+    //set_debug_marker(_context.assets, "context.assets", "main asset registry");
     _context.assets.init(100, &_context.memory);
+
+    set_debug_marker(_context.meshes, "context.meshes", "main mesh array");
     _context.meshes.init(100, &_context.memory);
+
+    set_debug_marker(_context.materials, "context.materials",
+        "main materials array (deprecate: meshes store their materials)");
     _context.materials.init(100, &_context.memory);
+
+    set_debug_marker(_context.textures, "context.textures", "main texture array");
     _context.textures.init(100, &_context.memory);
+
+    // Context
 
     if(settings.asset_paths &&
        settings.asset_paths.length())
     {
         _context.asset_paths
-            .init(settings.asset_paths, ':', &_context.memory);
+            .init_split(settings.asset_paths, ':', &_context.memory);
     } else {
         _context.asset_paths.init(&_context.memory);
         debug_warn(proto::debug::category::main,

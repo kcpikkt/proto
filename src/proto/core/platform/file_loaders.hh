@@ -4,6 +4,7 @@
 #include "proto/core/util/algo.hh"
 #include "proto/core/util/StringView.hh"
 #include "proto/core/debug/logging.hh"
+#include "proto/core/debug/markers.hh"
 #include "proto/core/graphics/Mesh.hh"
 #include "proto/core/graphics/Texture.hh"
 #include "proto/core/asset-system/interface.hh"
@@ -456,11 +457,14 @@ namespace proto{
 // SAVE POSITIONS/NORMALS/INDICES
 
         Array<vec3> positions;
+        set_debug_marker(positions, "parse_obj_asset_file_buffer_rec().positions");
         positions.init_resize(point_count, &context->memory);
         Array<vec3> normals;
-        normals.init_resize(normal_count, &context->memory);
+        set_debug_marker(positions, "parse_obj_asset_file_buffer_rec().normals");
+        if(normal_count) normals.init_resize(normal_count, &context->memory);
         Array<vec2> uvs;
-        uvs.init_resize(uv_count, &context->memory);
+        set_debug_marker(positions, "parse_obj_asset_file_buffer_rec().uvs");
+        if(uv_count) uvs.init_resize(uv_count, &context->memory);
 
         size_t point_index = 0;
         size_t normal_index = 0;

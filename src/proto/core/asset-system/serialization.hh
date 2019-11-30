@@ -75,7 +75,9 @@ namespace serialization {
                             StringView dirpath,
                             AssetContext * asset_context = proto::context);
     
-    AssetHandle load_asset(const char * path,
+    AssetHandle load_asset_dir(StringView dirpath,
+                               AssetContext * context = proto::context);
+    AssetHandle load_asset(StringView path,
                            AssetContext * context = proto::context);
 } // namespace serialization    
 } // namespace proto
