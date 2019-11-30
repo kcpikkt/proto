@@ -1,5 +1,5 @@
 #pragma once
-#include "proto/core/debug/markers.hh"
+//#include "proto/core/debug/markers.hh"
 
 #define proto_assert(COND) assert(COND);
 

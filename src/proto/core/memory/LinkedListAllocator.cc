@@ -219,6 +219,7 @@ void * LinkedListAllocator::realloc(void * block,
             } else
                 insert_sort(merged_node);
 
+
             assert(get_block(merged_node) == block);
 
 #if defined(PROTO_DEBUG)
@@ -303,9 +304,16 @@ LinkedListAllocator::try_split(Header * node,
 
         bitfield_set(&new_node->flags, Header::FREE);
 
-        _used += sizeof(Header) + get_block_padding(new_node);
+        if(node->flags & Header::FREE) {
+            _used += sizeof(Header) + get_block_padding(new_node);
+        } else {
+            _used -= new_node->size;
+        }
 
-        //unlink_node(node, prev_node);
+        // NOTE(kacper): try_split does not check if split block is linked.
+        //               Whether it was or not, if split was successful
+        //               allocator is now in invalid state until node and new_node
+        //               get insert sorted.
         return new_node;
     } else return nullptr; 
 }
@@ -668,6 +676,10 @@ void LinkedListAllocator::sanity_check() {
                 "LinkedListAllocator sanity check size sum is ", size_sum,
                 " while allocator record of its size is ", _size);
 
+    //if(used_sum != _used) {
+    //    debug_print();
+    //    assert(0);
+    //}
     assert_info(used_sum == _used,
                 proto::debug::category::memory,
                 "LinkedListAllocator sanity check used sum is ", used_sum,

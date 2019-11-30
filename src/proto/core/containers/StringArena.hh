@@ -2,121 +2,103 @@
 
 #include "proto/core/common/types.hh"
 #include "proto/core/memory/common.hh"
-#include "proto/core/util/algo.hh"
 #include "proto/core/containers/Array.hh"
 #include "proto/core/util/StringView.hh"
 #include "proto/core/DataholderCRTP.hh"
-#include "proto/core/string.hh"
+#include "proto/core/util/Bitfield.hh"
 
 namespace proto {
 
 struct StringArena : DataholderCRTP<StringArena> {
     using DataholderBase = DataholderCRTP<StringArena>;
 
+    // to allow for range-for
+    struct Iterator {
+        u64 _index;
+        StringArena& _arena;
+
+        Iterator(StringArena& arena, u64 index)
+            : _index(index), _arena(arena) {}
+
+        Iterator& operator++() {
+            _index++; return *this;
+        }
+
+        Iterator operator++(int) {
+            Iterator ret = *this;
+            _index++; return ret;
+        }
+
+        StringView operator*(){
+            return _arena[_index];
+        }
+
+        bool operator!=(Iterator& other) {
+            return //FIXME?(kacper):
+                other._arena._data != _arena._data || other._index != _index;
+        }
+    };
+
+    struct Offset {
+        u64 length;
+        u32 value;
+        Bitfield<u8> flags;
+        static constexpr u8 free_bit = 0;
+
+        Offset() {}
+        // lazyness over 9k (I would rather call it DRY!)
+        Offset(decltype(value) val, decltype(length) len)
+            : length(len), value(val) {}
+    };
+
     constexpr static u64 default_init_capacity = 32;
 
-    u64 _count;
-    u64 _capacity;
-    char * _data;
-    char * _cursor;
-    memory::Allocator * _allocator;
+    u64 _count = 0;
+    u64 _capacity = 0;
+    char * _data = nullptr;
+    char * _cursor = nullptr;
+    memory::Allocator * _allocator = nullptr;
 
-    Array<StringView> _views;
+    Array<Offset> _offsets;
 
-   void _move(StringArena&& other) {
-        DataholderBase::dataholder_move(meta::forward<StringArena>(other));
-        _data = other._data;
-        _cursor = other._cursor;
-        _capacity = other._capacity;
-        _count = other._count;
-        _allocator = other._allocator;
-        _views = meta::move(other._views);
-    }
+    void _move(StringArena&& other);
 
-    StringArena() {} // noop, uninitialized state
+    StringArena(); // noop, uninitialized state
 
-    StringArena(StringArena&& other) {
-        _move(meta::forward<StringArena>(other));
-    }
-
-    StringArena& operator=(StringArena&& other) {
-        _move(meta::forward<StringArena>(other));
-        return *this;
-    }
+    StringArena(StringArena&& other);
+    StringArena& operator=(StringArena&& other);
 
     //NOTE(kacper): no implicit copies; move or (N)RVO
     //              if copy is going to be needed, add named function
     StringArena(const StringArena& other) = delete;
     StringArena& operator=(const StringArena& other) = delete;
 
+    void init(memory::Allocator * allocator);
 
-    void init(memory::Allocator * allocator) {
-        init(default_init_capacity, allocator);
+    void init(u64 init_capacity, memory::Allocator * allocator);
+
+    void init_split(StringView str, char delimiter, memory::Allocator * allocator);
+
+    u64 count();
+
+    inline Iterator begin() {
+        return Iterator(*this, 0);
     }
 
-    void init(u64 init_capacity, memory::Allocator * allocator) {
-        DataholderBase::dataholder_init();
-        assert(allocator);
-        _allocator = allocator;
-        reserve(init_capacity);
-        _cursor = _data;
-        _views.init(allocator);
+    inline Iterator end() {
+        return Iterator(*this, count());
     }
 
-    void init_split(StringView str, char delimiter, memory::Allocator * allocator) {
-        //u32 count = (strview_count(str, delimiter) + 1);
-        //init(max(str.length(), default_init_capacity), allocator);
-        //vardump(count);
-        //_views.reserve(10);
-    }
-
-    u64 count() {
-        return _views.size();
-    }
-
-    StringView operator[](u64 index) {
-        return _views[index];
-    }
+    StringView operator[](u64 index);
     
-    void reserve(u64 new_capacity) {
-        assert(_allocator);
-        if(new_capacity <= _capacity) return;
+    void reserve(u64 new_capacity);
+    void grow(u64 least_capacity);
 
-        u64 bufsz = new_capacity * sizeof(u8);
-        assert(bufsz);
+    void store(StringView str);
 
-        _data = (_data)
-            ? (char*)_allocator->realloc(_data, bufsz)
-            : (char*)_allocator->alloc(bufsz);
+    void destroy_shallow();
 
-        assert(_data);
-        _capacity = new_capacity;
-    }
-    void grow(u64 least_capacity) {
-        reserve(2*least_capacity);
-    }
-
-    void store(StringView str) {
-        assert((_data + _capacity) >= _cursor);
-        u64 left = (_data + _capacity) - _cursor;
-        u64 len = str.length() + 1;
-        if(left > len)
-            grow(_capacity - left + len);
-
-        strview_copy(_cursor, str);
-
-        _views.push_back(StringView(_cursor, str.length()));
-    }
-
-    void destroy_shallow() {}
-
-    void destroy_deep() {
-        assert(_data);
-        assert(_allocator);
-        _allocator->free(_data);
-        _count = 0;
-        _capacity = 0;
-    }
+    void destroy_deep();
 };
 
 } // namespace proto

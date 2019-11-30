@@ -16,8 +16,21 @@ static char * strview_cat(char * dest, StringView src) {
 
 //NOTE(kacper): btw non capturing lambdas can be casted to function pointers
 // this function returns number of elements such that ch[i] != op(ch[i])
-static int str_t(char * str, char(*op)(char)) {
+//NOTE(kacper): just add caputring lambdas, they are super useful
+//TODO(kacper): implement std::function
+static int str_trans(char * str, char(*op)(char)) {
     int count = 0; char prev;
+
+    for(; (prev = *str) != '\0'; str++)
+        count += (prev != (*str = op(*str)) );
+
+    return count;
+}
+
+static int str_swap(char * str, char from, char to) {
+    int count = 0; char prev;
+
+    auto op = [&](char c) { return (c == from ? to : c); };
 
     for(; (prev = *str) != '\0'; str++)
         count += (prev != (*str = op(*str)) );

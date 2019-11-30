@@ -738,7 +738,7 @@ namespace proto{
 
         // FIXME(kacper): well idk, I guess we are using backslashes for
         //                every platform anyway
-        str_t(_filepath, [](char c){ return (c == '\\' ? '/' : c); });
+        str_trans(_filepath, [](char c){ return (c == '\\' ? '/' : c); });
 
         //log_info(1,"parsing asset file ", _filepath);
 

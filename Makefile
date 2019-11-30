@@ -163,7 +163,7 @@ $(TEST): $(OBJS) $(TESTOBJS)
 #	Filtering out entry-point as catch2 provide its own.
 # 	Alternatively recompile all OBJS with -D PROTO_MAIN=0
 	$(eval OBJS_NOENTRYPOINT = $(filter-out %/entry-point.o, $(OBJS)))
-	$(CXX) -o $@ $(OBJS_NOENTRYPOINT) $(TESTOBJS) $(LIBS) $(LDFLAGS) 
+	$(CXX) -rdynamic -o $@ $(OBJS_NOENTRYPOINT) $(TESTOBJS) $(LIBS) $(LDFLAGS) 
 
 obj/gl3w.o: vendor/gl3w/src/gl3w.c
 	$(CXX) -fPIC $(CXXFLAGS) -MMD -MP -c $< $(INCLUDES) -o $@
