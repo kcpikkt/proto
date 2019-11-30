@@ -1,9 +1,13 @@
 res/*
 obj/*
 bin/*
+lib/*
+src/tools/gl3w/*
 vendor/*
+include/*
 proto.config
 proto.creator*
 proto.files
 proto.includes
 .vs/
+README.md
