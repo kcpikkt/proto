@@ -368,12 +368,14 @@ PROTO_INIT {
     ctx = proto::context;
     //ctx->exit_sig = true;
 
-    //   auto handle = parse_asset_file_rec("crytek-sponza/sponza.obj", ctx);
+    //auto handle = parse_asset_file_rec("crytek-sponza/sponza.obj", ctx);
     key_input_sink.init(ctx->key_input_channel, key_callback);
     mouse_input_sink.init(ctx->mouse_input_channel, mouse_callback);
 
-
+    //ser::save_asset(handle, "res/savedsponza.past");
     ser::load_asset("res/savedteapot.past");
+    ser::load_asset("res/savedsponza.past");
+
     /*
     StringArena filepaths;
     filepaths.init(100,&context->memory);
@@ -399,8 +401,6 @@ PROTO_INIT {
     //        vardump(mesh.spans[0].index_count);
     //        vardump(mesh.spans[0].begin_index);
     //    }
-
-    ser::load_asset("res/savedteapot.past");
  
     //MemBuffer sponza_buffer =
     //    serialization::serialize_asset(sponza, &context->memory);
