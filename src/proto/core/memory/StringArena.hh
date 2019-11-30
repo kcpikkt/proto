@@ -1,4 +1,5 @@
 #pragma once
+#if 0
 #include "proto/core/debug.hh"
 #include "proto/core/memory/common.hh"
 #include "proto/core/containers/Array.hh"
@@ -170,3 +171,4 @@ struct StringArena {
 
 
 
+#endif

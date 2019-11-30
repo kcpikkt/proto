@@ -14,7 +14,6 @@ static char * strview_cat(char * dest, StringView src) {
 }
 
 
-
 //NOTE(kacper): btw non capturing lambdas can be casted to function pointers
 // this function returns number of elements such that ch[i] != op(ch[i])
 static int str_t(char * str, char(*op)(char)) {
@@ -26,6 +25,12 @@ static int str_t(char * str, char(*op)(char)) {
     return count;
 }
 
+static u32 strview_count(StringView str, char c) {
+    u32 ret_count = 0;
+    for(auto view_c : str)
+        if(view_c == c) ret_count++;
+    return ret_count;
+}
 } // namespace proto
 
 

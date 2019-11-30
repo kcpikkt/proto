@@ -1,5 +1,6 @@
 #include "proto/core/memory/LinkedListAllocator.hh"
 #include "proto/core/debug/logging.hh"
+#include "proto/core/debug/stacktrace.hh"
 #include "proto/core/util/bitfield.hh"
 #include "proto/core/util/algo.hh"
 #include <assert.h>
@@ -161,6 +162,7 @@ void * LinkedListAllocator::alloc(size_t requested_size, size_t alignment)
     Header * new_node = try_split(free_node, requested_size, prev_node);
     
     if(new_node) {
+        unlink_node(free_node, prev_node);
         insert_sort(free_node, new_node);
     }
     // else if split failed node is still in list, no sort needed
@@ -183,7 +185,8 @@ void * LinkedListAllocator::realloc(void * block, size_t requested_size) {
 
 void * LinkedListAllocator::realloc(void * block,
                                     size_t requested_size,
-                                    size_t alignment) {
+                                    size_t alignment)
+{
     Header * node = get_header(block);
 
     assert(node);
@@ -195,12 +198,12 @@ void * LinkedListAllocator::realloc(void * block,
         return block;
 
     // Due to online merging there should not be any two consecutive
-    // free blocks thus we need not to check any but the next one.
+    // free blocks thus we need not to check any more but the next one.
 
     // TODO(kacper): there could be also reallocation expading by
     // previous in memory though it would be useful only in few
     // cases and I dont really think it is worth implementing.
-    // But if so, then it should be last check.
+    // But if so, then it should be last check because it would be heaviest.
     if(node->next_in_mem) {
 
         size_t expand_size = sizeof(Header) + node->next_in_mem->size;
@@ -210,9 +213,10 @@ void * LinkedListAllocator::realloc(void * block,
 
             Header * merged_node = merge_with_next_in_mem(node);
             Header * new_node = try_split(merged_node, requested_size);
-            if(new_node)
+
+            if(new_node) {
                 insert_sort(merged_node, new_node);
-            else
+            } else
                 insert_sort(merged_node);
 
             assert(get_block(merged_node) == block);
@@ -244,7 +248,8 @@ void * LinkedListAllocator::realloc(void * block,
 LinkedListAllocator::Header * 
 LinkedListAllocator::try_split(Header * node,
                                size_t needed_size,
-                               Header * prev_node){
+                               Header * prev_node)
+{
     // make sure we have aligned spot for header
     void * block = get_block(node);
 
@@ -280,7 +285,7 @@ LinkedListAllocator::try_split(Header * node,
         assert(tmp_bcursor > (void*)block);
 
         new_node->size =
-            ((byte*)block + node->size) - (byte*)new_block;
+            ((byte*)block + node->size) - (byte*)new_block; // =residue?
 
         node->size = (byte*)new_node - (byte*)block;
 
@@ -300,7 +305,7 @@ LinkedListAllocator::try_split(Header * node,
 
         _used += sizeof(Header) + get_block_padding(new_node);
 
-        unlink_node(node, prev_node);
+        //unlink_node(node, prev_node);
         return new_node;
     } else return nullptr; 
 }
@@ -416,6 +421,7 @@ void LinkedListAllocator::unlink_node(Header * node,
             prev_lookup = lookup;
             lookup = lookup->next;
         } while(lookup);
+        debug::stacktrace();
         assert(0 && "tried to unlink non existing node" );
     }
 }

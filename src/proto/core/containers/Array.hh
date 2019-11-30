@@ -10,9 +10,10 @@ namespace proto{
 template<typename T,
          bool is_dataholder = meta::is_base_of_v<DataholderCRTP<T>, T> >
 struct Array
-    : DataholderCRTP<Array<T>>, debug::Marker {
+    :DataholderCRTP<Array<T>>, debug::Marker {
 
     using DataType = T;
+    using DataholderBase = DataholderCRTP<Array<T>>;
 
     // to allow for range-for
     struct Iterator {
@@ -41,19 +42,43 @@ struct Array
         }
     };
 
+    constexpr static u64 default_init_capacity = 1;
     T * _data = nullptr;
     u64 _size = 0;
     u64 _capacity = 0;
-    constexpr static u64 default_init_capacity = 1;
     memory::Allocator * _allocator = nullptr;
 
+    void _move(Array<T>&& other) {
+        DataholderBase::dataholder_move(meta::forward<Array<T>>(other));
+        _data = other._data; other._data = nullptr;
+        _allocator = other._allocator; other._allocator = 0;
+        _size = other._size; other._size = 0;
+        _capacity = other._capacity; other._capacity = 0;
+    }
+
+    Array() {} // noop, uninitialized state
+
+    Array(Array<T>&& other) {
+        _move(meta::forward<Array<T>>(other));
+    }
+
+    Array<T>& operator=(Array<T>&& other) {
+        _move(meta::forward<Array<T>>(other));
+        return *this;
+    }
+
+    //NOTE(kacper): no implicit copies; move or (N)RVO
+    //              if copy is going to be needed, add named function
+    Array(const Array<T>& other) = delete;
+    Array<T>& operator=(const Array<T>& other) = delete;
+
     void init(u64 init_capacity, memory::Allocator * allocator) {
+        DataholderBase::dataholder_init();
         assert(init_capacity);
         assert(allocator);
         _allocator = allocator;
 
         reserve(init_capacity);
-        DataholderCRTP<Array<T>>::init_base();
     }
 
     void init(memory::Allocator * allocator) {
@@ -93,7 +118,7 @@ struct Array
     }
 
     inline T& at(u64 index) {
-        assert(index < _size);
+        proto_assert(index < _size);
         return _data[index];
     }
 
@@ -169,9 +194,9 @@ struct Array
         u64 bufsz = new_capacity * sizeof(T);
         assert(bufsz);
 
-        _data = (T*)((_data)
-                     ? _allocator->realloc(_data, bufsz)
-                     : _allocator->alloc(bufsz));
+        _data = (_data)
+            ? (T*)_allocator->realloc(_data, bufsz)
+            : (T*)_allocator->alloc(bufsz);
 
         assert(_data);
         _capacity = new_capacity;
@@ -187,6 +212,8 @@ struct Array
                 _data[i].~T();
         }
         _allocator->free(_data);
+        _size = 0;
+        _capacity = 0;
     }
 };
 

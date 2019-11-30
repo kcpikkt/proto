@@ -4,8 +4,44 @@
 namespace proto {
     
     struct StringView {
+        // to allow for range-for
+        struct Iterator {
+            u64 _index;
+            StringView& _view;
+
+            Iterator(StringView& view, u64 index)
+                :  _index(index), _view(view) {}
+
+            Iterator& operator++() {
+                _index++; return *this;
+            }
+
+            Iterator operator++(int) {
+                Iterator ret = *this;
+                _index++; return ret;
+            }
+
+            const char& operator*(){
+                return _view[_index];
+            }
+
+            bool operator!=(Iterator& other) {
+                return 
+                    other._view._str != _view._str || other._index != _index;
+            }
+        };
+
+
         u64 _size;
         const char * _str = nullptr;
+
+        inline Iterator begin() {
+            return Iterator(*this, 0);
+        }
+
+        inline Iterator end() {
+            return Iterator(*this, _size);
+        }
 
         const char * str() {
             return _str;

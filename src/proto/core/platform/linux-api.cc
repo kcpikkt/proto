@@ -171,26 +171,26 @@ bool is_directory(StringView path) {
 //    _allocator = allocator;
 //    return 0;
 //}
-void ls(StringArena & arena, StringView dirpath) {
-    if(!is_directory(dirpath)) {
-        debug_warn(debug::category::io,
-                   "Path ", dirpath, " passed to ", __func__,
-                   "is not directory");
-        return;
-    }
-    char dirpath_cstr[256];
-    strview_copy(dirpath_cstr, dirpath);
-
-    DIR *d;
-    struct dirent *dir;
-    d = opendir(dirpath_cstr);
-    if(d) {
-        while((dir = readdir(d)) != NULL) {
-            arena.alloc(dir->d_name);
-        }
-        closedir(d);
-    }
-}
+//void ls(StringArena & arena, StringView dirpath) {
+//    if(!is_directory(dirpath)) {
+//        debug_warn(debug::category::io,
+//                   "Path ", dirpath, " passed to ", __func__,
+//                   "is not directory");
+//        return;
+//    }
+//    char dirpath_cstr[256];
+//    strview_copy(dirpath_cstr, dirpath);
+//
+//    DIR *d;
+//    struct dirent *dir;
+//    d = opendir(dirpath_cstr);
+//    if(d) {
+//        while((dir = readdir(d)) != NULL) {
+//            arena.alloc(dir->d_name);
+//        }
+//        closedir(d);
+//    }
+//}
 
 const char *
 path_ncat(char * dest,

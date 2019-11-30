@@ -14,7 +14,8 @@
 #include "proto/core/graphics/Texture.hh"
 #include "proto/core/graphics/Material.hh"
 #include "proto/core/memory/LinkedListAllocator.hh"
-#include "proto/core/memory/StringArena.hh"
+#include "proto/core/containers/Array.hh"
+#include "proto/core/containers/StringArena.hh"
 #include "proto/core/event-system.hh"
 #include "proto/core/asset-system/common.hh"
 #include "proto/core/asset-system/AssetRegistry.hh"
@@ -54,10 +55,11 @@ namespace proto {
     struct AssetContext {
         AssetRegistry assets;
         memory::LinkedListAllocator asset_metadata_allocator;
+        memory::LinkedListAllocator gp_texture_allocator;
+
         Array<Mesh> meshes;
         Array<Material> materials;
         Array<Texture> textures;
-        memory::LinkedListAllocator gp_texture_allocator;
 
         StringArena asset_paths;
     };
@@ -90,9 +92,6 @@ namespace proto {
 
         Channel<KeyEvent> key_input_channel;
         Channel<MouseEvent> mouse_input_channel;
-
-        //AssetRegistry assets;
-        // assets;
 
         bool exit_sig = false;
 #    if defined(PROTO_PLATFORM_WINDOWS)

@@ -148,9 +148,9 @@ demo:
 	$(CXX) -shared -o src/demos/test/libtest.so \
 	src/demos/test/test.o $(OBJS_CLIENT)
 
-
+#-rdynamic is for function names in stacktrace, debug only
 $(RUNTIME): $(LIBRARY) Makefile $(LIBRARY) demo
-	$(CXX) -g -o $@ $(LIBRARY) $(LIBS) $(LDFLAGS) 
+	$(CXX) -g -rdynamic -o $@ $(LIBRARY) $(LIBS) $(LDFLAGS) 
 
 $(LIBRARY): $(OBJS) Makefile obj/gl3w.o
 	ar rcs $(LIBRARY) $(AROBJS) $(AROBJDIR)/gl3w.o

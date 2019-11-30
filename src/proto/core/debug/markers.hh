@@ -1,4 +1,6 @@
 #pragma once
+#include "proto/core/debug/common.hh"
+#include "proto/core/debug/logging.hh"
 
 namespace proto {
 namespace debug {
@@ -13,7 +15,7 @@ namespace debug {
     //               This would require keeping a map of debug info
     //               and some kind of appropriate object identifier as key.
     //               Its clear that addresses are not the best candidate
-    //               for identifiers, though for case, when we assign debug info
+    //               for identifiers, though for case when we assign debug info
     //               to some object and we are sure that it wont change its location
     //               there is some potential for usability of such VolatileMarker
     //               
@@ -25,8 +27,8 @@ namespace debug {
     // MAYBE TODO(kacper): VolatileMarker
    
     struct Marker {
-        const char * debug_name = nullptr;
-        const char * debug_info = nullptr;
+        const char * _debug_name = nullptr;
+        const char * _debug_info = nullptr;
     };
     // for non debug versions, just to avoid breaking inheritance syntax
     struct EmptyMarker {}; 
@@ -39,48 +41,45 @@ namespace debug {
 
 #define set_debug_marker_variadic(_1, _2, _3, NAME, ...) NAME
 
-#define set_debug_marker(...)                                         \
-    set_debug_marker_variadic(__VA_ARGS__,                            \
-                              set_debug_marker_full,                  \
+#define set_debug_marker(...)                                        \
+    set_debug_marker_variadic(__VA_ARGS__,                           \
+                              set_debug_marker_full,                 \
                               set_debug_marker_partial)(__VA_ARGS__)
 
-#define set_debug_marker_partial(OBJECT, NAME) {                      \
-    static_assert(proto::meta::is_class_v<decltype(OBJECT)>);         \
-    static_assert(proto::meta::is_base_of_v<proto::debug::Marker,     \
-                  decltype(OBJECT)>,                                  \
-                  "object type does not inherit debug::Marker");      \
-    char * debug_name_mem = (char*)                                   \
-    proto::context->gp_debug_strings_allocator.alloc(sizeof(NAME));   \
-    if(debug_name_mem){                                               \
-        strncpy(debug_name_mem, NAME, sizeof(NAME));                  \
-        (OBJECT).debug_name = debug_name_mem;                         \
-    }}
-
-#define set_debug_marker_full(OBJECT, NAME, INFO) {                   \
-    set_debug_marker_partial(OBJECT, NAME)                            \
-    char * debug_info_mem = (char*)                                   \
-    proto::context->gp_debug_strings_allocator.alloc(sizeof(INFO));   \
-    if(debug_info_mem){                                               \
-        strncpy(debug_info_mem, INFO, sizeof(INFO));                  \
-        (OBJECT).debug_info = debug_info_mem;                         \
-    }}
-
-#define log_debug_marker(CATEGORY, OBJECT) {                         \
+#define set_debug_marker_partial(OBJECT, NAME) {                     \
     static_assert(proto::meta::is_class_v<decltype(OBJECT)>);        \
     static_assert(proto::meta::is_base_of_v<proto::debug::Marker,    \
                   decltype(OBJECT)>,                                 \
                   "object type does not inherit debug::Marker");     \
-                                                                     \
-    log_info((CATEGORY), "marker: ",                                 \
-             (OBJECT).debug_name != nullptr                          \
-                ? (OBJECT.debug_name)                                \
-                : "(noname)");                                       \
-                                                                     \
-    if((OBJECT).debug_info != nullptr) {                             \
-        log_info((CATEGORY),                                         \
-                 (OBJECT.debug_info));                               \
+    char * _debug_name_mem = (char*)                                 \
+    proto::context->gp_debug_strings_allocator.alloc(sizeof(NAME));  \
+    if(_debug_name_mem){                                             \
+        strncpy(_debug_name_mem, NAME, sizeof(NAME));                \
+        (OBJECT)._debug_name = _debug_name_mem;                      \
     }}
 
+#define set_debug_marker_full(OBJECT, NAME, INFO) {                  \
+    set_debug_marker_partial(OBJECT, NAME)                           \
+    char * _debug_info_mem = (char*)                                 \
+    proto::context->gp_debug_strings_allocator.alloc(sizeof(INFO));  \
+    if(_debug_info_mem){                                             \
+        strncpy(_debug_info_mem, INFO, sizeof(INFO));                \
+        (OBJECT)._debug_info = _debug_info_mem;                      \
+    }}
 
+#define log_debug_marker(CATEGORY, OBJECT) {                         \
+    log_info((CATEGORY), "marker: ",                                 \
+             (OBJECT)._debug_name != nullptr                         \
+                ? (OBJECT._debug_name)                               \
+                : "(noname)");                                       \
+                                                                     \
+    if((OBJECT)._debug_info != nullptr) {                            \
+        log_info((CATEGORY), "  info: ",                             \
+                 (OBJECT._debug_info));                              \
+    }}
+    //static_assert(proto::meta::is_class_v<decltype(OBJECT)>);    
+    //static_assert(proto::meta::is_base_of_v<proto::debug::Marker, 
+    //              decltype(OBJECT)>,                               
+    //              "object type does not inherit debug::Marker");     
 }
 }
