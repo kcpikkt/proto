@@ -171,9 +171,9 @@ namespace serialization {
             //    deserialize_specific_asset_buffer(asset, buffer);
             //} break;
         case AssetType<Texture>::index: {
-            Texture * asset = get_asset<Texture>(handle);
-            assert(asset);
-            deserialize_specific_asset_buffer(asset, buffer);
+            //Texture * asset = get_asset<Texture>(handle);
+            //assert(asset);
+            //deserialize_specific_asset_buffer(asset, buffer);
         } break;
         default: {
             assert(0);
@@ -343,9 +343,23 @@ namespace serialization {
     }
 
 
-    AssetHandle load_asset_dir(const char * path,
+    AssetHandle load_asset_dir(StringView path,
                                AssetContext * context)
     {
+        namespace sys = proto::platform;
+        AssetHandle ret = invalid_asset_handle;
+        auto filenames = sys::ls(path);
+        for(auto filename : filenames) {
+            StringView ext = sys::extension_view(filename);
+            char asset_path[256];
+
+            // NOTE(kacper): remember strcmp is stupid
+            if(ext.length() == 4 && !strncmp("past", ext, ext.length())) {
+                strview_copy(asset_path, path);
+                sys::path_ncat(asset_path, filename, 256);
+                ret = load_asset(asset_path, context);
+            }
+        }
         return invalid_asset_handle;
     }
  

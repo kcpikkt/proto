@@ -1,8 +1,8 @@
 #pragma once
+#include "proto/core/common/types.hh"
 #include "proto/core/platform/common.hh"
 #include "proto/core/platform/macros.hh"
 #include "proto/core/util/StringView.hh"
-#include <stddef.h>
 #include "proto/core/memory/common.hh"
 
 namespace proto {
@@ -15,7 +15,6 @@ namespace platform {
     char * base_name(char * filepath);
 
     int print_f(const char * format, ...); 
-
 
     //TODO(kacper):
     // either make it more like windows VirtualAlloc or add
@@ -44,7 +43,7 @@ namespace platform {
 
     // TODO(kacper): allocate inside, return unique_ptr to string arena;
     // TODO(kacper): ls_rel, ls_abs?
-    void ls(StringArena & arena, StringView dirpath);
+    StringArena ls(StringView dirpath);
 
     using FileModeType = u8;
     constexpr static FileModeType file_read   = BIT(1);

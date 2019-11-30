@@ -50,8 +50,8 @@ size_t to_string<unsigned char *>(char * buffer, size_t max_n,
 template<> [[maybe_unused]]
 size_t to_string<StringView>(char * buffer, size_t max_n,
                              StringView arg) {
-    size_t arg_len = min(arg.size(), max_n);
-    strncpy(buffer, arg, arg_len);
+    size_t arg_len = min(arg.length(), max_n);
+    strncpy(buffer, arg._str, arg_len);
     return arg_len;
 }
 
@@ -97,8 +97,7 @@ auto to_string(char * buffer, size_t max_n, I arg)
 
 template<> [[maybe_unused]]
 size_t to_string<char>(char * buffer, size_t max_n, char arg) {
-    size_t arg_len = 1;
-    assert(arg_len <= max_n);
+    size_t arg_len = max(max_n, 1);
     *buffer = arg;
     return arg_len;
 }

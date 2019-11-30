@@ -366,16 +366,14 @@ Array<int> test() {
 PROTO_INIT {
 
     ctx = proto::context;
-    ctx->exit_sig = true;
-
-    Array<int> testarr;
-    testarr.init(&ctx->memory);
-    testarr.reserve(100);
+    //ctx->exit_sig = true;
 
     //   auto handle = parse_asset_file_rec("crytek-sponza/sponza.obj", ctx);
     key_input_sink.init(ctx->key_input_channel, key_callback);
     mouse_input_sink.init(ctx->mouse_input_channel, mouse_callback);
 
+
+    ser::load_asset("res/savedteapot.past");
     /*
     StringArena filepaths;
     filepaths.init(100,&context->memory);
@@ -389,7 +387,6 @@ PROTO_INIT {
 
     //auto handle = parse_asset_file_rec("teapot.obj", ctx);
     //ser::save_asset(handle, "res/savedteapot.past");
-    //ser::load_asset("res/savedteapot.past");
 
     //destroy_asset(handle);
     //serialization::load_asset("res/savedsponza.past");

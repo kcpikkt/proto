@@ -5,7 +5,8 @@
 #include "proto/core/platform/api.hh"
 #include "proto/core/memory.hh"
 #include "proto/core/debug/logging.hh"
-#include "proto/core/memory/StringArena.hh"
+#include "proto/core/containers/StringArena.hh"
+#include "proto/core/context.hh"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -100,7 +101,7 @@ u32 dirname_len(const char * path) {
 
 const char * extension_substr(const char * path) {
     // basename is a macro for something
-    size_t len = strlen(path);
+    size_t len = strlen(path) + 1;
     const char * extension = path + len - 1;
 
     s32 index = len - 1;
@@ -171,26 +172,38 @@ bool is_directory(StringView path) {
 //    _allocator = allocator;
 //    return 0;
 //}
-//void ls(StringArena & arena, StringView dirpath) {
-//    if(!is_directory(dirpath)) {
-//        debug_warn(debug::category::io,
-//                   "Path ", dirpath, " passed to ", __func__,
-//                   "is not directory");
-//        return;
-//    }
-//    char dirpath_cstr[256];
-//    strview_copy(dirpath_cstr, dirpath);
-//
-//    DIR *d;
-//    struct dirent *dir;
-//    d = opendir(dirpath_cstr);
-//    if(d) {
-//        while((dir = readdir(d)) != NULL) {
-//            arena.alloc(dir->d_name);
-//        }
-//        closedir(d);
-//    }
-//}
+StringArena ls(StringView dirpath) {
+    StringArena arena;
+
+    if(!is_directory(dirpath)) {
+        debug_warn(debug::category::io,
+                   "Path ", dirpath, " passed to ", __func__,
+                   "is not directory");
+        return arena;
+    }
+    char dirpath_cstr[256];
+    strview_copy(dirpath_cstr, dirpath);
+
+    DIR *d;
+    struct dirent *dir;
+
+    u32 arena_cap = 0;
+    d = opendir(dirpath_cstr);
+    if(d) {
+        while((dir = readdir(d)) != NULL)
+            arena_cap += strlen(dir->d_name) + 1;
+        closedir(d);
+    }
+
+    arena.init(arena_cap, &context->gp_string_allocator);
+    d = opendir(dirpath_cstr);
+    if(d) {
+        while((dir = readdir(d)) != NULL)
+            arena.store(dir->d_name);
+        closedir(d);
+    }
+    return arena;
+}
 
 const char *
 path_ncat(char * dest,

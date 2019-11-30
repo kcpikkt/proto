@@ -1,6 +1,6 @@
 #pragma once
-#include <stddef.h>
-#include <assert.h>
+#include "proto/core/common/types.hh"
+#include "proto/core/debug/assert.hh"
 
 namespace proto {
 namespace memory{
@@ -10,42 +10,42 @@ namespace memory{
     // allocation calls are not so often to be a bottleneck
     // there are only few types of allocators so vtables are small
     struct Allocator {
-        virtual void * alloc(size_t) = 0;
-        virtual void * realloc(void *, size_t) = 0;
+        virtual void * alloc(proto::u64) = 0;
+        virtual void * realloc(void *, proto::u64) = 0;
         virtual void   free(void *) = 0;
     };
 
 
     using byte = unsigned char;
 
-    static constexpr size_t max_alignment = alignof(long double);
+    static constexpr proto::u64 max_alignment = alignof(long double);
 
-    static constexpr size_t kilobytes(size_t bytes) {
+    static constexpr proto::u64 kilobytes(proto::u64 bytes) {
         return 1024ull * bytes;
     }
-    static constexpr size_t megabytes(size_t bytes) {
+    static constexpr proto::u64 megabytes(proto::u64 bytes) {
         return 1024ull * kilobytes(bytes);
     }
-    static constexpr size_t gigabytes(size_t bytes) {
+    static constexpr proto::u64 gigabytes(proto::u64 bytes) {
         return 1024ull * megabytes(bytes);
     }
-    static constexpr bool is_power_of_two(size_t n) {
+    static constexpr bool is_power_of_two(proto::u64 n) {
         return (n != 0) && !(n & (n-1));
     }
 
-    static bool is_aligned(void * addr, size_t alignment) {
-        return ((size_t)addr % alignment == 0);
+    static bool is_aligned(void * addr, proto::u64 alignment) {
+        return ((proto::u64)addr % alignment == 0);
     }
 
     template<typename T>
-    static void * align_forw(T * addr, size_t alignment) {
+    static void * align_forw(T * addr, proto::u64 alignment) {
         assert(is_power_of_two(alignment));
-        return (void *)(  (size_t)((byte*)addr + (alignment - 1)) &
-                        ~((size_t)(alignment - 1)) );
+        return (void *)(  (proto::u64)((byte*)addr + (alignment - 1)) &
+                        ~((proto::u64)(alignment - 1)) );
     }
 
     template<typename T>
-    static void * align_back(T * addr, size_t alignment) {
+    static void * align_back(T * addr, proto::u64 alignment) {
         assert(is_power_of_two(alignment));
         return align_forw((void*)((byte*)addr - (alignment - 1)),
                           alignment);
@@ -54,4 +54,4 @@ namespace memory{
 } // namespace memory
 } // namespace proto
 
-void * operator new(size_t sz, proto::memory::Allocator & allocator);
+void * operator new(proto::u64 sz, proto::memory::Allocator & allocator);

@@ -1,10 +1,10 @@
 #pragma once
-#include "proto/core/DataholderCRTP.hh"
 #include "proto/core/meta.hh"
+#include "proto/core/DataholderCRTP.hh"
 #include "proto/core/debug/logging.hh"
 #include "proto/core/debug/markers.hh"
 #include "proto/core/memory/common.hh"
-// 
+
 namespace proto{
 
 template<typename T,
