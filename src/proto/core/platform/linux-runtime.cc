@@ -130,7 +130,6 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
 
     proto::context = &_context;
 
-
     /***************************************************************
      * RUNTIME SETUP
      */
@@ -286,6 +285,7 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
         debug_error(proto::debug::category::main, "glewInit() failed.");
 
     glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     //glEnable(GL_MULTISAMPLE);  
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
@@ -361,6 +361,10 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
         {{ 255,   0, 255, 255}, { 255, 255, 255, 255},
          { 255, 255, 255, 255}, { 255,   0, 255, 255}};
 
+    struct { u8 ch[4]; } emergency_white_texture_data[] =
+        {{ 255, 255, 255, 255}, { 255, 255, 255, 255},
+         { 255, 255, 255, 255}, { 255, 255, 255, 255}};
+
     _context.default_ambient_map =
         create_asset("default_ambient_map", "",
                      AssetType<Texture>::index);
@@ -386,7 +390,7 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
     Texture * default_ambient_texture =
         get_asset<Texture>(_context.default_ambient_map);
     assert(default_ambient_texture);
-    default_ambient_texture->data = (void*)emergency_texture_data;
+    default_ambient_texture->data = (void*)emergency_white_texture_data;
     default_ambient_texture->size = ivec2(2,2);
     default_ambient_texture->channels = 4;
 
@@ -400,7 +404,7 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
     Texture * default_specular_texture =
         get_asset<Texture>(_context.default_specular_map);
     assert(default_specular_texture);
-    default_specular_texture->data = (void*)emergency_texture_data;
+    default_specular_texture->data = (void*)emergency_white_texture_data;
     default_specular_texture->size = ivec2(2,2);
     default_specular_texture->channels = 4;
 

@@ -195,7 +195,8 @@ StringArena ls(StringView dirpath) {
         closedir(d);
     }
 
-    arena.init(arena_cap, &context->gp_string_allocator);
+    arena.init(arena_cap, &context->memory);
+    set_debug_marker(arena, "sys::ls() return arena");
     d = opendir(dirpath_cstr);
     if(d) {
         while((dir = readdir(d)) != NULL)

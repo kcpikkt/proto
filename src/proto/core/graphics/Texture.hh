@@ -42,10 +42,23 @@ struct Texture : Asset{
         ret.size = size;
         ret.channels = channels;
         ret.data_offset = sizeof(serialization::AssetHeader<Texture>);
-        ret.data_offset = serialized_data_size();
+        ret.data_size = serialized_data_size();
         return ret;
     }
-    
+     void init(){
+        glGenTextures(1, &gl_id);
+        assert(gl_id >= 0);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, gl_id);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
+   
     void init(memory::Allocator * allocator){
         assert(allocator);
         _allocator = allocator;
@@ -60,7 +73,6 @@ struct Texture : Asset{
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
         glBindTexture(GL_TEXTURE_2D, 0);
-
     }
 
     void gpu_upload() {
@@ -92,7 +104,7 @@ struct Texture : Asset{
     //DEPRECATED
     void bind() {
         PROTO_DEPRECATED;
-        glBindTexture(GL_TEXTURE_2D, gl_id);
+        //glBindTexture(GL_TEXTURE_2D, gl_id);
     }
 };
 } // namespace proto

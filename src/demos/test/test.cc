@@ -31,9 +31,13 @@ float quad_vertices[] = {
 using namespace proto;
 
 PROTO_SETUP {
-    settings->asset_paths = "res/:res/crytek-sponza:res/erato";
+    settings->asset_paths = "res/:res/external/crytek-sponza:res/gallery";
 }
-graphics::ShaderProgram main_shader, quad_shader, directional_light_shader;
+graphics::ShaderProgram
+    main_shader,
+    quad_shader,
+    directional_light_shader,
+    TBN_shader;
 GLuint quad_VAO, quad_VBO;
 GLuint dragon_VAO, dragon_VBO, dragon_EBO;
 GLuint sponza_VAO, sponza_VBO, sponza_EBO;
@@ -46,17 +50,17 @@ KeyInputSink key_input_sink;
 MouseInputSink mouse_input_sink;
 
 proto::vec3 dragon_pos(0.0,0.0,0.0);
-proto::vec3 cam_pos(200.0,100.0,0.0);
+proto::vec3 cam_pos(46.0,26.0,3.0);
 proto::vec3 cam_rot(0.0,M_PI/2.0f,0.0);
 proto::vec3 light_rot(0.0,0.0,0.0);
 
-proto::vec3 sun_pos(40.0,200.0,-40.0);
-proto::vec3 sun_dir = glm::normalize(vec3(-1.0,-1.0,-1.0));
+proto::vec3 sun_pos(4.0,100.0,-4.0);
+proto::vec3 sun_dir = glm::normalize(vec3(-0.1,-1.0,-0.31));
 
 float cam_speed = 30.0f;
 float cam_rot_speed = 0.03f;
-u32 depth_map_FBO = 0;
-u32 depth_map;
+u32 shadow_map_FBO = 0;
+AssetHandle shadow_map;
 
 const char * quad_vert_src = R"glsl(
     #version 450 core
@@ -89,6 +93,7 @@ const char * quad_frag_src = R"glsl(
         frag_color = texture(quad_tex, frag_in.uv);
     }
 )glsl";
+
 const char * main_vert_src = R"glsl(
     #version 450 core
     layout(location = 0) in vec3 a_position;
@@ -100,7 +105,7 @@ const char * main_vert_src = R"glsl(
         vec3 normal;
         vec2 uv;
         vec4 dirlight_space_pos;
-    } frag_in;
+    } geom_in;
 
     uniform float u_time;
     uniform mat4 u_mvp;
@@ -108,41 +113,96 @@ const char * main_vert_src = R"glsl(
     uniform mat4 u_dirlight_matrix;
     uniform vec3 u_cam_position;
 
-
    void main() {
-        frag_in.position = (u_model * vec4(a_position,1.0)).xyz;
-        frag_in.normal = a_normal;
-        frag_in.uv = a_uv;
-        frag_in.dirlight_space_pos = 
+        geom_in.position = (u_model * vec4(a_position,1.0)).xyz;
+        geom_in.normal = a_normal;
+        geom_in.uv = a_uv;
+        geom_in.dirlight_space_pos = 
             u_dirlight_matrix * (u_model * vec4(a_position, 1.0));
         gl_Position = u_mvp * vec4(a_position, 1.0);
     }
 )glsl";
 
+///////////////////////////////////////////////////////////////////////////
+const char * main_geom_src = R"glsl(
+#version 450 core
+layout(triangles) in;
+layout(triangle_strip, max_vertices = 3) out;
+
+in VertOut {
+    vec3 position;
+    vec3 normal;
+    vec2 uv;
+    vec4 dirlight_space_pos;
+} geom_in[];
+
+out GeomOut {
+    vec3 position;
+    vec3 normal;
+    vec3 tangent;
+    vec3 bitangent;
+    vec2 uv;
+    vec4 dirlight_space_pos;
+} frag_in;
+
+uniform mat4 u_mvp;
+uniform float u_time;
+
+mat2x3 computeTB() {
+    vec3 e1 = geom_in[1].position - geom_in[0].position; // edge between
+    vec3 e2 = geom_in[2].position - geom_in[0].position;
+
+    vec2 d1 = geom_in[1].uv - geom_in[0].uv; // uv deltas
+    vec2 d2 = geom_in[2].uv - geom_in[0].uv;
+    
+    float inv_det = 1.0/(d1.x * d2.y - d1.y * d2.x);
+
+    mat2x2 adj = {{-d2.y, d1.y}, { d2.x,-d1.x}};
+    mat3x2 E = {{ e1.x, e2.x}, { e1.y, e2.y}, { e1.z, e2.z}};
+
+    return transpose(inv_det * adj * E);
+}
+
+void emit(int index) {
+    mat2x3 TB = computeTB();
+    frag_in.position           = geom_in[index].position;
+    frag_in.normal             = geom_in[index].normal;
+    frag_in.tangent            = normalize(TB[0]);
+    frag_in.bitangent          = normalize(TB[1]);
+    frag_in.uv                 = geom_in[index].uv;
+    frag_in.dirlight_space_pos = geom_in[index].dirlight_space_pos;
+    gl_Position = gl_in[index].gl_Position; 
+    EmitVertex();
+}
+
+void main() {
+    int i; for(i=0; i<gl_in.length(); i++) {emit(i);}
+    EndPrimitive();
+}
+)glsl";
+///////////////////////////////////////////////////////////////////////////
 const char * main_frag_src = R"glsl(
     #version 450 core
 
-    in VertOut {
+    in GeomOut {
         vec3 position;
         vec3 normal;
+        vec3 tangent;
+        vec3 bitangent;
         vec2 uv;
-
         vec4 dirlight_space_pos;
     } frag_in;
 
     uniform float u_time;
     uniform mat4 u_mvp;
+    uniform mat4 u_model;
     uniform vec3 u_cam_pos;
-    uniform vec3 u_sun_pos;
-    uniform vec3 u_light_pos;
-    uniform vec3 u_debug_color;
-
-    uniform sampler2D dirlight_shadow_map;
 
     uniform struct Material {
         vec3 diffuse;
         vec3 ambient;
         vec3 specular;
+        float shininess;
         sampler2D diffuse_map;
         sampler2D ambient_map;
         sampler2D specular_map;
@@ -154,43 +214,205 @@ const char * main_frag_src = R"glsl(
         vec3 direction;
     } u_dirlight[1];
 
-    vec3 light_dir   = normalize(u_light_pos - frag_in.position);
-    vec3 view_dir    = normalize(u_cam_pos - frag_in.position);
-    vec3 halfway_dir = normalize(light_dir + view_dir);
-
-
     float dirlight_shadow() {
+        vec3 normal = normalize(frag_in.normal);
+        vec3 to_dirlight_dir = normalize(-u_dirlight[0].direction);
         vec3 proj_coords = 
             frag_in.dirlight_space_pos.xyz / frag_in.dirlight_space_pos.w;
         proj_coords = proj_coords * 0.5 + 0.5;
-        float dirlight_depth = texture(dirlight_shadow_map, proj_coords.xy).r;
+        float dirlight_depth = texture(u_dirlight[0].shadow_map, proj_coords.xy).r;
         float cam_depth = proj_coords.z;
-        float bias = max(0.02 * 
-            (1.0 - dot(frag_in.normal, 
-                normalize(u_sun_pos - frag_in.position))
-            ), 0.0006);
+        float bias = max(0.02 * (1.0 - dot(normal,to_dirlight_dir)), 0.0006);
         float shadow = (cam_depth-bias) > dirlight_depth ? 0.9 : 0.0;
         return shadow;
     }
+
     out vec4 frag_color;
-    void main() {
-        float shininess = 16.3f;
-        float spec = pow(max(dot(frag_in.normal, halfway_dir), 0.0), shininess);
-        float shadow = 0.0;//dirlight_shadow();
-        vec3 specular = vec3(1.0) * spec;
+
+void main() {
+
 
 float global_ambient = 0.1;
-        vec3 light_dir = vec3(0.3,1.0,0.3);
-        vec3 light_color = vec3(1.0,1.0,1.0);
-        vec3 frag_ambient = global_ambient * u_material.ambient * light_color *
-texture(u_material.ambient_map, frag_in.uv).xyz;
+vec3 light_color = vec3(1.0,1.0,1.0);
 
-        vec3 frag_diffuse = 
-max(0.0, dot(frag_in.normal, normalize(light_dir))) * 
-texture(u_material.diffuse_map, frag_in.uv).xyz;
+// PARALAX MAPPING
 
-        frag_color = vec4((frag_diffuse + frag_ambient) * (1.0 - shadow), 1.0);
-    }
+mat3 TBN = transpose(mat3(
+    normalize(frag_in.tangent), 
+    normalize(frag_in.bitangent), 
+    normalize(frag_in.normal) ));
+
+vec3 frag_pos = (u_model * vec4(frag_in.position, 1.0)).xyz;
+vec3 tan_cam_dir = normalize(TBN * u_cam_pos - TBN * frag_pos);
+
+float paralax = (sin(3.0 * u_time) + 1.0)/2.0 * 0.01;
+float height = -texture(u_material.bump_map, frag_in.uv).r;    
+vec2 p = tan_cam_dir.xy / tan_cam_dir.z * (height * paralax);
+vec2 uv = frag_in.uv ;//- p;    
+
+// PHONG
+
+float angle_factor;
+vec3 frag_ambient;
+vec3 frag_specular;
+vec3 frag_diffuse;
+
+frag_ambient = 
+    global_ambient * 
+    u_material.ambient * 
+    texture(u_material.ambient_map, uv).xyz;
+
+vec3 normal = normalize(frag_in.normal);
+vec3 to_dirlight_dir = normalize(-u_dirlight[0].direction);
+
+angle_factor = clamp(dot(normal,to_dirlight_dir), 0.0, 1.0);
+
+frag_diffuse = 
+    angle_factor *
+    u_material.diffuse *
+    light_color *
+    texture(u_material.diffuse_map, uv).xyz;
+
+vec3 to_cam_dir = normalize(u_cam_pos - frag_in.position);
+
+angle_factor = dot(reflect(-to_dirlight_dir, normal), to_cam_dir);
+angle_factor = clamp(angle_factor, 0.0, 1.0);
+angle_factor = pow(angle_factor, max(1.0,u_material.shininess));
+
+float global_specular = 5.0f;
+frag_specular =
+    global_specular *
+    angle_factor *
+    light_color *
+    u_material.specular *
+    texture(u_material.specular_map, uv).xyz;
+
+frag_diffuse *= (1.0 - angle_factor);
+
+float shadow = clamp(1.0 -  dirlight_shadow(), 0.0, 1.0);
+            
+frag_color = vec4((frag_diffuse + frag_specular) * (shadow) + frag_ambient , 1.0);
+//frag_color = texture(u_material.bump_map, uv);
+
+}
+
+)glsl";
+
+/////////////////////////////////////////////////////////////////////
+
+const char * TBN_vert_src = R"glsl(
+#version 450 core
+layout(location = 0) in vec3 a_position;
+layout(location = 1) in vec3 a_normal;
+layout(location = 2) in vec2 a_uv;
+ 
+out VertOut {
+    vec3 position;
+    vec3 normal;
+    vec2 uv;
+} geom_in;  
+
+uniform mat4 u_mvp;
+ 
+void main() { 
+    geom_in.position = a_position;
+    geom_in.normal = a_normal;
+    geom_in.uv = a_uv;
+    gl_Position = u_mvp * vec4(a_position,1.0); 
+}
+
+)glsl";
+
+const char * TBN_geom_src = R"glsl(
+#version 450 core
+layout(triangles) in;
+layout(line_strip, max_vertices = 6) out;
+
+in VertOut {
+    vec3 position;
+    vec3 normal;
+    vec2 uv;
+} geom_in[];  
+
+out GeomOut {
+    vec3 position;
+    vec3 color;
+} frag_in;  
+
+uniform mat4 u_mvp;
+
+vec3 compute_normal() {
+    vec3 e1 = (geom_in[0].position - geom_in[1].position);
+    vec3 e2 = (geom_in[0].position - geom_in[2].position);
+    return normalize(cross(e1, e2));
+}
+
+vec3 normal_color = vec3(0.0,0.0,1.0);
+vec3 tangent_color = vec3(1.0,0.0,0.0);
+vec3 bitangent_color = vec3(0.0,1.0,0.0);
+
+
+mat2x3 computeTB() {
+    vec3 e1 = geom_in[1].position - geom_in[0].position; // edge between
+    vec3 e2 = geom_in[2].position - geom_in[0].position;
+
+    vec2 d1 = geom_in[1].uv - geom_in[0].uv; // uv deltas
+    vec2 d2 = geom_in[2].uv - geom_in[0].uv;
+    
+    float inv_det = 1.0/(d1.x * d2.y - d1.y * d2.x);
+
+    mat2x2 adj = {{-d2.y, d1.y}, { d2.x,-d1.x}};
+    mat3x2 E = {{ e1.x, e2.x}, { e1.y, e2.y}, { e1.z, e2.z}};
+
+    return transpose(inv_det * adj * E);
+}
+
+void draw_vec(int index, vec3 dir, vec3 color) { 
+    gl_Position = u_mvp * vec4(geom_in[index].position, 1.0); 
+    frag_in.position = geom_in[index].position;
+    frag_in.color = color;
+    EmitVertex();
+
+    vec3 tip = geom_in[index].position + dir * 0.1;
+    gl_Position = u_mvp * vec4(tip, 1.0); 
+    frag_in.position = tip;
+    frag_in.color = color;
+    EmitVertex();
+    EndPrimitive();
+}
+
+void emit(int index) {
+    mat2x3 TB = computeTB();
+    vec3 tangent = normalize(TB[0]);
+    vec3 bitangent = normalize(TB[1]);
+    vec3 normal = geom_in[index].normal;
+
+    draw_vec(index, normal, normal_color);
+    draw_vec(index, tangent, tangent_color);
+    draw_vec(index, bitangent, bitangent_color);
+}
+
+void main() {
+    emit(0);
+}
+)glsl";
+
+const char * TBN_frag_src = R"glsl(
+#version 450 core
+out vec4 frag_color;
+
+in GeomOut {
+    vec3 position;
+    vec3 color;
+} frag_in;  
+
+uniform vec3 u_cam_pos;
+uniform mat4 u_model;
+
+void main() { 
+    vec3 between = u_cam_pos - (u_model * vec4(frag_in.position, 1.0)).xyz;
+    frag_color = vec4(frag_in.color ,pow(10.0/length(between),7.0) ); 
+}
 )glsl";
 
 //const char * main_geom_src = R"glsl(
@@ -361,52 +583,18 @@ Array<int> test() {
     return ret;
 }
 
-#include "proto/core/containers/StringArena.hh"
 
 PROTO_INIT {
-
     ctx = proto::context;
-    //ctx->exit_sig = true;
 
-    //auto handle = parse_asset_file_rec("crytek-sponza/sponza.obj", ctx);
     key_input_sink.init(ctx->key_input_channel, key_callback);
     mouse_input_sink.init(ctx->mouse_input_channel, mouse_callback);
 
-    //ser::save_asset(handle, "res/savedsponza.past");
-    ser::load_asset("res/savedteapot.past");
-    ser::load_asset("res/savedsponza.past");
-
-    /*
-    StringArena filepaths;
-    filepaths.init(100,&context->memory);
-    sys::ls(filepaths, "res/");
-
-    for(u32 i=0; i<filepaths.count(); i++) {
-        io::print(filepaths[i]);
-    }
-    io::flush();
-    */
-
-    //auto handle = parse_asset_file_rec("teapot.obj", ctx);
-    //ser::save_asset(handle, "res/savedteapot.past");
-
-    //destroy_asset(handle);
-    //serialization::load_asset("res/savedsponza.past");
-    //Mesh * sponza = get_asset<Mesh>(handle);
-    //assert(sponza);
-    //
-    //    for(int i=0; i<ctx->meshes.size(); i++) {
-    //        Mesh & mesh = *get_asset<Mesh>(ctx->meshes[i].handle);
-    //        AssetMetadata & metadata = *get_metadata(ctx->meshes[i].handle);
-    //        vardump(mesh.spans[0].index_count);
-    //        vardump(mesh.spans[0].begin_index);
-    //    }
- 
-    //MemBuffer sponza_buffer =
-    //    serialization::serialize_asset(sponza, &context->memory);
-    //destroy_asset(handle);
-
-    //serialization::deserialize_asset_buffer(sponza_buffer);
+    //auto handle = parse_asset_file_rec("external/crytek-sponza/sponza.obj", ctx);
+    //ser::save_asset_tree_rec(handle, "res/models/crytek-sponza");
+    ser::load_asset_dir("res/models/crytek-sponza");
+    //Array<int> ok;
+    //ok.init_resize(10, &context->memory);
 
     for(int i=0; i<ctx->textures.size(); i++)
         gl::gpu_upload(&ctx->textures[i]);
@@ -420,50 +608,16 @@ PROTO_INIT {
 
     assert(!glGetError());
 
-    //platform::File mesh_file;
-    //mesh_file.open("res/teapot.past", platform::file_write);
-    //serialize_asset(&new_mesh, &mesh_file);
-    //mesh_file.close();
 
-    //#if 0
-    //    Texture buffer_tex;
-    //    buffer_tex.init(&ctx->gp_texture_allocator);
-    //    load_texture(&buffer_tex, "res/prozor1.JPG");
-    //    vardump(buffer_tex.size.x);
-    //    vardump(buffer_tex.size.y);
-    //
-    //    //debug_info(1,
-    //    //           buffer_tex.size.x *
-    //    //           buffer_tex.size.y *
-    //    //           buffer_tex.channels *
-    //    //           sizeof(u8));
-    //    platform::File texture_file;
-    //    texture_file.open("res/prozor1.past", platform::file_write);
-    //    serialize_asset(&buffer_tex, &texture_file);
-    //    texture_file.close();
-    //#endif
-    
-    //load_asset("res/crytek-sponza.past");
-    //ctx->exit_sig = true;
+    TBN_shader.init();
+    TBN_shader.create_shader(graphics::ShaderType::Vert, TBN_vert_src);
+    TBN_shader.create_shader(graphics::ShaderType::Geom, TBN_geom_src);
+    TBN_shader.create_shader(graphics::ShaderType::Frag, TBN_frag_src);
+    TBN_shader.link();
 
-    // load_asset("res/sponza.past");
-    //load_asset("res/teapot.past");
-
-    // DynamicArray<u32> * test = &(context->meshes[0].indices);
-
-    //for(int i=0; i<36; i+=3)
-    //    log_info(1,(*test)[i+0], " ",
-    //               (*test)[i+1], " ",
-    //               (*test)[i+2], " ");
-
-
-    //    DynamicArray<u32> * test = &(ctx->submeshes[0].indices);
-    //    debug_info(1, test->size());
-    //
-    //    for(int i=0; i < test->size(); i++)
-    //        debug_info(1, (*test)[i]);
     main_shader.init();
     main_shader.create_shader(graphics::ShaderType::Vert, main_vert_src);
+    main_shader.create_shader(graphics::ShaderType::Geom, main_geom_src);
     main_shader.create_shader(graphics::ShaderType::Frag, main_frag_src);
     main_shader.link();
 
@@ -480,10 +634,13 @@ PROTO_INIT {
     directional_light_shader.link();
     // --------------------
 
-    glGenFramebuffers(1, &depth_map_FBO);
+    glGenFramebuffers(1, &shadow_map_FBO);
 
-    glGenTextures(1, &depth_map);
-    glBindTexture(GL_TEXTURE_2D, depth_map);
+    shadow_map = create_asset("shadow_map", "", AssetType<Texture>::index);
+
+    gl::bind_texture(shadow_map);
+    //gl::debug_print_texture_slots();
+
     glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24,
                  4096, 4096, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -491,8 +648,9 @@ PROTO_INIT {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);  
 
-    glBindFramebuffer(GL_FRAMEBUFFER, depth_map_FBO);
-    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, depth_map, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, shadow_map_FBO);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                         get_asset<Texture>(shadow_map)->gl_id, 0);
     glDrawBuffer(GL_NONE);
     glReadBuffer(GL_NONE);
 
@@ -520,14 +678,13 @@ PROTO_INIT {
 
 int count = 0;
 
-void render_mesh(Mesh * mesh) {
+void render_mesh(Mesh * mesh, bool tmp = false) {
     assert(mesh);
     mesh->bind();
     for(u32 i=0; i<mesh->spans.size(); i++) {
-        main_shader.use();
         Material * material = &mesh->spans[i].material;
 
-        if(material) {
+        if(material && tmp) {
             main_shader.set_uniform <GL_FLOAT_VEC3> ("u_material.ambient",
                                     &material->ambient_color);
 
@@ -536,6 +693,9 @@ void render_mesh(Mesh * mesh) {
 
             main_shader.set_uniform <GL_FLOAT_VEC3> ("u_material.specular",
                                     &material->specular_color);
+
+            main_shader.set_uniform <GL_FLOAT> ("u_material.shininess",
+                                    material->shininess);
 
             Texture * ambient_map = get_asset<Texture>(material->ambient_map);
 
@@ -569,10 +729,9 @@ void render_mesh(Mesh * mesh) {
 
             Texture * bump_map = get_asset<Texture>(material->bump_map);
 
-            if(bump_map)
-                main_shader.set_uniform<GL_SAMPLER_2D>
-                    ("u_material.bump_map", gl::bind_texture(bump_map));
-
+            //if(bump_map)
+            //    main_shader.set_uniform<GL_SAMPLER_2D>
+            //        ("u_material.bump_map", gl::bind_texture(bump_map));
         }
 
         glDrawElements
@@ -606,9 +765,10 @@ PROTO_UPDATE {
     proto::mat4 mvp = projection * view * model;
 
     count++;
-    float dirlight_near_plane = 1.1f, dirlight_far_plane = 800.0f;
+    float dirlight_near_plane = 1.1f, dirlight_far_plane = 200.0f;
+    float tmp = 50.0f;
     glm::mat4 dirlight_proj =
-        glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f,
+        glm::ortho(-tmp, tmp, -tmp, tmp,
                    dirlight_near_plane, dirlight_far_plane);  
 
     glm::mat4 dirlight_view =
@@ -617,22 +777,21 @@ PROTO_UPDATE {
 
     glm::mat4 dirlight_mv_matrix = dirlight_proj * dirlight_view; 
 
-    proto::vec3 light_pos(4* sin(ctx->clock.elapsed_time/10.0f), 30.0f,
-                          4* cos(ctx->clock.elapsed_time/10.0f));
+    //proto::vec3 light_pos(4* sin(ctx->clock.elapsed_time/10.0f), 30.0f,
+    //                      4* cos(ctx->clock.elapsed_time/10.0f));
 
-    sun_pos = light_pos;
+    //sun_pos = light_pos;
+
+    glViewport(0, 0, 4096, 4096);
+    glBindFramebuffer(GL_FRAMEBUFFER, shadow_map_FBO);
+    glClear(GL_DEPTH_BUFFER_BIT);
 
     directional_light_shader.use();
     directional_light_shader.set_uniform
         <GL_FLOAT_MAT4> ("u_mv", &dirlight_mv_matrix);
 
-    glViewport(0, 0, 4096, 4096);
-    glBindFramebuffer(GL_FRAMEBUFFER, depth_map_FBO);
-    glClear(GL_DEPTH_BUFFER_BIT);
-
-    //    tmp_render();
     // shadowmap render
-    //render_mesh(&ctx->meshes[mesh_index]);
+    render_mesh(&ctx->meshes[mesh_index]);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glClearColor(1.0f,1.0f,1.0f,1.0f);
@@ -650,23 +809,22 @@ PROTO_UPDATE {
     main_shader.set_uniform<GL_FLOAT_VEC3> ("u_cam_pos", &cam_pos);
     main_shader.set_uniform<GL_FLOAT_VEC3> ("u_sun_pos", &sun_pos);
 
-    glActiveTexture(GL_TEXTURE0);
-    //    glBindTexture(GL_TEXTURE_2D, depth_map);
-
-    main_shader.set_uniform <GL_FLOAT_VEC3> ("u_light_pos", &light_pos);
     main_shader.set_uniform <GL_FLOAT_VEC3> ("u_dirlight[0].direction", &sun_dir);
-    //main_shader.set_uniform <GL_SAMPLER_2D> ("u_dirlight[0].direction",
-    //                                         gl::bind_texture() );
+    main_shader.set_uniform <GL_SAMPLER_2D> ("u_dirlight[0].shadow_map",
+                                             gl::bind_texture(shadow_map) );
 
-    main_shader.use();
-    render_mesh(&ctx->meshes[mesh_index]);
+   render_mesh(&ctx->meshes[mesh_index], true);
 
-    //quad_shader.use();
-    //quad_shader.set_uniform<GL_SAMPLER_2D>("quad_tex",
-    //    gl::bind_texture(&context->textures[((size_t)ctx->clock.elapsed_time * 2) %
-    //                                        ctx->textures.size()]));
-    //glBindVertexArray(quad_VAO);
-    //glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+   TBN_shader.use();
+   TBN_shader.set_uniform<GL_FLOAT_MAT4> ("u_model", &model);
+   TBN_shader.set_uniform<GL_FLOAT_MAT4> ("u_mvp", &mvp);
+   TBN_shader.set_uniform<GL_FLOAT_VEC3> ("u_cam_pos", &cam_pos);
+   render_mesh(&ctx->meshes[mesh_index]);
+
+   quad_shader.use();
+   //quad_shader.set_uniform<GL_SAMPLER_2D>("quad_tex", gl::bind_texture(shadow_map));
+   glBindVertexArray(quad_VAO);
+   //glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 }
 
 

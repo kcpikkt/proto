@@ -165,11 +165,14 @@ namespace proto{
                     cursor+=2;
                     current_mat->specular_color = extract_vec3(&cursor);
                 } else if(!strncmp(cursor, "a", 1)) {
-                    cursor+=1;
+                    cursor+=2;
                     current_mat->alpha = extract_float(&cursor);
                 } else if(!strncmp(cursor, "Ta", 2)) {
-                    cursor+=1;
+                    cursor+=2;
                     current_mat->alpha = 1.0 - extract_float(&cursor);
+                } else if(!strncmp(cursor, "Ns", 2)) {
+                    cursor+=2;
+                    current_mat->shininess = extract_float(&cursor);
                 } else if(!strncmp(cursor, "map_", 4)) {
                     cursor+=4;
                     AssetMetadata * metadata = get_metadata(handle);

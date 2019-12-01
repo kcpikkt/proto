@@ -31,9 +31,9 @@ AssetHandle create_asset(StringView name,
     return create_asset(context, name, filepath, type);
 }
 AssetHandle create_asset(AssetContext * asset_context,
-                                StringView name,
-                                StringView filepath,
-                                AssetTypeIndex type)
+                         StringView name,
+                         StringView filepath,
+                         AssetTypeIndex type)
 {
     AssetContext & ctx = *asset_context;
     AssetRegistry & reg = ctx.assets;

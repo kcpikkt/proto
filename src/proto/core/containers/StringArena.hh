@@ -6,10 +6,11 @@
 #include "proto/core/util/StringView.hh"
 #include "proto/core/DataholderCRTP.hh"
 #include "proto/core/util/Bitfield.hh"
+#include "proto/core/debug/markers.hh"
 
 namespace proto {
 
-struct StringArena : DataholderCRTP<StringArena> {
+struct StringArena : DataholderCRTP<StringArena>, debug::Marker{
     using DataholderBase = DataholderCRTP<StringArena>;
 
     // to allow for range-for

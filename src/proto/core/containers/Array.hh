@@ -131,6 +131,7 @@ struct Array
              typename = decltype((T)meta::declval<U>())>
     T& push_back(U&& element = T()) { // universal ref btw
         if(_size == _capacity) grow();
+        assert(_size < _capacity);
         at(_size++) = meta::forward<U>(element);
         return back();
     }
@@ -158,7 +159,7 @@ struct Array
     }
     
     void grow() {
-        reserve(proto::max(1, (u64)(1.5f * _size) ));
+        reserve(proto::max(1, (2 * _size) ));
     }
 
     void erase(u64 index) {

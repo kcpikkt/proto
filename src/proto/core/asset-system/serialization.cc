@@ -136,7 +136,33 @@ namespace serialization {
     void deserialize_specific_asset_buffer(T * asset, MemBuffer buffer);
 
     template<>
-    void deserialize_specific_asset_buffer<Mesh>(Mesh * mesh, MemBuffer buffer) {
+    void deserialize_specific_asset_buffer<Texture>(Texture * texture,
+                                                    MemBuffer buffer)
+    {
+        assert(texture);
+        AssetHeader<Texture> texture_header;
+        u64 texture_header_size = sizeof(AssetHeader<Texture>);
+        memcpy(&texture_header, buffer.data, texture_header_size);
+
+        u8 * tex_data_ptr = buffer.data8 + texture_header.data_offset;
+
+        memory::Allocator * allocator = &context->memory;
+        void * data = allocator->alloc(texture_header.data_size);
+        assert(data);
+        texture->data = data;
+        texture->_allocator = allocator;
+        texture->channels = texture_header.channels;
+        texture->size = texture_header.size;
+
+        assert(texture_header.data_size = texture->serialized_data_size());
+
+        memcpy(texture->data, tex_data_ptr, texture_header.data_size);
+    }
+ 
+    template<>
+    void deserialize_specific_asset_buffer<Mesh>(Mesh * mesh,
+                                                 MemBuffer buffer)
+    {
         AssetHeader<Mesh> mesh_header;
         u64 mesh_header_size = sizeof(AssetHeader<Mesh>);
         memcpy(&mesh_header, buffer.data, mesh_header_size);
@@ -171,9 +197,9 @@ namespace serialization {
             //    deserialize_specific_asset_buffer(asset, buffer);
             //} break;
         case AssetType<Texture>::index: {
-            //Texture * asset = get_asset<Texture>(handle);
-            //assert(asset);
-            //deserialize_specific_asset_buffer(asset, buffer);
+            Texture * asset = get_asset<Texture>(handle);
+            assert(asset);
+            deserialize_specific_asset_buffer(asset, buffer);
         } break;
         default: {
             assert(0);
@@ -211,6 +237,7 @@ namespace serialization {
 
             metadata->deps[i] = serialized_dep->handle;
         }
+
         u8 * asset_header_ptr = buffer.data8 + main_header.data_offset;
         u64 asset_data_size = (buffer.data8 + buffer.size) - asset_header_ptr;
         MemBuffer asset_buffer = {.data8 = asset_header_ptr,
@@ -344,7 +371,7 @@ namespace serialization {
 
 
     AssetHandle load_asset_dir(StringView path,
-                               AssetContext * context)
+                               AssetContext * asset_context)
     {
         namespace sys = proto::platform;
         AssetHandle ret = invalid_asset_handle;
@@ -355,9 +382,10 @@ namespace serialization {
 
             // NOTE(kacper): remember strcmp is stupid
             if(ext.length() == 4 && !strncmp("past", ext, ext.length())) {
+
                 strview_copy(asset_path, path);
                 sys::path_ncat(asset_path, filename, 256);
-                ret = load_asset(asset_path, context);
+                ret = load_asset(asset_path, asset_context);
             }
         }
         return invalid_asset_handle;

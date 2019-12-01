@@ -23,16 +23,15 @@ namespace gl{
         AssetHandle prev_handle = slot.texture;
 
         if(prev_handle) {
-            Texture * texture = get_asset<Texture>(prev_handle);
-            assert(texture);
-            assert(texture->bound_unit >= 0);
-            texture->bound_unit = -1;
+            Texture * prev_texture = get_asset<Texture>(prev_handle);
+            assert(prev_texture);
+            assert(prev_texture->bound_unit >= 0);
+            prev_texture->bound_unit = -1;
         }
         glActiveTexture(GL_TEXTURE0 + modindex);
         glBindTexture(GL_TEXTURE_2D, texture->gl_id);
         slot.texture = texture->handle;
         texture->bound_unit = modindex;
-        //log_info(1, "bound ", modindex);
 
         context->texture_slots_index++;
         return modindex;
@@ -42,11 +41,33 @@ namespace gl{
         return bind_texture(get_asset<Texture>(texture_handle));
     }
 
+    void debug_print_texture_slots() {
+        printf("Texture units state\n");
+        int count = 0;
+        for(auto s : context->texture_slots) {
+            count++;
+            printf("[%.2d]", count);
+
+            if(s.texture) {
+                auto * metadata = get_metadata(s.texture);
+                auto * texture = get_asset<Texture>(s.texture);
+                printf(" %d %s\n", texture->bound_unit, metadata->name);
+            } else {
+                printf(" (unbound)\n");
+            }
+        }
+    }
+
     template<typename T> void gpu_upload(T *);
 
     template<> void gpu_upload<Texture>(Texture * tex) {
         assert(tex);
-        assert(tex->data);
+        if(!tex->data) {
+            debug_warn(debug::category::graphics,
+                       "Texture GPU upload failed because passed texture "
+                       "does not hold any image data.");
+            return;
+        }
 
         bind_texture(tex);
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);

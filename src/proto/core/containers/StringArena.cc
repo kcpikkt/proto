@@ -17,11 +17,11 @@ void StringArena::_move(StringArena&& other) {
 StringArena::StringArena() {} // noop, uninitialized state
 
 StringArena::StringArena(StringArena&& other) {
-    _move(meta::forward<StringArena>(other));
+    _move(meta::move(other));
 }
 
 StringArena& StringArena::operator=(StringArena&& other) {
-    _move(meta::forward<StringArena>(other));
+    _move(meta::move(other));
     return *this;
 }
 
@@ -76,16 +76,18 @@ StringView StringArena::operator[](u64 index) {
 }
 
 void StringArena::reserve(u64 new_capacity) {
-    //FIXME(kacper): repoint StringView pointers...
-    //               or implemenet offset based StringView
+    assert(_cursor >= _data);
+    assert((_data + _capacity) >= _cursor);
+
     assert(_allocator);
     if(new_capacity <= _capacity) return;
 
-    u64 bufsz = new_capacity * sizeof(u8);
+    u64 bufsz = new_capacity * sizeof(char);
     assert(bufsz);
 
     u64 cursor_offset = _cursor - _data;
 
+    log_info(1,"reserved: ", bufsz);
     _data = (_data)
         ? (char*)_allocator->realloc(_data, bufsz)
         : (char*)_allocator->alloc(bufsz);
