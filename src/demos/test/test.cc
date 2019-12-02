@@ -148,23 +148,27 @@ out GeomOut {
 uniform mat4 u_mvp;
 uniform float u_time;
 
-mat2x3 computeTB() {
-    vec3 e1 = geom_in[1].position - geom_in[0].position; // edge between
-    vec3 e2 = geom_in[2].position - geom_in[0].position;
+mat2x3 computeTB(int index) {
 
-    vec2 d1 = geom_in[1].uv - geom_in[0].uv; // uv deltas
-    vec2 d2 = geom_in[2].uv - geom_in[0].uv;
+    int v0 = (index + 0)%3; 
+    int v1 = (index + 1)%3; 
+    int v2 = (index + 2)%3; 
+    vec3 e1 = (geom_in[v1].position - geom_in[v0].position); // edge between
+    vec3 e2 = (geom_in[v2].position - geom_in[v0].position);
+
+    vec2 d1 = (geom_in[v1].uv - geom_in[v0].uv); // uv deltas
+    vec2 d2 = (geom_in[v2].uv - geom_in[v0].uv);
     
     float inv_det = 1.0/(d1.x * d2.y - d1.y * d2.x);
 
-    mat2x2 adj = {{-d2.y, d1.y}, { d2.x,-d1.x}};
+    mat2x2 adj = {{-d2.y, d2.x}, { d1.y,-d1.x}};
     mat3x2 E = {{ e1.x, e2.x}, { e1.y, e2.y}, { e1.z, e2.z}};
 
     return transpose(inv_det * adj * E);
 }
 
 void emit(int index) {
-    mat2x3 TB = computeTB();
+    mat2x3 TB = computeTB(index);
     frag_in.position           = geom_in[index].position;
     frag_in.normal             = geom_in[index].normal;
     frag_in.tangent            = normalize(TB[0]);
@@ -246,9 +250,14 @@ vec3 frag_pos = (u_model * vec4(frag_in.position, 1.0)).xyz;
 vec3 tan_cam_dir = normalize(TBN * u_cam_pos - TBN * frag_pos);
 
 float paralax = (sin(3.0 * u_time) + 1.0)/2.0 * 0.01;
-float height = -texture(u_material.bump_map, frag_in.uv).r;    
+
+float height = texture(u_material.bump_map, frag_in.uv).r;    
 vec2 p = tan_cam_dir.xy / tan_cam_dir.z * (height * paralax);
-vec2 uv = frag_in.uv ;//- p;    
+vec2 uv = frag_in.uv - p;    
+
+//if(uv.x > 1.0 || uv.y > 1.0 || uv.x < 0.0 || uv.y < 0.0)
+//    discard;
+
 
 // PHONG
 
@@ -289,7 +298,7 @@ frag_specular =
 
 frag_diffuse *= (1.0 - angle_factor);
 
-float shadow = clamp(1.0 -  dirlight_shadow(), 0.0, 1.0);
+float shadow = clamp(1.0 -  0.0*dirlight_shadow(), 0.0, 1.0);
             
 frag_color = vec4((frag_diffuse + frag_specular) * (shadow) + frag_ambient , 1.0);
 //frag_color = texture(u_material.bump_map, uv);
@@ -351,17 +360,20 @@ vec3 normal_color = vec3(0.0,0.0,1.0);
 vec3 tangent_color = vec3(1.0,0.0,0.0);
 vec3 bitangent_color = vec3(0.0,1.0,0.0);
 
+mat2x3 computeTB(int index) {
 
-mat2x3 computeTB() {
-    vec3 e1 = geom_in[1].position - geom_in[0].position; // edge between
-    vec3 e2 = geom_in[2].position - geom_in[0].position;
+    int v0 = (index + 0)%3; 
+    int v1 = (index + 1)%3; 
+    int v2 = (index + 2)%3; 
+    vec3 e1 = (geom_in[v1].position - geom_in[v0].position); // edge between
+    vec3 e2 = (geom_in[v2].position - geom_in[v0].position);
 
-    vec2 d1 = geom_in[1].uv - geom_in[0].uv; // uv deltas
-    vec2 d2 = geom_in[2].uv - geom_in[0].uv;
+    vec2 d1 = (geom_in[v1].uv - geom_in[v0].uv); // uv deltas
+    vec2 d2 = (geom_in[v2].uv - geom_in[v0].uv);
     
     float inv_det = 1.0/(d1.x * d2.y - d1.y * d2.x);
 
-    mat2x2 adj = {{-d2.y, d1.y}, { d2.x,-d1.x}};
+    mat2x2 adj = {{-d2.y, d2.x}, { d1.y,-d1.x}};
     mat3x2 E = {{ e1.x, e2.x}, { e1.y, e2.y}, { e1.z, e2.z}};
 
     return transpose(inv_det * adj * E);
@@ -382,7 +394,7 @@ void draw_vec(int index, vec3 dir, vec3 color) {
 }
 
 void emit(int index) {
-    mat2x3 TB = computeTB();
+    mat2x3 TB = computeTB(index);
     vec3 tangent = normalize(TB[0]);
     vec3 bitangent = normalize(TB[1]);
     vec3 normal = geom_in[index].normal;
@@ -729,9 +741,9 @@ void render_mesh(Mesh * mesh, bool tmp = false) {
 
             Texture * bump_map = get_asset<Texture>(material->bump_map);
 
-            //if(bump_map)
-            //    main_shader.set_uniform<GL_SAMPLER_2D>
-            //        ("u_material.bump_map", gl::bind_texture(bump_map));
+            if(bump_map)
+                main_shader.set_uniform<GL_SAMPLER_2D>
+                    ("u_material.bump_map", gl::bind_texture(bump_map));
         }
 
         glDrawElements
