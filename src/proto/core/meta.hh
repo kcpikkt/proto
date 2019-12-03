@@ -401,6 +401,25 @@ namespace meta {
     template<typename Base, typename Derived>
     inline static constexpr auto is_base_of_v = is_base_of<Base, Derived>::value;
 
+    // is_convertible
+    namespace internal {
+        template<typename To>
+        true_t is_convertible_test(To);
+
+        template<typename>
+        false_t is_convertible_test(...);
+
+        template<typename From, typename To>
+        using is_convertible = decltype(is_convertible_test<To>(declval<From>()));
+    }
+
+    template<typename A, typename B>
+    using is_convertible = internal::is_convertible<A, B>;
+
+    template<typename A, typename B>
+    inline static constexpr auto is_convertible_v = is_convertible<A, B>::value;
+
+
     // has_operator_*
 
 #define PROTO_META_HAS_OPERATOR_DEF(OP,OPNAME)                          \
