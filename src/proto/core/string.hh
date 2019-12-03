@@ -1,49 +1,42 @@
 #pragma once
+#include "proto/core/meta.hh"
 #include "proto/core/util/StringView.hh"
+#include "proto/core/common/types.hh"
 
 namespace proto {
-static char * strview_copy(char * dest, StringView src) {
-    memcpy(dest, src, src.length());
-    dest[src.length()] = '\0';
-    return dest;
+
+template<typename I> // for all strings
+auto to_string_integer(char * buffer, u64 max_len, I arg) ->
+    meta::enable_if_t<meta::is_integer_v<I> && (sizeof(I) > 1), u64>;
+
+template<typename T>
+u64 to_string_specific(char * buffer, u64 max_len, T arg);
+
+template<typename T>
+u64 to_string(char * buffer, u64 max_len, T arg);
+
+template<typename T>
+u64 sprint(char * buffer, u64 max_len, T arg);
+
+template<typename T, typename ...Ts>
+static u64 sprint(char * buffer, u64 max_len, T arg, Ts... args) {
+    u64 len = sprint(buffer, max_len, arg);
+    return len + sprint(buffer + len, max_len - len, args...);
 }
 
-static char * strview_cat(char * dest, StringView src) {
-    u64 destlen = strlen(dest);
-    return strview_copy(dest + destlen, src);
-}
-
+char * strview_copy(char * dest, StringView src);
+char * strview_cat(char * dest, StringView src);
 
 //NOTE(kacper): btw non capturing lambdas can be casted to function pointers
 // this function returns number of elements such that ch[i] != op(ch[i])
 //NOTE(kacper): just add caputring lambdas, they are super useful
 //TODO(kacper): implement std::function
-static int str_trans(char * str, char(*op)(char)) {
-    int count = 0; char prev;
+int str_transform(char * str, char(*op)(char));
 
-    for(; (prev = *str) != '\0'; str++)
-        count += (prev != (*str = op(*str)) );
+int str_swap(char * str, char from, char to);
 
-    return count;
-}
+u32 strview_count(StringView str, char c);
 
-static int str_swap(char * str, char from, char to) {
-    int count = 0; char prev;
-
-    auto op = [&](char c) { return (c == from ? to : c); };
-
-    for(; (prev = *str) != '\0'; str++)
-        count += (prev != (*str = op(*str)) );
-
-    return count;
-}
-
-static u32 strview_count(StringView str, char c) {
-    u32 ret_count = 0;
-    for(auto view_c : str)
-        if(view_c == c) ret_count++;
-    return ret_count;
-}
 } // namespace proto
 
 
