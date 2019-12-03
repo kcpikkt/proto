@@ -1,5 +1,7 @@
 #pragma once
 #include "proto/core/graphics/common.hh"
+#include "proto/core/util/StringView.hh"
+#include "proto/core/graphics/Material.hh"
 
 namespace proto {
 namespace graphics {
@@ -13,6 +15,7 @@ enum ShaderType {
     Compute = 5, Comp = 5
 };
     
+
 struct ShaderProgram {
     GLuint _program;
     GLuint shaders[6] = {};
@@ -22,8 +25,11 @@ struct ShaderProgram {
     void compile_shader(ShaderType type);
     void attach_shader(ShaderType type);
     void create_shader(ShaderType type, const char * src);
+    void create_shader_from_file(ShaderType type, StringView path);
     void link();
     void use();
+
+    void set_material(Material * value );
 
     template<GLenum UniformType, typename UniformValueType>
     void set_uniform(const char * name, UniformValueType value );

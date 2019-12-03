@@ -3,6 +3,7 @@
 #include "proto/core/containers/Array.hh"
 #include "proto/core/memory/common.hh"
 #include "proto/core/graphics/common.hh"
+#include "proto/core/util/Bitfield.hh"
 
 namespace proto {
     struct Texture;
@@ -25,6 +26,9 @@ struct Texture : Asset{
     s32 bound_unit = -1;
     void * data;
     ivec2 size;
+    Bitfield<u8> flags;
+    constexpr static u8 gpu_uploaded_bit = BIT(1);
+    constexpr static u8 bound_bit        = BIT(2);
 
    
     u64 serialized_data_size() {
@@ -49,6 +53,7 @@ struct Texture : Asset{
         glGenTextures(1, &gl_id);
         assert(gl_id >= 0);
         glActiveTexture(GL_TEXTURE0);
+        // FIXME(kacper):
         glBindTexture(GL_TEXTURE_2D, gl_id);
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -73,38 +78,6 @@ struct Texture : Asset{
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
         glBindTexture(GL_TEXTURE_2D, 0);
-    }
-
-    void gpu_upload() {
-        assert(data);
-        //assert_info(channels == 3,
-        //            proto::debug::category::graphics,
-        //            "add support for textures with more than 3 channels");
-
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, gl_id);
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-        /*  */ if(channels == 1) {
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, size.x, size.y, 0, GL_LUMINANCE,
-                         GL_UNSIGNED_BYTE, data);
-            glGenerateMipmap(GL_TEXTURE_2D);
-        } else if(channels == 3) {
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, size.x, size.y, 0, GL_RGB,
-                         GL_UNSIGNED_BYTE, data);
-            glGenerateMipmap(GL_TEXTURE_2D);
-        } else if(channels == 4) {
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, size.x, size.y, 0, GL_RGBA,
-                         GL_UNSIGNED_BYTE, data);
-            glGenerateMipmap(GL_TEXTURE_2D);
-        } else {
-            debug_warn(debug::category::graphics,
-                       "No support for textures with ", channels, " channels");
-        }
-    }
-    //DEPRECATED
-    void bind() {
-        PROTO_DEPRECATED;
-        //glBindTexture(GL_TEXTURE_2D, gl_id);
     }
 };
 } // namespace proto

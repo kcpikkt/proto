@@ -2,6 +2,10 @@
 #include "proto/core/debug/logging.hh"
 #include "proto/core/common/types.hh"
 #include "proto/core/context.hh"
+#include "proto/core/platform/api.hh"
+#include "proto/core/memory/common.hh"
+#include "proto/core/asset-system/interface.hh"
+#include "proto/core/graphics/gl.hh"
 //#include "proto/core/platform/common.hh"
 
 using namespace proto;
@@ -75,6 +79,24 @@ void ShaderProgram::create_shader(ShaderType type, const char * src) {
     glAttachShader(_program, shader);
 }
 
+void ShaderProgram::create_shader_from_file(ShaderType type, StringView path) {
+    platform::File file;
+    assert(!file.open(path, platform::file_read));
+
+    memory::Allocator * allocator = &(context->memory);
+    u8 * buf = (u8*)allocator->alloc(file.size() + 1);
+
+    assert(buf);
+    assert(file.size() == file.read(buf, file.size() ));
+
+    buf[file.size()] = '\0';
+
+    const char * src = (const char *)buf;
+    create_shader(type, src);
+}
+
+
+
 void ShaderProgram::link() {
     GLint status;
     glLinkProgram(_program);
@@ -103,6 +125,7 @@ void ShaderProgram::link() {
 
 void ShaderProgram::use() {
     glUseProgram(_program);
+    proto::context->current_shader = this;
 }
 
 template<>
@@ -111,6 +134,14 @@ void ShaderProgram::set_uniform<GL_SAMPLER_2D, s32>
     glUniform1i ( glGetUniformLocation(_program, name), (s32)value);
 }
 
+// -----------
+template<>
+void ShaderProgram::set_uniform<GL_UNSIGNED_INT, u32>
+(const char * name, u32 value ) {
+    glUniform1ui ( glGetUniformLocation(_program, name), (s32)value);
+}
+
+// -----------
 template<>
 void ShaderProgram::set_uniform<GL_FLOAT, float>
 (const char * name, float value ) {
@@ -200,3 +231,59 @@ void ShaderProgram::set_uniform<GL_FLOAT_MAT4, proto::mat4 *>
     glUniformMatrix4fv ( glGetUniformLocation(_program, name), 1, GL_FALSE,
                          (float * )value);
 }
+
+
+void ShaderProgram::set_material(Material * material) {
+    assert(material);
+    assert(proto::context);
+    auto& ctx = *proto::context;
+
+    set_uniform <GL_FLOAT_VEC3> ("u_material.ambient",
+                &material->ambient_color);
+
+    set_uniform <GL_FLOAT_VEC3> ("u_material.diffuse",
+                &material->diffuse_color);
+
+    set_uniform <GL_FLOAT_VEC3> ("u_material.specular",
+                &material->specular_color);
+
+    set_uniform <GL_FLOAT> ("u_material.shininess",
+                material->shininess);
+
+    Texture * ambient_map = get_asset<Texture>(material->ambient_map);
+
+    if(ambient_map)
+        set_uniform<GL_SAMPLER_2D>
+            ("u_material.ambient_map", gl::bind_texture(ambient_map));
+    else
+        set_uniform<GL_SAMPLER_2D>
+            ("u_material.ambient_map", gl::bind_texture(ctx.default_ambient_map));
+
+    Texture * diffuse_map = get_asset<Texture>(material->diffuse_map);
+
+    if(diffuse_map)
+        set_uniform<GL_SAMPLER_2D>
+            ("u_material.diffuse_map", gl::bind_texture(diffuse_map));
+    else
+        set_uniform<GL_SAMPLER_2D>
+            ("u_material.diffuse_map", gl::bind_texture(ctx.default_diffuse_map));
+
+    Texture * specular_map = get_asset<Texture>(material->specular_map);
+
+    if(specular_map)
+        set_uniform<GL_SAMPLER_2D>
+            ("u_material.specular_map", gl::bind_texture(specular_map));
+    else
+        set_uniform<GL_SAMPLER_2D>
+            ("u_material.specular_map", gl::bind_texture(ctx.default_specular_map));
+
+    Texture * bump_map = get_asset<Texture>(material->bump_map);
+
+    if(bump_map)
+        set_uniform<GL_SAMPLER_2D>
+            ("u_material.bump_map", gl::bind_texture(bump_map));
+    else
+        set_uniform<GL_SAMPLER_2D>
+            ("u_material.bump_map", gl::bind_texture(ctx.default_bump_map));
+}
+

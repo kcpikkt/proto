@@ -13,6 +13,7 @@
 #include "proto/core/math/hash.hh"
 #include "proto/core/util/StringView.hh"
 #include "proto/core/graphics/gl.hh"
+#include "proto/core/graphics/rendering.hh"
 #include "proto/core/util/namespace-shorthands.hh"
 #include <stdio.h>
 #include <glm/glm.hpp>
@@ -36,8 +37,10 @@ PROTO_SETUP {
 graphics::ShaderProgram
     main_shader,
     quad_shader,
+    highlight_shader,
     directional_light_shader,
     TBN_shader;
+
 GLuint quad_VAO, quad_VBO;
 GLuint dragon_VAO, dragon_VBO, dragon_EBO;
 GLuint sponza_VAO, sponza_VBO, sponza_EBO;
@@ -94,220 +97,6 @@ const char * quad_frag_src = R"glsl(
     }
 )glsl";
 
-const char * main_vert_src = R"glsl(
-    #version 450 core
-    layout(location = 0) in vec3 a_position;
-    layout(location = 1) in vec3 a_normal;
-    layout(location = 2) in vec2 a_uv;
-
-    out VertOut {
-        vec3 position;
-        vec3 normal;
-        vec2 uv;
-        vec4 dirlight_space_pos;
-    } geom_in;
-
-    uniform float u_time;
-    uniform mat4 u_mvp;
-    uniform mat4 u_model;
-    uniform mat4 u_dirlight_matrix;
-    uniform vec3 u_cam_position;
-
-   void main() {
-        geom_in.position = (u_model * vec4(a_position,1.0)).xyz;
-        geom_in.normal = a_normal;
-        geom_in.uv = a_uv;
-        geom_in.dirlight_space_pos = 
-            u_dirlight_matrix * (u_model * vec4(a_position, 1.0));
-        gl_Position = u_mvp * vec4(a_position, 1.0);
-    }
-)glsl";
-
-///////////////////////////////////////////////////////////////////////////
-const char * main_geom_src = R"glsl(
-#version 450 core
-layout(triangles) in;
-layout(triangle_strip, max_vertices = 3) out;
-
-in VertOut {
-    vec3 position;
-    vec3 normal;
-    vec2 uv;
-    vec4 dirlight_space_pos;
-} geom_in[];
-
-out GeomOut {
-    vec3 position;
-    vec3 normal;
-    vec3 tangent;
-    vec3 bitangent;
-    vec2 uv;
-    vec4 dirlight_space_pos;
-} frag_in;
-
-uniform mat4 u_mvp;
-uniform float u_time;
-
-mat2x3 computeTB(int index) {
-
-    int v0 = (index + 0)%3; 
-    int v1 = (index + 1)%3; 
-    int v2 = (index + 2)%3; 
-    vec3 e1 = (geom_in[v1].position - geom_in[v0].position); // edge between
-    vec3 e2 = (geom_in[v2].position - geom_in[v0].position);
-
-    vec2 d1 = (geom_in[v1].uv - geom_in[v0].uv); // uv deltas
-    vec2 d2 = (geom_in[v2].uv - geom_in[v0].uv);
-    
-    float inv_det = 1.0/(d1.x * d2.y - d1.y * d2.x);
-
-    mat2x2 adj = {{-d2.y, d2.x}, { d1.y,-d1.x}};
-    mat3x2 E = {{ e1.x, e2.x}, { e1.y, e2.y}, { e1.z, e2.z}};
-
-    return transpose(inv_det * adj * E);
-}
-
-void emit(int index) {
-    mat2x3 TB = computeTB(index);
-    frag_in.position           = geom_in[index].position;
-    frag_in.normal             = geom_in[index].normal;
-    frag_in.tangent            = normalize(TB[0]);
-    frag_in.bitangent          = normalize(TB[1]);
-    frag_in.uv                 = geom_in[index].uv;
-    frag_in.dirlight_space_pos = geom_in[index].dirlight_space_pos;
-    gl_Position = gl_in[index].gl_Position; 
-    EmitVertex();
-}
-
-void main() {
-    int i; for(i=0; i<gl_in.length(); i++) {emit(i);}
-    EndPrimitive();
-}
-)glsl";
-///////////////////////////////////////////////////////////////////////////
-const char * main_frag_src = R"glsl(
-    #version 450 core
-
-    in GeomOut {
-        vec3 position;
-        vec3 normal;
-        vec3 tangent;
-        vec3 bitangent;
-        vec2 uv;
-        vec4 dirlight_space_pos;
-    } frag_in;
-
-    uniform float u_time;
-    uniform mat4 u_mvp;
-    uniform mat4 u_model;
-    uniform vec3 u_cam_pos;
-
-    uniform struct Material {
-        vec3 diffuse;
-        vec3 ambient;
-        vec3 specular;
-        float shininess;
-        sampler2D diffuse_map;
-        sampler2D ambient_map;
-        sampler2D specular_map;
-        sampler2D bump_map;
-    } u_material;
-
-    uniform struct DirectionalLight {
-        sampler2D shadow_map;
-        vec3 direction;
-    } u_dirlight[1];
-
-    float dirlight_shadow() {
-        vec3 normal = normalize(frag_in.normal);
-        vec3 to_dirlight_dir = normalize(-u_dirlight[0].direction);
-        vec3 proj_coords = 
-            frag_in.dirlight_space_pos.xyz / frag_in.dirlight_space_pos.w;
-        proj_coords = proj_coords * 0.5 + 0.5;
-        float dirlight_depth = texture(u_dirlight[0].shadow_map, proj_coords.xy).r;
-        float cam_depth = proj_coords.z;
-        float bias = max(0.02 * (1.0 - dot(normal,to_dirlight_dir)), 0.0006);
-        float shadow = (cam_depth-bias) > dirlight_depth ? 0.9 : 0.0;
-        return shadow;
-    }
-
-    out vec4 frag_color;
-
-void main() {
-
-
-float global_ambient = 0.1;
-vec3 light_color = vec3(1.0,1.0,1.0);
-
-// PARALAX MAPPING
-
-mat3 TBN = transpose(mat3(
-    normalize(frag_in.tangent), 
-    normalize(frag_in.bitangent), 
-    normalize(frag_in.normal) ));
-
-vec3 frag_pos = (u_model * vec4(frag_in.position, 1.0)).xyz;
-vec3 tan_cam_dir = normalize(TBN * u_cam_pos - TBN * frag_pos);
-
-float paralax = (sin(3.0 * u_time) + 1.0)/2.0 * 0.01;
-
-float height = texture(u_material.bump_map, frag_in.uv).r;    
-vec2 p = tan_cam_dir.xy / tan_cam_dir.z * (height * paralax);
-vec2 uv = frag_in.uv - p;    
-
-//if(uv.x > 1.0 || uv.y > 1.0 || uv.x < 0.0 || uv.y < 0.0)
-//    discard;
-
-
-// PHONG
-
-float angle_factor;
-vec3 frag_ambient;
-vec3 frag_specular;
-vec3 frag_diffuse;
-
-frag_ambient = 
-    global_ambient * 
-    u_material.ambient * 
-    texture(u_material.ambient_map, uv).xyz;
-
-vec3 normal = normalize(frag_in.normal);
-vec3 to_dirlight_dir = normalize(-u_dirlight[0].direction);
-
-angle_factor = clamp(dot(normal,to_dirlight_dir), 0.0, 1.0);
-
-frag_diffuse = 
-    angle_factor *
-    u_material.diffuse *
-    light_color *
-    texture(u_material.diffuse_map, uv).xyz;
-
-vec3 to_cam_dir = normalize(u_cam_pos - frag_in.position);
-
-angle_factor = dot(reflect(-to_dirlight_dir, normal), to_cam_dir);
-angle_factor = clamp(angle_factor, 0.0, 1.0);
-angle_factor = pow(angle_factor, max(1.0,u_material.shininess));
-
-float global_specular = 5.0f;
-frag_specular =
-    global_specular *
-    angle_factor *
-    light_color *
-    u_material.specular *
-    texture(u_material.specular_map, uv).xyz;
-
-frag_diffuse *= (1.0 - angle_factor);
-
-float shadow = clamp(1.0 -  0.0*dirlight_shadow(), 0.0, 1.0);
-            
-frag_color = vec4((frag_diffuse + frag_specular) * (shadow) + frag_ambient , 1.0);
-//frag_color = texture(u_material.bump_map, uv);
-
-}
-
-)glsl";
-
-/////////////////////////////////////////////////////////////////////
 
 const char * TBN_vert_src = R"glsl(
 #version 450 core
@@ -361,7 +150,6 @@ vec3 tangent_color = vec3(1.0,0.0,0.0);
 vec3 bitangent_color = vec3(0.0,1.0,0.0);
 
 mat2x3 computeTB(int index) {
-
     int v0 = (index + 0)%3; 
     int v1 = (index + 1)%3; 
     int v2 = (index + 2)%3; 
@@ -373,7 +161,7 @@ mat2x3 computeTB(int index) {
     
     float inv_det = 1.0/(d1.x * d2.y - d1.y * d2.x);
 
-    mat2x2 adj = {{-d2.y, d2.x}, { d1.y,-d1.x}};
+    mat2x2 adj = {{d2.y, -d2.x}, { -d1.y,d1.x}};
     mat3x2 E = {{ e1.x, e2.x}, { e1.y, e2.y}, { e1.z, e2.z}};
 
     return transpose(inv_det * adj * E);
@@ -426,44 +214,6 @@ void main() {
     frag_color = vec4(frag_in.color ,pow(10.0/length(between),7.0) ); 
 }
 )glsl";
-
-//const char * main_geom_src = R"glsl(
-//    #version 450 core
-//    layout(triangles) in;
-//    
-//    // Three lines will be generated: 6 vertices
-//    layout(line_strip, max_vertices=6) out;
-//    
-//    uniform float normal_length;
-//    uniform mat4 gxl3d_ModelViewProjectionMatrix;
-//    
-//    in Vertex {
-//      vec4 normal;
-//      vec4 color;
-//    } vertex[];
-//    
-//    out vec4 vertex_color;
-//    
-//    void main()
-//    {
-//      int i;
-//      for(i=0; i<gl_in.length(); i++)
-//      {
-//        vec3 P = gl_in[i].gl_Position.xyz;
-//        vec3 N = vertex[i].normal.xyz;
-//        
-//        gl_Position = gxl3d_ModelViewProjectionMatrix * vec4(P, 1.0);
-//        vertex_color = vertex[i].color;
-//        EmitVertex();
-//        
-//        gl_Position = gxl3d_ModelViewProjectionMatrix * vec4(P + N * normal_length, 1.0);
-//        vertex_color = vertex[i].color;
-//        EmitVertex();
-//        
-//        EndPrimitive();
-//      }
-//    }
-//)glsl";
 
 const char * directional_light_vert_src = R"glsl(
     #version 450 core
@@ -533,34 +283,6 @@ void mouse_callback(MouseEvent& ev) {
     //}
 }
 
-//
-//#define PROTO_ENUM_ENTRY(NAME, VALUE, INFO)           \
-//    constexpr static ImplType NAME = VALUE;           \
-//    constexpr static InfoType NAME##_info = INFO;     \
-//
-//#define PROTO_ENUM_BEGIN(NAME, IMPLTYPE, INFOTYPE)    \
-//    struct NAME {                                     \
-//        using ImplType = IMPLTYPE;                    \
-//        using InfoType = INFOTYPE;                   
-//
-//#define PROTO_ENUM_END \
-//    constexpr static element_info(ImplType element) { \
-//    }                                                 \
-//    };
-//
-//PROTO_ENUM_BEGIN(TestEnum, u32, struct { const char * name; })
-//PROTO_ENUM_ENTRY(Entry1, 1, { "entry1" });
-//PROTO_ENUM_ENTRY(Entry2, 2, { "entry2" });
-//PROTO_ENUM_END
-
-//void print_asset_tree(AssetMetadata& root_asset, u32 level = 0) {
-//    for(u32 i=0; i<level; i++) io::print('\t');
-//
-//    io::println(root_asset.name);
-//    for(u32 i=0; i<root_asset.deps.size(); i++)
-//        print_asset_tree(root_asset.deps[i], level + 1)
-//}
-
 void print_asset_tree(AssetHandle handle, u32 level = 0) {
     assert(handle);
     AssetMetadata * metadata = get_metadata(handle);
@@ -591,10 +313,15 @@ Texture tex;
 Array<int> test() {
     Array<int> ret;
     ret.init_resize(10,&context->memory);
-    vardump(ret.size());
     return ret;
 }
 
+GLuint main_shader_ssbo;
+struct _MainShaderSSBOStruct {
+    u32 hash = invalid_asset_handle.hash;
+    u32 span_index = 0;
+    float depth = 100000000.0;
+};
 
 PROTO_INIT {
     ctx = proto::context;
@@ -602,9 +329,9 @@ PROTO_INIT {
     key_input_sink.init(ctx->key_input_channel, key_callback);
     mouse_input_sink.init(ctx->mouse_input_channel, mouse_callback);
 
+    ser::load_asset_dir("res/models/crytek-sponza");
     //auto handle = parse_asset_file_rec("external/crytek-sponza/sponza.obj", ctx);
     //ser::save_asset_tree_rec(handle, "res/models/crytek-sponza");
-    ser::load_asset_dir("res/models/crytek-sponza");
     //Array<int> ok;
     //ok.init_resize(10, &context->memory);
 
@@ -620,6 +347,12 @@ PROTO_INIT {
 
     assert(!glGetError());
 
+    highlight_shader.init();
+    highlight_shader.create_shader_from_file(graphics::ShaderType::Vert,
+                     "src/proto/shaders/highlight_vert.glsl");
+    highlight_shader.create_shader_from_file(graphics::ShaderType::Frag,
+                     "src/proto/shaders/highlight_frag.glsl");
+    highlight_shader.link();
 
     TBN_shader.init();
     TBN_shader.create_shader(graphics::ShaderType::Vert, TBN_vert_src);
@@ -628,9 +361,12 @@ PROTO_INIT {
     TBN_shader.link();
 
     main_shader.init();
-    main_shader.create_shader(graphics::ShaderType::Vert, main_vert_src);
-    main_shader.create_shader(graphics::ShaderType::Geom, main_geom_src);
-    main_shader.create_shader(graphics::ShaderType::Frag, main_frag_src);
+    main_shader.create_shader_from_file(graphics::ShaderType::Vert,
+                                        "src/proto/shaders/blinn-phong_vert.glsl");
+    main_shader.create_shader_from_file(graphics::ShaderType::Geom,
+                                        "src/proto/shaders/blinn-phong_geom.glsl");
+    main_shader.create_shader_from_file(graphics::ShaderType::Frag,
+                                        "src/proto/shaders/blinn-phong_frag.glsl");
     main_shader.link();
 
     quad_shader.init();
@@ -685,75 +421,16 @@ PROTO_INIT {
                           (void*) (sizeof(float) * 3) );
    //================================================================
 
-
+    glGenBuffers(1, &main_shader_ssbo);
+    _MainShaderSSBOStruct main_shader_ssbo_data;
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, main_shader_ssbo);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(main_shader_ssbo_data),
+                 (void*)&main_shader_ssbo_data, GL_DYNAMIC_READ);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, main_shader_ssbo);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
 int count = 0;
-
-void render_mesh(Mesh * mesh, bool tmp = false) {
-    assert(mesh);
-    mesh->bind();
-    for(u32 i=0; i<mesh->spans.size(); i++) {
-        Material * material = &mesh->spans[i].material;
-
-        if(material && tmp) {
-            main_shader.set_uniform <GL_FLOAT_VEC3> ("u_material.ambient",
-                                    &material->ambient_color);
-
-            main_shader.set_uniform <GL_FLOAT_VEC3> ("u_material.diffuse",
-                                    &material->diffuse_color);
-
-            main_shader.set_uniform <GL_FLOAT_VEC3> ("u_material.specular",
-                                    &material->specular_color);
-
-            main_shader.set_uniform <GL_FLOAT> ("u_material.shininess",
-                                    material->shininess);
-
-            Texture * ambient_map = get_asset<Texture>(material->ambient_map);
-
-            if(ambient_map)
-                main_shader.set_uniform<GL_SAMPLER_2D>
-                    ("u_material.ambient_map", gl::bind_texture(ambient_map));
-            else
-                main_shader.set_uniform<GL_SAMPLER_2D>
-                    ("u_material.ambient_map",
-                     gl::bind_texture(ctx->default_ambient_map));
-
-            Texture * diffuse_map = get_asset<Texture>(material->diffuse_map);
-
-            if(diffuse_map)
-                main_shader.set_uniform<GL_SAMPLER_2D>
-                    ("u_material.diffuse_map", gl::bind_texture(diffuse_map));
-            else
-                main_shader.set_uniform<GL_SAMPLER_2D>
-                    ("u_material.diffuse_map",
-                     gl::bind_texture(ctx->default_diffuse_map));
-
-            Texture * specular_map = get_asset<Texture>(material->specular_map);
-
-            if(specular_map)
-                main_shader.set_uniform<GL_SAMPLER_2D>
-                    ("u_material.specular_map", gl::bind_texture(specular_map));
-            else
-                main_shader.set_uniform<GL_SAMPLER_2D>
-                    ("u_material.specular_map",
-                     gl::bind_texture(ctx->default_specular_map));
-
-            Texture * bump_map = get_asset<Texture>(material->bump_map);
-
-            if(bump_map)
-                main_shader.set_uniform<GL_SAMPLER_2D>
-                    ("u_material.bump_map", gl::bind_texture(bump_map));
-        }
-
-        glDrawElements
-            (GL_TRIANGLES, mesh->spans[i].index_count,
-             GL_UNSIGNED_INT, (void*)(sizeof(u32) * mesh->spans[i].begin_index));
-    }
-
-        
-}
-
 PROTO_UPDATE {
     proto::mat4 identity(1.0f);
 
@@ -801,19 +478,24 @@ PROTO_UPDATE {
     directional_light_shader.use();
     directional_light_shader.set_uniform
         <GL_FLOAT_MAT4> ("u_mv", &dirlight_mv_matrix);
+    gl::bind_texture(shadow_map);
 
     // shadowmap render
-    render_mesh(&ctx->meshes[mesh_index]);
+    graphics::render_mesh(&ctx->meshes[mesh_index], true);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, main_shader_ssbo);
+
+    _MainShaderSSBOStruct main_shader_ssbo_data;
+    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(main_shader_ssbo_data),
+                 (void*)&main_shader_ssbo_data, GL_DYNAMIC_READ);
+
     glClearColor(1.0f,1.0f,1.0f,1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glViewport(0, 0, ctx->window_size.x, ctx->window_size.y);
+
     main_shader.use();
-
-    main_shader.set_uniform<GL_FLOAT>
-        ("u_time", proto::context->clock.elapsed_time);
-
+    main_shader.set_uniform<GL_FLOAT> ("u_time", ctx->clock.elapsed_time);
     main_shader.set_uniform<GL_FLOAT_MAT4> ("u_mvp", &mvp);
     main_shader.set_uniform<GL_FLOAT_MAT4> ("u_model", &model);
     main_shader.set_uniform
@@ -821,21 +503,41 @@ PROTO_UPDATE {
     main_shader.set_uniform<GL_FLOAT_VEC3> ("u_cam_pos", &cam_pos);
     main_shader.set_uniform<GL_FLOAT_VEC3> ("u_sun_pos", &sun_pos);
 
+    vec2 resolution = (vec2)ctx->window_size;
+    main_shader.set_uniform<GL_FLOAT_VEC2> ("u_resolution", &resolution);
+
     main_shader.set_uniform <GL_FLOAT_VEC3> ("u_dirlight[0].direction", &sun_dir);
-    main_shader.set_uniform <GL_SAMPLER_2D> ("u_dirlight[0].shadow_map",
-                                             gl::bind_texture(shadow_map) );
+    //    main_shader.set_uniform <GL_SAMPLER_2D> ("u_dirlight[0].shadow_map",
+    //                                             gl::bind_texture(shadow_map) );
 
-   render_mesh(&ctx->meshes[mesh_index], true);
+   graphics::render_mesh(&ctx->meshes[mesh_index]);
+   // render_mesh_span(&ctx->meshes[mesh_index], 377, true);
 
-   TBN_shader.use();
-   TBN_shader.set_uniform<GL_FLOAT_MAT4> ("u_model", &model);
-   TBN_shader.set_uniform<GL_FLOAT_MAT4> ("u_mvp", &mvp);
-   TBN_shader.set_uniform<GL_FLOAT_VEC3> ("u_cam_pos", &cam_pos);
-   render_mesh(&ctx->meshes[mesh_index]);
+       glBindBuffer(GL_SHADER_STORAGE_BUFFER, main_shader_ssbo);
 
-   quad_shader.use();
+   auto * center_mesh = (_MainShaderSSBOStruct *)
+       glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+   u32 index = center_mesh->span_index;
+   glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+
+   //TBN_shader.use();
+   //TBN_shader.set_uniform<GL_FLOAT_MAT4> ("u_model", &model);
+   //TBN_shader.set_uniform<GL_FLOAT_MAT4> ("u_mvp", &mvp);
+   //TBN_shader.set_uniform<GL_FLOAT_VEC3> ("u_cam_pos", &cam_pos);
+   ////render_mesh_span(&ctx->meshes[mesh_index], index);
+
+   glDisable(GL_DEPTH_TEST);
+   highlight_shader.use();
+   highlight_shader.set_uniform<GL_FLOAT_MAT4> ("u_mvp", &mvp);
+   vec4 highlight_color = vec4(1.0, 1.0, 1.0, 0.1);
+   highlight_shader.set_uniform<GL_FLOAT_VEC4> ("u_highlight_color",
+                                                &highlight_color);
+   glEnable(GL_DEPTH_TEST);
+   //render_mesh_span(&ctx->meshes[mesh_index], index, true);
+    //render_mesh(&ctx->meshes[mesh_index]);
+   //quad_shader.use();
    //quad_shader.set_uniform<GL_SAMPLER_2D>("quad_tex", gl::bind_texture(shadow_map));
-   glBindVertexArray(quad_VAO);
+   //glBindVertexArray(quad_VAO);
    //glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 }
 

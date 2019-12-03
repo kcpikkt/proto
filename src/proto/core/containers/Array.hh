@@ -21,7 +21,7 @@ struct Array
         Array<T>& _array;
 
         Iterator(Array<T>& array, u64 index)
-            : _array(array), _index(index) {}
+            :  _index(index), _array(array) {}
 
         Iterator& operator++() {
             _index++; return *this;

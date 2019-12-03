@@ -801,10 +801,11 @@ namespace proto{
         assert(!file.open(finalpath, platform::file_read));
 
         memory::Allocator * allocator = &(context->memory);
-        u8 * buf = (u8*)allocator->alloc(file.size());
+        u8 * buf = (u8*)allocator->alloc(file.size() + 1);
 
         assert(buf);
         assert(file.size() == file.read(buf, file.size() ));
+        buf[file.size()] = '\0';
 
         switch(file_format_index) {
         case _AssetFileFormatIndex::obj: {

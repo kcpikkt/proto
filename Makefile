@@ -38,7 +38,7 @@ endif
 
 
 ifeq ($(PLATFORM), LINUX)
-INCLUDES := -I src/ -I vendor/ -I src/tools/gl3w/include/
+INCLUDES := -I src/ -I vendor/ -I vendor/gl3w/include/
 LIBS := -L/usr/lib -lX11 -lGL -lGLX -lGLEW  -ldl
 LDFLAGS =  #-rpath /usr/local/lib --enable-new-dtags
 else ifeq ($(PLATFORM), WINDOWS)

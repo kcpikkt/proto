@@ -18,3 +18,14 @@ namespace debug {
 } // namespace debug {
 
 #define PROTO_NOOP ((void)0)
+
+//TODO(kacper): expand __func__ inside?
+//NOTE(kacper): meh, I get function name when assertion fails already
+#define PROTO_NOT_IMPLEMENTED \
+    { assert(0 && "Not implemented!"); }
+
+#define PROTO_DEPRECATED \
+    { debug_warn(proto::debug::category::main, \
+                 "Usage of deprecated function. ", __PRETTY_FUNCTION__); }
+
+

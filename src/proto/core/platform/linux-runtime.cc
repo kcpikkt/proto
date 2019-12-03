@@ -365,6 +365,10 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
         {{ 255, 255, 255, 255}, { 255, 255, 255, 255},
          { 255, 255, 255, 255}, { 255, 255, 255, 255}};
 
+    struct { u8 ch[4]; } emergency_black_texture_data[] =
+        {{ 0, 0, 0, 0}, { 0, 0, 0, 0},
+         { 0, 0, 0, 0}, { 0, 0, 0, 0}};
+
     _context.default_ambient_map =
         create_asset("default_ambient_map", "",
                      AssetType<Texture>::index);
@@ -374,18 +378,24 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
     _context.default_specular_map =
         create_asset("default_specular_map", "",
                      AssetType<Texture>::index);
+    _context.default_bump_map =
+        create_asset("default_bump_map", "",
+                     AssetType<Texture>::index);
 
     if(!_context.default_ambient_map) 
         debug_warn(debug::category::main,
                    "Could not create default_ambient_map");
-
     if(!_context.default_diffuse_map) 
         debug_warn(debug::category::data,
                    "Could not create default_diffuse_map");
-
     if(!_context.default_specular_map) 
         debug_warn(debug::category::main,
                    "Could not create default_specular_map");
+    if(!_context.default_bump_map) 
+        debug_warn(debug::category::main,
+                   "Could not create default_bump_map");
+
+
 
     Texture * default_ambient_texture =
         get_asset<Texture>(_context.default_ambient_map);
@@ -408,6 +418,12 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
     default_specular_texture->size = ivec2(2,2);
     default_specular_texture->channels = 4;
 
+    Texture * default_bump_texture =
+        get_asset<Texture>(_context.default_bump_map);
+    assert(default_bump_texture);
+    default_bump_texture->data = (void*)emergency_black_texture_data;
+    default_bump_texture->size = ivec2(2,2);
+    default_bump_texture->channels = 4;
 
     /*
     proto::memory::linear_allocator temp_allocator;
@@ -509,7 +525,7 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
                     if((i+1)%24 == 0) printf("\n");
                 }
             };
-    printf("header size %lu\n", sizeof(proto::memory::LinkedListAllocator::header));
+    printf("heater size %lu\n", sizeof(proto::memory::LinkedListAllocator::header));
     namespace mem = proto::memory;
     // unsigned char * p;
     // size_t sz = 32;

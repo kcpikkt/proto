@@ -87,7 +87,6 @@ void StringArena::reserve(u64 new_capacity) {
 
     u64 cursor_offset = _cursor - _data;
 
-    log_info(1,"reserved: ", bufsz);
     _data = (_data)
         ? (char*)_allocator->realloc(_data, bufsz)
         : (char*)_allocator->alloc(bufsz);

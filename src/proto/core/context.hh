@@ -13,6 +13,7 @@
 #include "proto/core/graphics/Mesh.hh"
 #include "proto/core/graphics/Texture.hh"
 #include "proto/core/graphics/Material.hh"
+#include "proto/core/graphics/ShaderProgram.hh"
 #include "proto/core/memory/LinkedListAllocator.hh"
 #include "proto/core/containers/Array.hh"
 #include "proto/core/containers/StringArena.hh"
@@ -41,14 +42,20 @@ namespace proto {
         struct TextureSlot {
             AssetHandle texture = invalid_asset_handle;
             u32 gl_tex_unit;
+            u32 gl_id_bound;
+            Bitfield<u8> flags;
+            constexpr static u8 fresh_bit = 1;
         };
         Array<TextureSlot> texture_slots;
         // temp
         u64 texture_slots_index = 0;
 
+
+        graphics::ShaderProgram * current_shader = nullptr; //tmp
         AssetHandle default_ambient_map;
         AssetHandle default_diffuse_map;
         AssetHandle default_specular_map;
+        AssetHandle default_bump_map;
     };
 #endif
 

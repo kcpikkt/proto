@@ -26,7 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <GL/gl3w.h>
+#include </usr/local/include/gl3w/GL/gl3w.h>
 #include <stdlib.h>
 
 #define ARRAY_SIZE(x)  (sizeof(x) / sizeof((x)[0]))

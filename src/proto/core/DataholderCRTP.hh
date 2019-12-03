@@ -88,6 +88,7 @@ void DataholderCRTP<T>::destroy() {
         if(!is_moved())
             _destroy_deep();
     } else {
+        #if 0
         if constexpr(meta::is_base_of_v<debug::Marker, T>) {
             log_debug_marker(debug::category::main,
                              (*static_cast<T*>(this)));
@@ -95,6 +96,7 @@ void DataholderCRTP<T>::destroy() {
         debug_warn(debug::category::main,
                    "destructor called on unitialized dataholder object, ",
                    "no destruction performed.");
+        #endif
     }
 }
 
