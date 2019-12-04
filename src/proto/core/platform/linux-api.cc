@@ -6,7 +6,9 @@
 #include "proto/core/memory.hh"
 #include "proto/core/debug/logging.hh"
 #include "proto/core/containers/StringArena.hh"
+#include "proto/core/util/String.hh"
 #include "proto/core/context.hh"
+#include "proto/core/io.hh"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -52,11 +54,11 @@ StringView basename_view(StringView path) {
     u32 index = 0;
     const char * basename;
     char c;
-    while(c = path[index],
-          index < path.length() && c != '\0')
-    {
+    while(index < path.length()) {
+        c = path[index];
+        if(c == '\0') break;
         // no backslashes in names, ok?
-        if(c == '/' || c == '\\') { basename = path + index + 1; }
+        if(c == '/' || c == '\\') { basename = path.str() + index + 1; }
         index++;
     }
     if(index != path.length())
@@ -64,7 +66,7 @@ StringView basename_view(StringView path) {
                    "StringView contains null character on index "
                    "less than its length.", index, " ", path.length());
 
-    u32 basename_offset = basename - path;
+    u32 basename_offset = basename - path.str();
     u32 len = path.length() - basename_offset;
 
     index = path.length() - basename_offset;
@@ -88,8 +90,6 @@ const char * dirname_substr(const char * path, u32 * len) {
 StringView dirname_view(const char * path) {
     return StringView(path, dirname_len(path));
 }
-
-
 
 u32 dirname_len(const char * path) {
     size_t index = strlen(path);
@@ -121,7 +121,6 @@ StringView extension_view(const char * path) {
 }
 
 
-#include "proto/core/io.hh"
 // case insensitive
 int strcmp_i(const char * str1, const char * str2) {
     for(u32 i=0; true; i++, str1++, str2++) {
@@ -159,19 +158,32 @@ bool is_directory(StringView path) {
     return S_ISDIR(statbuf.st_mode);
 }
 
-// struct File
-// it does not allocate memory soo maybe idk
-//File::File(){}
-//
-//File::File(memory::Allocator * allocator){
-//    init(allocator);
-//}
-//
-//int File::init(memory::Allocator * allocator){
-//    assert(allocator);
-//    _allocator = allocator;
-//    return 0;
-//}
+String search_for_file(StringArena& dirs, StringView filename) {
+    String ret;
+
+    char filepath[512];
+    strview_copy(filepath, filename);
+
+    if(access(filepath, F_OK) == -1) {
+        for(u32 i=0; i < dirs.count(); i++) {
+            if(!is_directory(dirs[i])) continue;
+
+            strview_copy(filepath, dirs[i]);
+
+            platform::path_ncat(filepath, filename, 512);
+
+            if(access(filepath, F_OK) != -1) {
+                ret.init(filepath, &context->memory);
+                break;
+            }
+        }
+    } else {
+        //TOOD(kacper): use proper allocator for that
+        ret.init(filename, &context->memory);
+    }
+    return ret;
+}
+
 StringArena ls(StringView dirpath) {
     StringArena arena;
 

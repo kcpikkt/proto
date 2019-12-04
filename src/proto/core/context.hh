@@ -21,6 +21,8 @@
 #include "proto/core/asset-system/common.hh"
 #include "proto/core/asset-system/AssetRegistry.hh"
 #include "proto/core/input.hh"
+#include "proto/core/util/Bitfield.hh"
+#include "proto/core/util/ModCounter.hh"
 
 namespace proto {
     // context is all global state of the engine
@@ -41,14 +43,15 @@ namespace proto {
     struct OpenGLContext {
         struct TextureSlot {
             AssetHandle texture = invalid_asset_handle;
-            u32 gl_tex_unit;
-            u32 gl_id_bound;
+            s32 gl_tex_unit;
+            s32 gl_id_bound;
             Bitfield<u8> flags;
-            constexpr static u8 fresh_bit = 1;
+            constexpr static u8 bound_bit = BIT(0);
+            constexpr static u8 fresh_bit = BIT(1);
         };
         Array<TextureSlot> texture_slots;
         // temp
-        u64 texture_slots_index = 0;
+        ModCounter<u32> texture_slots_index;
 
 
         graphics::ShaderProgram * current_shader = nullptr; //tmp

@@ -4,32 +4,36 @@
 #include "proto/core/graphics/Texture.hh"
 #include "proto/core/asset-system/interface.hh"
 #include "proto/core/debug/logging.hh"
+#include "proto/core/util/algo.hh"
 
 namespace proto {
 namespace graphics{
 namespace gl{
     s32 bind_texture(Texture * texture) {
-        
-        //printf("bonding %d %s\n", texture->bound_unit,
-        //       get_metadata(texture->handle)->name);
+        assert(texture);
+        return bind_texture(*texture);
+    }
 
-        if(texture->bound_unit >= 0) {
-            assert(context->texture_slots[texture->bound_unit].texture ==
-                   texture->handle);
-            return texture->bound_unit;
-        }
+    s32 bind_texture(Texture & texture) {
+        assert(proto::context);
+        auto& ctx = *proto::context;
 
         using Slot = OpenGLContext::TextureSlot;
-        s32 slots_count = context->texture_slots.size();
-        s32 modindex = context->texture_slots_index % slots_count;
-        s32 init_modindex = modindex;
-
-        // if not fresh then bind
-        while(context->texture_slots[modindex].flags.check(Slot::fresh_bit)) {
-
-            modindex = (modindex + 1) % slots_count;
-            if(modindex == init_modindex) { return -1; } // all slots fresh
+        
+        if(texture.flags.check(Texture::bound_bit)) {
+            assert(belongs(texture.bound_unit, 0, (s32)ctx.texture_slots.size()));
+            auto& slot = ctx.texture_slots[texture.bound_unit];
+            assert(slot.flags.check(Slot::bound_bit));
+            assert(slot.texture == texture.handle);
+            slot.flags.set(Slot::fresh_bit);
+            return texture.bound_unit;
         }
+
+        auto& modindex = ctx.texture_slots_index;
+        u32 loopcount = 0;
+        do {
+            if(loopcount++ >= ctx.texture_slots.size()) return -1;// no hit
+        } while(ctx.texture_slots[++modindex].flags.check(Slot::fresh_bit));
 
         auto& slot = context->texture_slots[modindex];
         AssetHandle prev_handle = slot.texture;
@@ -37,23 +41,69 @@ namespace gl{
         if(prev_handle) {
             Texture * prev_texture = get_asset<Texture>(prev_handle);
             assert(prev_texture);
-            assert(prev_texture->bound_unit >= 0);
+            if(!(prev_texture->bound_unit == modindex)) {
+                debug_print_texture_slots();
+                vardump(prev_texture->bound_unit);
+                vardump((u8)modindex);
+                vardump(get_metadata(prev_texture->handle)->name);
+            }
+
+            assert(prev_texture->bound_unit == modindex);
+
             prev_texture->bound_unit = -1;
+            prev_texture->flags.unset(Texture::bound_bit);
         }
+
+        assert(texture.gl_id >= 0);
         glActiveTexture(GL_TEXTURE0 + modindex);
-        glBindTexture(GL_TEXTURE_2D, texture->gl_id);
-        slot.texture = texture->handle;
-        texture->bound_unit = modindex;
+        glBindTexture(GL_TEXTURE_2D, texture.gl_id);
+        slot.texture = texture.handle;
 
-        slot.flags.set(Slot::fresh_bit);
+        texture.bound_unit = (s32)modindex;
 
-        context->texture_slots_index++;
+        texture.flags.set(Texture::bound_bit);
+        slot.flags.set(Slot::bound_bit | Slot::fresh_bit);
+
+        assert(belongs(texture.bound_unit, 0ul, ctx.texture_slots.size()));
+
         return modindex;
     }
 
-    void free_texture_slots() {
-        for(auto& s : context->texture_slots)
-            s.flags.unset(OpenGLContext::TextureSlot::fresh_bit);
+    void unbind_texture_slot(s32 index) {
+        assert(proto::context);
+        auto& ctx = *proto::context;
+        vardump(index);
+        assert(belongs(index, 0, (s32)ctx.texture_slots.size()));
+
+        using Slot = OpenGLContext::TextureSlot;
+        auto& slot = ctx.texture_slots[index];
+
+        if(slot.flags.check(Slot::bound_bit)) {
+            Texture * texture = get_asset<Texture>(slot.texture);
+            assert(texture);
+            assert(texture->flags.check(Texture::bound_bit));
+            assert(index == texture->bound_unit);
+
+            texture->flags.unset(Texture::bound_bit);
+            texture->bound_unit = -1;
+            slot.flags.unset(Slot::bound_bit);
+            slot.flags.unset(Slot::fresh_bit);
+            slot.texture = invalid_asset_handle;
+        } else {
+            assert(!slot.texture);
+        }
+    }
+
+    void stale_texture_slot(u32 index) {
+        assert(proto::context);
+        using Slot = proto::OpenGLContext::TextureSlot;
+        context->texture_slots[index].flags.unset(Slot::fresh_bit);
+    }
+
+    void stale_all_texture_slots() {
+        assert(proto::context);
+        using Slot = proto::OpenGLContext::TextureSlot;
+        for(auto& s : context->texture_slots) s.flags.unset(Slot::fresh_bit);
     }
 
     s32 bind_texture(AssetHandle texture_handle) {
@@ -63,10 +113,10 @@ namespace gl{
     void debug_print_texture_slots() {
         printf("Texture units state\n");
         using Slot = OpenGLContext::TextureSlot;
-        int count = 0;
-        for(auto s : context->texture_slots) {
-            count++;
-            printf("[%.2d]", count);
+
+        for(s32 i=0; i<context->texture_slots.size(); i++) {
+            printf("[%.2d]", i);
+            auto& s = context->texture_slots[i];
 
             if(s.texture) {
                 auto * metadata = get_metadata(s.texture);
@@ -111,6 +161,8 @@ namespace gl{
                        "No support for textures with ", tex->channels, " channels");
         }
 
+        stale_texture_slot(tex->bound_unit);
+        stale_all_texture_slots();
     }
 
     template<> void gpu_upload<Mesh>(Mesh * mesh) {

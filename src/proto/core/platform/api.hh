@@ -6,6 +6,7 @@
 #include "proto/core/memory/common.hh"
 
 namespace proto {
+    struct String;
     struct StringArena;
 namespace platform {
     const char* cwd(char * buf, size_t len);
@@ -40,6 +41,8 @@ namespace platform {
     int strncmp_i(const char * str1, const char * str2, u32 n); 
 
     bool is_directory(StringView path);
+
+    String search_for_file(StringArena& dirs, StringView filename);
 
     // TODO(kacper): allocate inside, return unique_ptr to string arena;
     // TODO(kacper): ls_rel, ls_abs?

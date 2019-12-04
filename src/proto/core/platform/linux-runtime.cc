@@ -329,6 +329,7 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
     set_debug_marker(_context.meshes, "context.texture_slots",
                      "local reflection of OpenGL texture units binding");
     _context.texture_slots.init_resize(32, &_context.memory);
+    _context.texture_slots_index.init(32);
 
     // AssetContext
     //set_debug_marker(_context.assets, "context.assets", "main asset registry");

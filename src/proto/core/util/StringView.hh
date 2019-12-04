@@ -1,5 +1,6 @@
 #pragma once
 #include "proto/core/common.hh"
+#include "proto/core/debug/assert.hh"
 
 namespace proto {
     
@@ -21,7 +22,7 @@ namespace proto {
                 _index++; return ret;
             }
 
-            const char& operator*(){
+            char operator*(){
                 return _view[_index];
             }
 
@@ -55,7 +56,17 @@ namespace proto {
             return _size;
         }
 
-        // NOTE(kacper) I am not sure I want it to be implicit
+        operator bool() {
+            return (bool)_str;
+        }
+
+        char operator[](u64 index) {
+            assert(_str);
+            proto_assert(index < _size);
+            return _str[index];
+        }
+        // NOTE(kacper): I am not sure I want it to be implicit
+        // FIXME(kacper): no, it should not, remove it
         operator const char *() {
             return _str;
         }
@@ -73,6 +84,11 @@ namespace proto {
             _str = str;
             _size = strlen(str);
         }
+        StringView(const unsigned char * str)
+            : StringView((const char*)str)
+        {}
+
+
 
         void remove_suffix(u64 n) {
             assert(n <= _size);

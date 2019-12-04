@@ -77,7 +77,7 @@ TEST_CASE("LinkedListAllocator") {
     //    (more precisely with LikedListAllocator::header_magic_number)
 
     SECTION("") {
-        void * mem1 = fillalloc(128, 0x11);
+        [[maybe_unused]]void * mem1 = fillalloc(128, 0x11);
         void * mem2 = fillalloc(256, 0x22);
         void * mem3 = fillalloc(64, 0x33);
         fillfree(mem2, 0x20);

@@ -165,6 +165,28 @@ u32 strview_count(StringView str, char c) {
     return ret_count;
 }
 
+bool strview_cmp(StringView fst, StringView snd) {
+    if(fst.length() != snd.length()) return false;
+    u32 index = 0, len = fst.length();;
+    while( *(fst.str() + index) == *(snd.str() + index) && index < len) index++;
+    return (index == len);
+}
+bool strview_cmp_i(StringView fst, StringView snd) {
+    if(fst.length() != snd.length()) return false;
+    char ch1, ch2;
+    u32 index = 0, len = fst.length();;
+    while(index < len) {
+        ch1 = *(fst.str() + index);
+        ch2 = *(snd.str() + index);
+        int diff = ch1 - ch2;
+        if((diff == 0)                               ||
+           (ch1 >= 'a' && ch1 <= 'z' && diff ==  32) ||
+           (ch1 >= 'A' && ch1 <= 'Z' && diff == -32)) index++;
+        else break;
+    }
+    return (index == len);
+}
+
 } // namespace proto
 
 

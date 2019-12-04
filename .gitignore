@@ -10,3 +10,4 @@ proto.creator*
 proto.files
 proto.includes
 .vs/
+*.so

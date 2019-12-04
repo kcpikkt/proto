@@ -37,6 +37,10 @@ int str_swap(char * str, char from, char to);
 
 u32 strview_count(StringView str, char c);
 
+bool strview_cmp(StringView fst, StringView snd);
+//case insensitive
+bool strview_cmp_i(StringView fst, StringView snd);
+
 } // namespace proto
 
 

@@ -326,7 +326,6 @@ struct _MainShaderSSBOStruct {
     float depth = 100000000.0;
 };
 
-ModCounter<u8> counter;
 PROTO_INIT {
     ctx = proto::context;
     ctx->exit_sig = true;

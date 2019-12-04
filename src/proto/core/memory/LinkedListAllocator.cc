@@ -4,12 +4,29 @@
 #include "proto/core/util/bitfield.hh"
 #include "proto/core/util/algo.hh"
 #include "proto/core/debug/assert.hh"
+#include "proto/core/common/types.hh"
 
 #if defined(PROTO_DEBUG)
 #include "proto/core/io.hh"
 #endif
 
 using namespace proto::memory;
+
+namespace proto {
+void memdump(void * mem) {
+    u64 off = ((u64)mem)%16;
+    u8* line = (u8*)( ((u64)mem) - off - (16 * 8));
+    for(u8 i=0; i<17; i++) {
+        printf("%#010x: ", (u64)line);
+        for(u8 j=0; j<16; j++) {
+            printf( (i == 8 && j == off) ? "*" : " ");
+            printf("%02x", *(line+j));
+        }
+        line += 16;
+        puts("");
+    }
+}
+}
 
 void LinkedListAllocator::emplace_init_node()
 {
@@ -310,6 +327,11 @@ LinkedListAllocator::try_split(Header * node,
         } else {
             _used -= new_node->size;
         }
+        puts(__func__);
+        //memdump(node);
+        //printf("old %#010x\n", (u64)node);
+        //printf("new %#010x\n", (u64)new_node);
+        //memdump(new_node);
 
         // NOTE(kacper): try_split does not check if split block is linked.
         //               Whether it was or not, if split was successful
@@ -441,12 +463,21 @@ void LinkedListAllocator::unlink_node(Header * node,
     }
 }
 
+
 // NOTE(kacper): there is no reason, except for aesthetic, to not inline this code 
 LinkedListAllocator:: Header *
 LinkedListAllocator::find_free_node(size_t requested_size, Header ** prev_node){
     proto_assert(_first != nullptr);
     Header * lookup = _first;
     do{
+        if(lookup->magic_number != header_magic_number) {
+            debug_print();
+            vardump((*prev_node)->size);
+            memdump(lookup);
+            vardump(addr_offset(lookup));
+            vardump(_size);
+            memdump(*prev_node);
+        }
         proto_assert(lookup->magic_number == header_magic_number);
 
         if( (lookup->flags & Header::FREE) &&
@@ -699,7 +730,7 @@ void LinkedListAllocator::debug_print() {
     Header * prev_lookup = nullptr;
     printf("in mem view:\n");
     while(lookup) {
-        printf("%p (%zu)", (size_t)((byte*)lookup - (byte*)_arena),
+        printf("%#010x (%zu)", (size_t)lookup,
                lookup->size);
         if(lookup->flags & Header::FREE)
             printf(" free");

@@ -136,6 +136,7 @@ frag_diffuse *= (1.0 - angle_factor);
 float shadow = clamp(1.0 - dirlight_shadow(), 0.0, 1.0);
 shadow = 1.0;
             
-frag_color = vec4((frag_diffuse + frag_specular) * (shadow) + frag_ambient , 1.0);
+//frag_color = vec4((frag_diffuse + frag_specular) * (shadow) + frag_ambient , 1.0);
+frag_color = texture(u_material.diffuse_map, uv);
 }
 
