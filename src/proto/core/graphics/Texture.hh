@@ -18,8 +18,7 @@ namespace serialization {
     };
 } // namespace proto {
 
-struct Texture : Asset{
-
+struct Texture : Asset, DataholderCRTP<Texture> {
     memory::Allocator * _allocator;
     u8 channels;
     u32 gl_id;
@@ -49,15 +48,37 @@ struct Texture : Asset{
         ret.data_size = serialized_data_size();
         return ret;
     }
-     void init(){
+    void _move(Texture&& other) {
+        _allocator = other._allocator;
+        channels   = other.channels;
+        gl_id      = other.gl_id;
+        bound_unit = other.bound_unit;
+        data       = other.data;
+        size       = other.size;
+        flags      = other.flags;
+    }
+
+    Texture() {}
+
+    Texture(Texture&& other) {
+        _move(meta::forward<Texture>(other));
+    }
+
+    Texture& operator=(Texture&& other) {
+        _move(meta::forward<Texture>(other));
+        return *this;
+    }
+
+    void init(){
         glGenTextures(1, &gl_id);
         assert(gl_id >= 0);
         glActiveTexture(GL_TEXTURE0);
         // FIXME(kacper):
         glBindTexture(GL_TEXTURE_2D, gl_id);
 
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                        GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
@@ -72,8 +93,9 @@ struct Texture : Asset{
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, gl_id);
 
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                        GL_LINEAR_MIPMAP_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 

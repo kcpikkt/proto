@@ -48,6 +48,7 @@ namespace proto {
             Bitfield<u8> flags;
             constexpr static u8 bound_bit = BIT(0);
             constexpr static u8 fresh_bit = BIT(1);
+            constexpr static u8 reserved_bit = BIT(2);
         };
         Array<TextureSlot> texture_slots;
         // temp
@@ -59,6 +60,9 @@ namespace proto {
         AssetHandle default_diffuse_map;
         AssetHandle default_specular_map;
         AssetHandle default_bump_map;
+
+        AssetHandle black_texture;
+        AssetHandle white_texture;
     };
 #endif
 
@@ -101,7 +105,8 @@ namespace proto {
         char * exe_path = nullptr;
 
         Channel<KeyEvent> key_input_channel;
-        Channel<MouseEvent> mouse_input_channel;
+        Channel<MouseMoveEvent> mouse_move_input_channel;
+        Channel<MouseButtonEvent> mouse_button_input_channel;
 
         bool exit_sig = false;
 #    if defined(PROTO_PLATFORM_WINDOWS)

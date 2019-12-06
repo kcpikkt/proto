@@ -10,6 +10,7 @@
 #include "proto/core/asset-system/interface.hh"
 #include "proto/core/context.hh"
 #include "proto/core/platform/api.hh"
+#include "proto/core/util/parsing.hh"
 #include "proto/core/math/hash.hh"
 #include "proto/core/string.hh"
 #include "proto/core/util/String.hh"
@@ -56,6 +57,7 @@ namespace proto{
                                       AssetContext * asset_context,
                                       AssetMetadata * dependant_asset = nullptr)
     {
+        //stbi_set_flip_vertically_on_load()
         assert(buffer);
         assert(size);
         assert(allocator);
@@ -94,7 +96,7 @@ namespace proto{
 
         log_info(debug::category::data,
                  "Loaded texture ", name,
-                 ", size  ", texture->size,
+                 ", size ", texture->size,
                  ", ", (int)texture->channels, " channel",
                  ((texture->channels > 1) ? "s" : " ") );
 
@@ -279,6 +281,7 @@ namespace proto{
                                     AssetContext * asset_context,
                                     AssetMetadata * dependant_asset = nullptr)
     {
+
         //TEMP
         bool optimize_for_space = false;
         constexpr auto dbgctg = debug::category::data;
@@ -704,6 +707,7 @@ namespace proto{
                             : uvs[index_sets[i].uv_index
                                   + index_offset]
                 };
+
             mesh_extreme =
                 max(glm::length(mesh->vertices[i].position),mesh_extreme);
         }

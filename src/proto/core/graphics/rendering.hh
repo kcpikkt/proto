@@ -33,7 +33,8 @@ void render_span(Mesh * mesh, u32 index, bool simple = false) {
 
     //TODO(kacper): no need to stale all of them? perhaps stale only ones that
     //              you used?
-    gl::stale_all_texture_slots();
+    if(!simple)
+        gl::stale_all_texture_slots();
 }
 
 void render_mesh(Mesh * mesh, bool simple = false) {

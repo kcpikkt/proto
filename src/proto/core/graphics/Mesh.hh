@@ -5,7 +5,7 @@
 #include "proto/core/util/algo.hh"
 #include "proto/core/debug/logging.hh"
 #include "proto/core/containers/Array.hh"
-#include "proto/core/util/parsing.hh"
+#include "proto/core/util/Bitfield.hh"
 #include "proto/core/asset-system/common.hh"
 #include "proto/core/graphics/Material.hh"
 #include "proto/core/DataholderCRTP.hh"
@@ -37,6 +37,8 @@ struct Mesh : Asset, DataholderCRTP<Mesh>{
         u32 begin_index;
         u32 index_count;
         Material material;
+        Bitfield<u8> flags;
+        constexpr static u8 flip_uv_bit = BIT(0);
     };
 
     u32 VAO, VBO, EBO;
@@ -82,6 +84,28 @@ struct Mesh : Asset, DataholderCRTP<Mesh>{
         ret.spans_size = serialized_spans_size();
         
         return ret;
+    }
+
+    void _move(Mesh&& other) {
+        vertices = meta::move(other.vertices);
+        indices = meta::move(other.indices);
+        spans = meta::move(other.spans);
+
+        VAO = other.VAO;
+        VBO = other.VBO;
+        EBO = other.EBO;
+        _allocator = other._allocator;
+    }
+
+    Mesh() {}
+
+    Mesh(Mesh&& other) {
+        _move(meta::forward<Mesh>(other));
+    }
+
+    Mesh& operator=(Mesh&& other) {
+        _move(meta::forward<Mesh>(other));
+        return *this;
     }
 
     //FIXME(kacper);

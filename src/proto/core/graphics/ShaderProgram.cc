@@ -136,6 +136,13 @@ void ShaderProgram::set_uniform<GL_SAMPLER_2D, s32>
 
 // -----------
 template<>
+void ShaderProgram::set_uniform<GL_INT, s32>
+(const char * name, s32 value ) {
+    glUniform1i ( glGetUniformLocation(_program, name), (s32)value);
+}
+
+// -----------
+template<>
 void ShaderProgram::set_uniform<GL_UNSIGNED_INT, u32>
 (const char * name, u32 value ) {
     glUniform1ui ( glGetUniformLocation(_program, name), (s32)value);
@@ -250,38 +257,33 @@ void ShaderProgram::set_material(Material * material) {
     set_uniform <GL_FLOAT> ("u_material.shininess",
                 material->shininess);
 
-    Texture * ambient_map = get_asset<Texture>(material->ambient_map);
 
-    if(ambient_map)
+    Texture * map;
+
+    if( (map = get_asset<Texture>(material->ambient_map)) )
         set_uniform<GL_SAMPLER_2D>
-            ("u_material.ambient_map", gl::bind_texture(ambient_map));
+            ("u_material.ambient_map", gl::bind_texture(map));
     else
         set_uniform<GL_SAMPLER_2D>
             ("u_material.ambient_map", gl::bind_texture(ctx.default_ambient_map));
 
-    Texture * diffuse_map = get_asset<Texture>(material->diffuse_map);
-
-    if(diffuse_map)
+    if( (map = get_asset<Texture>(material->diffuse_map)) )
         set_uniform<GL_SAMPLER_2D>
-            ("u_material.diffuse_map", gl::bind_texture(diffuse_map));
+            ("u_material.diffuse_map", gl::bind_texture(map));
     else
         set_uniform<GL_SAMPLER_2D>
             ("u_material.diffuse_map", gl::bind_texture(ctx.default_diffuse_map));
 
-    Texture * specular_map = get_asset<Texture>(material->specular_map);
-
-    if(specular_map)
+    if( (map = get_asset<Texture>(material->specular_map)) )
         set_uniform<GL_SAMPLER_2D>
-            ("u_material.specular_map", gl::bind_texture(specular_map));
+            ("u_material.specular_map", gl::bind_texture(map));
     else
         set_uniform<GL_SAMPLER_2D>
             ("u_material.specular_map", gl::bind_texture(ctx.default_specular_map));
 
-    Texture * bump_map = get_asset<Texture>(material->bump_map);
-
-    if(bump_map)
+    if( (map = get_asset<Texture>(material->bump_map)) )
         set_uniform<GL_SAMPLER_2D>
-            ("u_material.bump_map", gl::bind_texture(bump_map));
+            ("u_material.bump_map", gl::bind_texture(map));
     else
         set_uniform<GL_SAMPLER_2D>
             ("u_material.bump_map", gl::bind_texture(ctx.default_bump_map));

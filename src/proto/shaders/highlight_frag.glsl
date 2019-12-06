@@ -13,7 +13,6 @@ uniform mat4 u_model;
 uniform mat4 u_dirlight_matrix;
 uniform vec3 u_cam_position;
 uniform vec4 u_highlight_color;
-
 out vec4 frag_color;
 
 void main() {

@@ -374,6 +374,9 @@ namespace serialization {
                                AssetContext * asset_context)
     {
         namespace sys = proto::platform;
+
+        log_info(debug::category::data,
+                 "Loading assets from directory ", path);
         AssetHandle ret = invalid_asset_handle;
         auto filenames = sys::ls(path);
         for(auto filename : filenames) {

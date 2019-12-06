@@ -326,16 +326,16 @@ void main() {
 )glsl";
 /////////////////////////////////////////////////////////////////
 const char * lamp_vert_src = R"glsl(
-#version 450 core
+#version 450
 layout (location = 0) in vec3 a_position;
-uniform mat4 u_model;
+uniform mat4 model;
 void main() {
     gl_Position = 
-        u_model * vec4(a_position,1.0);
+        model * vec4(a_position,1.0);
 })glsl";
 
 const char * lamp_geom_src = R"glsl(
-#version 450 core
+#version 450
 layout(triangles) in;
 layout(triangle_strip, max_vertices = 18) out;
 
@@ -343,19 +343,18 @@ uniform mat4 u_shadow_t[6];
 out vec4 frag_pos;
 
 void main() {
-    for(int face=0; face<6; face++) {
+    for(int face =0; face<6; face++) {
         gl_Layer = face;
         for(int i=0; i<3; i++) {
             frag_pos = gl_in[i].gl_Position;
             gl_Position = u_shadow_t[face] * frag_pos;
-            EmitVertex();
         }
         EndPrimitive();
     }
 })glsl";
 
 const char * lamp_frag_src = R"glsl(
-#version 450 core
+#version 450
 in vec4 frag_pos;
 
 uniform vec3 u_lamp_pos;
@@ -363,9 +362,12 @@ uniform float u_far_plane;
 
 void main() {
     float lamp_dist = length(frag_pos.xyz - u_lamp_pos);
-    lamp_dist = lamp_dist / 100.0;
+    lamp_dist = u_lamp_dist / u_far_plane;
     gl_FragDepth = lamp_dist;
 })glsl";
+
+
+
 
 
 bool inspect_mode = true; 
@@ -480,11 +482,6 @@ AssetHandle lightbulb;
 
 PROTO_INIT {
     ctx = proto::context;
-    ctx->texture_slots[0].flags.set(OpenGLContext::TextureSlot::reserved_bit);
-    ctx->texture_slots[1].flags.set(OpenGLContext::TextureSlot::reserved_bit);
-    ctx->texture_slots[2].flags.set(OpenGLContext::TextureSlot::reserved_bit);
-    ctx->texture_slots[3].flags.set(OpenGLContext::TextureSlot::reserved_bit);
-    ctx->texture_slots[4].flags.set(OpenGLContext::TextureSlot::reserved_bit);
 
     span_change_timestamp = context->clock.elapsed_time;
     //ctx->exit_sig = true;
@@ -557,9 +554,8 @@ PROTO_INIT {
 
 
     ////////////////////////////////////////////////////////////////////////
-    shadow_cubemap_size = ivec2(1024);
+    shadow_cubemap_size = vec2(1024, 1024);
     glGenTextures(1, &shadow_cubemap);
-    glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, shadow_cubemap);
 
     for(u8 i=0; i<6; i++) {
@@ -567,7 +563,6 @@ PROTO_INIT {
                      shadow_cubemap_size.x, shadow_cubemap_size.y, 0,
                      GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
     }
-
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -611,6 +606,8 @@ PROTO_INIT {
     lamp_shader.create_shader(graphics::ShaderType::Geom, lamp_geom_src);
     lamp_shader.create_shader(graphics::ShaderType::Frag, lamp_frag_src);
     lamp_shader.link();
+
+
 
     main_shader.init();
     main_shader.create_shader_from_file(graphics::ShaderType::Vert,
@@ -692,16 +689,8 @@ PROTO_INIT {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
-#include "proto/core/math/geometry.hh"
-
-///////////////////////////////////////////////////////////////////////////////
 int count = 0;
 PROTO_UPDATE {
-
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture
-        (GL_TEXTURE_2D,
-         get_asset<Texture>(ctx->meshes[0].spans[377].material.diffuse_map)->gl_id);
     proto::mat4 identity(1.0f);
 
     proto::mat4 model = identity;
@@ -717,7 +706,7 @@ PROTO_UPDATE {
     view = glm::translate(view, -cam_pos);
 
     proto::mat4 projection =
-        perspective(45.0f,
+        glm::perspective(45.0f,
                          (float)ctx->window_size.x / ctx->window_size.y,
                          1.1f, 3000.0f);
     proto::mat4 mvp = projection * view * model;
@@ -746,6 +735,7 @@ PROTO_UPDATE {
     //proto::vec3 light_pos(4* sin(ctx->clock.elapsed_time/10.0f), 30.0f,
     //                      4* cos(ctx->clock.elapsed_time/10.0f));
     //sun_pos = light_pos;
+
     glViewport(0, 0, 4096, 4096);
     glBindFramebuffer(GL_FRAMEBUFFER, shadow_map_FBO);
     glClear(GL_DEPTH_BUFFER_BIT);
@@ -765,49 +755,29 @@ PROTO_UPDATE {
     glBindFramebuffer(GL_FRAMEBUFFER, shadow_cubemap_FBO);
     glClear(GL_DEPTH_BUFFER_BIT);
 
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, shadow_cubemap);
-
     // TODO SETUP SHADER
+
+
     float aspect = (float)shadow_cubemap_size.x / (float)shadow_cubemap_size.y;
-    float near = 3.0f, far = 40.0f;
+    float near = 1.0f, far = 100.0f;
     Array<mat4> shadow_transforms; shadow_transforms.init(6, &ctx->memory);
 
-    float time = ctx->clock.elapsed_time;
-    lamp_pos = vec3(0.0,10.0 * cos(time) + 12.0,0.0);
-
-    mat4 lamp_model = identity;
-    lamp_model = glm::scale(lamp_model, vec3(300.0));
-    lamp_model = glm::translate(lamp_model, lamp_pos);
-
-    mat4 shadow_proj = perspective(M_PI/2,
-                       (float)shadow_cubemap_size.x/(float)shadow_cubemap_size.y,
-                       near, far);
-
     shadow_transforms.push_back
-        (glm::lookAt(lamp_pos, lamp_pos + vec3( 1.0,0.0,0.0), vec3(0.0,-1.0,0.0)));
+        (glm::lookAt(lamp_pos, lamp_pos + vec3( 1.0,0.0,0.0), vec3(0.0,1.0,0.0)));
     shadow_transforms.push_back
-        (glm::lookAt(lamp_pos, lamp_pos + vec3(-1.0,0.0,0.0), vec3(0.0,-1.0,0.0)));
+        (glm::lookAt(lamp_pos, lamp_pos + vec3(-1.0,0.0,0.0), vec3(0.0,1.0,0.0)));
     shadow_transforms.push_back
-        (glm::lookAt(lamp_pos, lamp_pos + vec3(0.0, 1.0,0.0), vec3(0.0, 0.0,1.0)));
+        (glm::lookAt(lamp_pos, lamp_pos + vec3(0.0, 1.0,0.0), vec3(0.0,0.0,1.0)));
     shadow_transforms.push_back
-        (glm::lookAt(lamp_pos, lamp_pos + vec3(0.0,-1.0,0.0), vec3(0.0, 0.0,-1.0)));
+        (glm::lookAt(lamp_pos, lamp_pos + vec3(0.0,-1.0,0.0), vec3(0.0,0.0,1.0)));
     shadow_transforms.push_back
-        (glm::lookAt(lamp_pos, lamp_pos + vec3(0.0,0.0, 1.0), vec3(0.0,-1.0,0.0)));
+        (glm::lookAt(lamp_pos, lamp_pos + vec3(0.0,0.0, 1.0), vec3(0.0,1.0,0.0)));
     shadow_transforms.push_back
-        (glm::lookAt(lamp_pos, lamp_pos + vec3(0.0,0.0,-1.0), vec3(0.0,-1.0,0.0)));
+        (glm::lookAt(lamp_pos, lamp_pos + vec3(0.0,0.0,-1.0), vec3(0.0,1.0,0.0)));
 
-    for(auto& t : shadow_transforms) t = shadow_proj * t;
 
-    auto mat_print = [](mat4 mat) {puts("");
-        printf("[%f %f %f]\n", mat[0][1], mat[1][0], mat[2][0]);
-        printf("[%f %f %f]\n", mat[1][1], mat[1][1], mat[2][1]);
-        printf("[%f %f %f]\n", mat[2][1], mat[1][2], mat[2][2]);
-    };
-
-    lamp_shader.set_uniform<GL_FLOAT>("u_far_plane", far);
+    lamp_shader.set_uniform<GL_FLOAT>("u_far_plane", &far);
     lamp_shader.set_uniform<GL_FLOAT_VEC3>("u_lamp_pos", &lamp_pos);
-    lamp_shader.set_uniform<GL_FLOAT_MAT4>("u_model", &model);
     lamp_shader.set_uniform<GL_FLOAT_MAT4>("u_shadow_t[0]", &shadow_transforms[0]);
     lamp_shader.set_uniform<GL_FLOAT_MAT4>("u_shadow_t[1]", &shadow_transforms[1]);
     lamp_shader.set_uniform<GL_FLOAT_MAT4>("u_shadow_t[2]", &shadow_transforms[2]);
@@ -816,7 +786,6 @@ PROTO_UPDATE {
     lamp_shader.set_uniform<GL_FLOAT_MAT4>("u_shadow_t[5]", &shadow_transforms[5]);
 
     gfx::render_mesh(&ctx->meshes[mesh_index], true);
-    
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     // SKYBOX PRE-RENDERING ===================================================
 
@@ -826,16 +795,16 @@ PROTO_UPDATE {
 
     glDepthMask(GL_FALSE);
     glCullFace(GL_FRONT);
-    auto & cube_mesh = (*get_asset<Mesh>(cube));
 
     skybox_shader.use();
     mat4 skybox_mv = projection * mat4(mat3(view));
     skybox_shader.set_uniform<GL_FLOAT_MAT4> ("u_mv", &skybox_mv);
+    auto & cube_mesh = (*get_asset<Mesh>(cube));
     auto begin_index = cube_mesh.spans[0].begin_index;
     auto index_count = cube_mesh.spans[0].index_count;
     cube_mesh.bind();
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, skybox_cubemap_gl_id);
+    //glBindTexture(GL_TEXTURE_CUBE_MAP, skybox_cubemap_gl_id);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, shadow_cubemap);
     glDrawArrays(GL_TRIANGLES, 0, cube_mesh.vertices.size());
 
     glDepthMask(GL_TRUE);
@@ -863,21 +832,22 @@ PROTO_UPDATE {
     vec2 resolution = (vec2)ctx->window_size;
     main_shader.set_uniform<GL_FLOAT_VEC2> ("u_resolution", &resolution);
 
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, shadow_cubemap);
 
     main_shader.set_uniform <GL_FLOAT_VEC3> ("u_dirlight[0].direction", &sun_dir);
     main_shader.set_uniform <GL_SAMPLER_2D> ("u_dirlight[0].shadow_map",
                                              gl::bind_texture(shadow_map) );
 
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, shadow_cubemap);
-    main_shader.set_uniform<GL_FLOAT_VEC3>("u_pointlight[0].position", &lamp_pos);
-    main_shader.set_uniform<GL_FLOAT>("u_pointlight[0].far", far);
-    main_shader.set_uniform<GL_FLOAT>("u_pointlight[0].near", near);
-    main_shader.set_uniform<GL_SAMPLER_2D>("u_pointlight[0].shadow_map", 0);
-
     gfx::render_mesh(&ctx->meshes[mesh_index]);
-    // main_shader.set_uniform<GL_FLOAT_MAT4> ("u_mvp", &cube_mvp);
-    // gfx::render_mesh(get_asset<Mesh>(cube));
+
+    main_shader.set_uniform<GL_FLOAT_MAT4> ("u_mvp", &cube_mvp);
+
+    //cube_mesh.bind();
+    //glBindTexture(GL_TEXTURE_CUBE_MAP, skybox_cubemap_gl_id);
+    //glDrawArrays(GL_TRIANGLES, 0, cube_mesh.vertices.size());
+
+    //gfx::render_mesh(get_asset<Mesh>(cube), true);
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, main_shader_ssbo);
 
@@ -951,9 +921,11 @@ PROTO_UPDATE {
         for(auto& slot : context->texture_slots) {
             position.y -= scale.y;
             using Slot = OpenGLContext::TextureSlot;
-            quad_shader.set_uniform<GL_FLOAT_VEC2> ("u_position", &position);
-            quad_shader.set_uniform<GL_SAMPLER_2D> ("quad_tex", index);
-            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+            if(slot.flags.check(Slot::bound_bit)) {
+                quad_shader.set_uniform<GL_FLOAT_VEC2> ("u_position", &position);
+                quad_shader.set_uniform<GL_SAMPLER_2D> ("quad_tex", index);
+                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+            }
             index++;
         }
 

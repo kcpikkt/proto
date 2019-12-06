@@ -16,7 +16,7 @@ namespace proto {
         }
         
         StringView view() {
-            return StringView(_data, size()); 
+            return StringView(_data, strlen(_data)); 
         }
 
         operator bool() { return _data; }

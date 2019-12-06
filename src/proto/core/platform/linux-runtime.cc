@@ -66,7 +66,7 @@ namespace platform {
 
 proto::ivec2 mouse_lock_pos = proto::ivec2(200,200);
 static void X_event_callback(XEvent& X_event) {
-    static MouseEvent prev_mouse_event{};
+    static MouseMoveEvent prev_mouse_move_event{};
     if(X_event.type == KeyPress || X_event.type == KeyRelease) {
         KeyEvent event;
         event.code =
@@ -76,19 +76,23 @@ static void X_event_callback(XEvent& X_event) {
 
         _context.key_input_channel.emit(event);
     } else if(X_event.type == MotionNotify) {
-        MouseEvent event;
-
-                event.coord = proto::vec2(X_event.xmotion.x,
+        MouseMoveEvent event;
+        event.coord = proto::vec2(X_event.xmotion.x,
                                   X_event.xmotion.y);
 
-        event.delta = prev_mouse_event.coord - event.coord;
+        event.delta = prev_mouse_move_event.coord - event.coord;
 
-        prev_mouse_event = event;
+        prev_mouse_move_event = event;
 
         if(!(X_event.xmotion.x == mouse_lock_pos.x &&
              X_event.xmotion.y == mouse_lock_pos.y)) {
-            _context.mouse_input_channel.emit(event);
+            _context.mouse_move_input_channel.emit(event);
         }
+    } else if (X_event.type == ButtonPress || X_event.type == ButtonRelease) {
+        MouseButtonEvent event;
+        event.coord = proto::vec2(X_event.xbutton.x,
+                                  X_event.xbutton.y);
+        _context.mouse_button_input_channel.emit(event);
     } else if (X_event.type == ConfigureNotify) {
 
         if(_context.window_size.x != X_event.xconfigure.width &&
@@ -130,6 +134,12 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
 
     proto::context = &_context;
 
+    namespace mem = proto::memory;
+
+    u64 _mem_size = mem::gigabytes(2);
+    void * _mem = malloc(_mem_size);
+    assert(!_context.memory.init(_mem, _mem_size));
+
     /***************************************************************
      * RUNTIME SETUP
      */
@@ -138,6 +148,13 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
     //               for now I just take the first arg as path to client lib
     assert(argc > 1);
     _context.clientlib_path = argv[1];
+
+    s32 cmdline_length = 0;
+    for(s32 i=0; i<argc; i++) cmdline_length += strlen(argv[i]);
+
+    _context.cmdline.init(cmdline_length, &_context.memory);
+
+    for(s32 i=0; i<argc; i++) _context.cmdline.store(argv[i]);
 
     // NOTE(kacper): here runtime first time opens dl to pass RuntimeSettings
     //               struct pointer to client_setup function, where client lib
@@ -207,7 +224,8 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
                  StructureNotifyMask |
                  PointerMotionMask |
                  ExposureMask |
-                 KeyPressMask);
+                 KeyPressMask |
+                 ButtonPressMask);
 
     static int visual_attribs[] =
         {GLX_RENDER_TYPE, GLX_RGBA_BIT,
@@ -217,6 +235,8 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
          GLX_GREEN_SIZE, 1,
          GLX_BLUE_SIZE, 1,
          GLX_DEPTH_SIZE, 3,
+         GLX_SAMPLE_BUFFERS  , 1, // MSAA
+         GLX_SAMPLES         , 4, // MSAA
          None
         };
 
@@ -286,7 +306,8 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
 
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    //glEnable(GL_MULTISAMPLE);  
+
+    glEnable(GL_MULTISAMPLE);  
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
@@ -300,12 +321,6 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
      * CONTEXT INITIALIZATION
      */
     // MEMORY
-    namespace mem = proto::memory;
-
-    u64 _mem_size = mem::gigabytes(2);
-    void * _mem = malloc(_mem_size);
-    assert(!_context.memory.init(_mem, _mem_size));
-
     _context.gp_string_allocator
         .init(&_context.memory, mem::megabytes(5));
 
@@ -321,8 +336,9 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
     _context.asset_metadata_allocator
         .init(&_context.memory, mem::megabytes(50));
 
-    _context.key_input_channel.init(100, &_context.memory);
-    _context.mouse_input_channel.init(100, &_context.memory);
+    _context.key_input_channel.init(10, &_context.memory);
+    _context.mouse_move_input_channel.init(10, &_context.memory);
+    _context.mouse_button_input_channel.init(10, &_context.memory);
 
     // INITS
     // OpenGLContext
@@ -367,8 +383,8 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
          { 255, 255, 255, 255}, { 255, 255, 255, 255}};
 
     struct { u8 ch[4]; } emergency_black_texture_data[] =
-        {{ 0, 0, 0, 0}, { 0, 0, 0, 0},
-         { 0, 0, 0, 0}, { 0, 0, 0, 0}};
+        {{ 0, 0, 0, 255}, { 0, 0, 0, 255},
+         { 0, 0, 0, 255}, { 0, 0, 0, 255}};
 
     _context.default_ambient_map =
         create_asset("default_ambient_map", "",

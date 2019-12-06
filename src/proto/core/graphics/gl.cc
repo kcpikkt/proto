@@ -2,6 +2,7 @@
 #include "proto/core/graphics/common.hh"
 #include "proto/core/context.hh"
 #include "proto/core/graphics/Texture.hh"
+#include "proto/core/graphics/Cubemap.hh"
 #include "proto/core/asset-system/interface.hh"
 #include "proto/core/debug/logging.hh"
 #include "proto/core/util/algo.hh"
@@ -9,8 +10,24 @@
 namespace proto {
 namespace graphics{
 namespace gl{
+
+    s32 bind_texture(AssetHandle texture_handle) {
+        if(!texture_handle) {
+            debug_warn(debug::category::graphics,
+                       "Texture handle passed to ", __PRETTY_FUNCTION__,
+                       " is invalid, no bindig performed");
+            return -1;
+        }
+        return bind_texture(get_asset<Texture>(texture_handle));
+    }
+
     s32 bind_texture(Texture * texture) {
-        assert(texture);
+        if(!texture) {
+            debug_warn(debug::category::graphics,
+                       "Pointer to texture passed to ", __PRETTY_FUNCTION__,
+                       " is null, no bindig performed");
+            return -1;
+        }
         return bind_texture(*texture);
     }
 
@@ -23,17 +40,22 @@ namespace gl{
         if(texture.flags.check(Texture::bound_bit)) {
             assert(belongs(texture.bound_unit, 0, (s32)ctx.texture_slots.size()));
             auto& slot = ctx.texture_slots[texture.bound_unit];
-            assert(slot.flags.check(Slot::bound_bit));
-            assert(slot.texture == texture.handle);
-            slot.flags.set(Slot::fresh_bit);
-            return texture.bound_unit;
+
+            if(!slot.flags.check(Slot::reserved_bit)) {
+                assert(slot.flags.check(Slot::bound_bit));
+                assert(slot.texture == texture.handle);
+                slot.flags.set(Slot::fresh_bit);
+                return texture.bound_unit;
+            }
         }
 
         auto& modindex = ctx.texture_slots_index;
         u32 loopcount = 0;
         do {
             if(loopcount++ >= ctx.texture_slots.size()) return -1;// no hit
-        } while(ctx.texture_slots[++modindex].flags.check(Slot::fresh_bit));
+        } while(modindex++,
+                ctx.texture_slots[modindex].flags.check(Slot::fresh_bit) ||
+                ctx.texture_slots[modindex].flags.check(Slot::reserved_bit) );
 
         auto& slot = context->texture_slots[modindex];
         AssetHandle prev_handle = slot.texture;
@@ -63,6 +85,8 @@ namespace gl{
 
         texture.flags.set(Texture::bound_bit);
         slot.flags.set(Slot::bound_bit | Slot::fresh_bit);
+        // cant bind reserved slot!
+        assert(!slot.flags.check(Slot::reserved_bit));
 
         assert(belongs(texture.bound_unit, 0ul, ctx.texture_slots.size()));
 
@@ -104,10 +128,6 @@ namespace gl{
         assert(proto::context);
         using Slot = proto::OpenGLContext::TextureSlot;
         for(auto& s : context->texture_slots) s.flags.unset(Slot::fresh_bit);
-    }
-
-    s32 bind_texture(AssetHandle texture_handle) {
-        return bind_texture(get_asset<Texture>(texture_handle));
     }
 
     void debug_print_texture_slots() {

@@ -14,6 +14,7 @@ namespace proto {
     struct InvalidAsset;
     struct Mesh;
     struct Texture;
+    struct Cubemap;
     struct Material;
 
     using AssetTypeIndex = u8;
@@ -37,6 +38,7 @@ namespace proto {
     PROTO_ASSET_TYPE(Mesh,         1);
     PROTO_ASSET_TYPE(Material,     2);
     PROTO_ASSET_TYPE(Texture,      3);
+    PROTO_ASSET_TYPE(Cubemap,      4);
 
     struct AssetHandle {
         u32 hash = 0;
@@ -69,6 +71,8 @@ namespace proto {
                 map_type_info<Material>();     break;
             case AssetType<Texture>::index:
                 map_type_info<Texture>();      break;
+            case AssetType<Cubemap>::index:
+                map_type_info<Cubemap>();      break;
             default:
                 map_type_info<InvalidAsset>(); break;
             }

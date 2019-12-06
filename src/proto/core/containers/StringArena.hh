@@ -47,9 +47,15 @@ struct StringArena : DataholderCRTP<StringArena>, debug::Marker{
         static constexpr u8 free_bit = 0;
 
         Offset() {}
-        // lazyness over 9k (I would rather call it DRY!)
+
         Offset(decltype(value) val, decltype(length) len)
             : length(len), value(val) {}
+
+        void _copy(const Offset& other) {
+            memcpy(this, &other, sizeof(Offset)); //idk
+        }
+        Offset(const Offset& other) { _copy(other); }
+        Offset& operator=(const Offset& other) { _copy(other); return *this; }
     };
 
     constexpr static u64 default_init_capacity = 32;

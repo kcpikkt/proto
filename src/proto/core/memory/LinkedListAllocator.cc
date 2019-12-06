@@ -327,12 +327,6 @@ LinkedListAllocator::try_split(Header * node,
         } else {
             _used -= new_node->size;
         }
-        puts(__func__);
-        //memdump(node);
-        //printf("old %#010x\n", (u64)node);
-        //printf("new %#010x\n", (u64)new_node);
-        //memdump(new_node);
-
         // NOTE(kacper): try_split does not check if split block is linked.
         //               Whether it was or not, if split was successful
         //               allocator is now in invalid state until node and new_node
@@ -470,14 +464,7 @@ LinkedListAllocator::find_free_node(size_t requested_size, Header ** prev_node){
     proto_assert(_first != nullptr);
     Header * lookup = _first;
     do{
-        if(lookup->magic_number != header_magic_number) {
-            debug_print();
-            vardump((*prev_node)->size);
-            memdump(lookup);
-            vardump(addr_offset(lookup));
-            vardump(_size);
-            memdump(*prev_node);
-        }
+        
         proto_assert(lookup->magic_number == header_magic_number);
 
         if( (lookup->flags & Header::FREE) &&
