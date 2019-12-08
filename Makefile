@@ -1,7 +1,7 @@
 
 cxx ?= clang++
-cxxflags = -std=c++17 -Wall -Wextra -Wno-unused-function
-dllflags = -fPIC -rdynamic
+cxxflags =  -fPIC -std=c++17 -Wall -Wextra -Wno-unused-function
+dllflags = -shared -rdynamic
 ldflags =  #-rpath /usr/local/lib --enable-new-dtags
 
 debug ?= 1
@@ -126,15 +126,22 @@ runtime: $(runtime)
 test: $(test)
 
 .PHONY: client
-client: $(client_objs) $(library)
+client: $(client_objs) $(proto_objs)
 	$(if $(client_src_dir),,\
 	$(error Client sources directory path variable 'client_src_dir' is not set. ))
 	$(if $(client_name),,\
 	$(error Client dynamic library name 'client_name' is not set. ))
-	$(if $(client_src),,\
+	$(if $(client_srcs),,\
 	$(error No source files in $(client_src_dir) ))
 
-	$(cxx) $(ldflags) $(dllflags) -o $(client_objs) $(library)
+#	$(eval proto_objs_filtered = $(filter-out %/entry-point.o, $(proto_objs)))
+	$(eval proto_objs_filtered = $(filter-out %-runtime.o, $(proto_objs)))
+
+	$(cxx) $(dllflags) $(ldflags) -o $(bin_dir)/$(client_name).so \
+		$(client_objs) $(proto_objs_filtered) $(libs)
+
+	echo $(runtime) $(bin_dir)/$(client_name).so > $(bin_dir)/run-$(client_name).sh
+	@chmod +x $(bin_dir)/run-$(client_name).sh
 
 $(client_objs): $(client_obj_dir)/%.o: $(client_src_dir)/%.cc
 	@echo $@

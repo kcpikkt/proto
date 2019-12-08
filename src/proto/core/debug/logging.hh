@@ -27,39 +27,32 @@
 
 namespace proto {
 namespace debug {
-    using log_level_t = uint8_t;
-
-    constexpr log_level_t info      = 1;
-    constexpr log_level_t warning   = 2;
-    constexpr log_level_t error     = 3;
-    constexpr log_level_t assertion = 4;
-
     struct logging {
-        static void _log_header(const log_level_t level,
-                                [[maybe_unused]]const log_category_t log_category,
+        static void _log_header(const Level level,
+                                [[maybe_unused]]const Category log_category,
                                 [[maybe_unused]]const char * file,
                                 [[maybe_unused]]const uint64_t line)
         {
-            if(level == info) {}
-            else if (level == warning)
+            if(level == level::info) {}
+            else if (level == level::warning)
                 printf(YELLOW("warning: "));
-            else if (level == error)
+            else if (level == level::error)
                 printf(RED("error: "));
-            else if (level == assertion)
+            else if (level == level::assertion)
                 printf("assertion: ");
             else
                 assert(false && "unknown log level");
         }
-        static void _debug_log_header(const log_level_t level,
-                                [[maybe_unused]]const log_category_t log_category,
+        static void _debug_log_header(const Level level,
+                                [[maybe_unused]]const Category log_category,
                                 const char * file,
                                 const uint64_t line)
         {
             printf("%s:%lu: ", file, line);
-            if(level == info) {}
-            else if (level == warning)
+            if(level == level::info) {}
+            else if (level == level::warning)
                 printf(YELLOW("warning: "));
-            else if (level == error)
+            else if (level == level::error)
                 printf(RED("error: "));
             else
                 assert(false && "unknown log level");
@@ -68,8 +61,8 @@ namespace debug {
  
 
         template<typename ...Ts>
-        static void _log(const log_level_t level,
-                        [[maybe_unused]]const log_category_t log_category,
+        static void _log(const Level level,
+                        [[maybe_unused]]const Category log_category,
                         const char * file,
                         const uint64_t line,
                         Ts... ts)
@@ -79,8 +72,8 @@ namespace debug {
             fflush(stdout);
         }
         template<typename ...Ts>
-        static void _debug_log(const log_level_t level,
-                        [[maybe_unused]]const log_category_t log_category,
+        static void _debug_log(const Level level,
+                        [[maybe_unused]]const Category log_category,
                         const char * file,
                         const uint64_t line,
                         Ts... ts)
@@ -90,52 +83,52 @@ namespace debug {
             fflush(stdout);
         }
     };
-#define log_info(CATEGORY, ...) (           \
+#define log_info(CATEGORY, ...) (         \
     proto::debug::logging::_log(          \
-        proto::debug::info, CATEGORY,      \
+        proto::debug::level::info, CATEGORY,     \
         __FILE__, __LINE__, __VA_ARGS__))
 
-#define log_warn(CATEGORY, ...) (           \
+#define log_warn(CATEGORY, ...) (         \
     proto::debug::logging::_log(          \
-        proto::debug::warning, CATEGORY,   \
+        proto::debug::level::warning, CATEGORY,  \
         __FILE__, __LINE__, __VA_ARGS__))
 
-#define log_error(CATEGORY, ...) (          \
+#define log_error(CATEGORY, ...) (        \
     proto::debug::logging::_log(          \
-        proto::debug::error, CATEGORY,     \
+        proto::debug::level::error, CATEGORY,    \
         __FILE__, __LINE__, __VA_ARGS__))
 
 
-#define log_info_f(CATEGORY, fmt, ...) (           \
-    proto::debug::logging::_log_f(          \
-        proto::debug::info, CATEGORY,      \
+#define log_info_f(CATEGORY, fmt, ...) (  \
+    proto::debug::logging::_log_f(        \
+        proto::debug::level::info, CATEGORY,     \
         __FILE__, __LINE__, fmt, __VA_ARGS__))
 
-#define log_warn_f(CATEGORY, fmt, ...) (        \
+#define log_warn_f(CATEGORY, fmt, ...) (  \
     proto::debug::logging::_log_f(             \
-        proto::debug::warning, CATEGORY,        \
+        proto::debug::level::warning, CATEGORY,        \
         __FILE__, __LINE__, fmt, __VA_ARGS__))
 
 #define log_error_f(CATEGORY, fmt, ...) (       \
     proto::debug::logging::_log_f(             \
-        proto::debug::error, CATEGORY,          \
+        proto::debug::level::error, CATEGORY,          \
         __FILE__, __LINE__, fmt, __VA_ARGS__))
 
 
 #define debug_info(CATEGORY, ...) (        \
     proto::debug::logging::_debug_log(          \
-        proto::debug::info, CATEGORY,      \
+        proto::debug::level::info, CATEGORY,      \
         __FILE__, __LINE__, __VA_ARGS__))
 
 
 #define debug_warn(CATEGORY, ...) (        \
     proto::debug::logging::_debug_log(          \
-        proto::debug::warning, CATEGORY,   \
+        proto::debug::level::warning, CATEGORY,   \
         __FILE__, __LINE__, __VA_ARGS__))
 
 #define debug_error(CATEGORY, ...) (       \
     proto::debug::logging::_debug_log(          \
-        proto::debug::error, CATEGORY,     \
+        proto::debug::level::error, CATEGORY,     \
         __FILE__, __LINE__, __VA_ARGS__))
 
 #define cond_debug_info(COND, CATEGORY, ...) {                 \
@@ -155,14 +148,14 @@ namespace debug {
     if(!(COND)) {                                 \
         trace();                                  \
         proto::debug::logging::_debug_log(        \
-            proto::debug::error, CATEGORY,     \
+            proto::debug::level::error, CATEGORY,     \
             __FILE__, __LINE__, __VA_ARGS__);     \
         assert(COND);                             \
     }}
 
 #define vardump(VARNAME) (           \
     proto::debug::logging::_log(          \
-        proto::debug::info, proto::debug::category::main, \
+        proto::debug::level::info, proto::debug::category::main, \
         __FILE__, __LINE__, PROTO_STR(VARNAME), "=", (VARNAME) ))
 
 } //namespace debug

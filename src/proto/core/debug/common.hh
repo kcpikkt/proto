@@ -3,16 +3,28 @@
 
 namespace proto {
 namespace debug {
-    using log_category_t = u64;
+    using Level = u8;
+    using Category = u8;
+
+    // TODO(kacper): bit silly maybe change that to enum
+    // thank god for sed
+    namespace level {
+        constexpr static Level all       = 0;
+        constexpr static Level info      = 1;
+        constexpr static Level warning   = 2;
+        constexpr static Level error     = 3;
+        constexpr static Level assertion = 4;
+    }
 
     namespace category {
-        constexpr log_category_t main     = BIT(1);
-        constexpr log_category_t io       = BIT(2);
-        constexpr log_category_t memory   = BIT(3);
-        constexpr log_category_t data     = BIT(4);
-        constexpr log_category_t graphics = BIT(5);
-        constexpr log_category_t physics  = BIT(6);
-    }
+        constexpr static Category all      = ~((Category)0);
+        constexpr static Category main     = BIT(0);
+        constexpr static Category io       = BIT(1);
+        constexpr static Category memory   = BIT(2);
+        constexpr static Category data     = BIT(3);
+        constexpr static Category graphics = BIT(4);
+        constexpr static Category physics  = BIT(5);
+    }                                           
 
 } // namespace proto {
 } // namespace debug {

@@ -56,7 +56,6 @@ namespace proto {
         // temp
         ModCounter<u32> texture_slots_index;
 
-
         graphics::ShaderProgram * current_shader = nullptr; //tmp
         AssetHandle default_ambient_map;
         AssetHandle default_diffuse_map;
@@ -110,6 +109,9 @@ namespace proto {
         Channel<KeyEvent> key_input_channel;
         Channel<MouseMoveEvent> mouse_move_input_channel;
         Channel<MouseButtonEvent> mouse_button_input_channel;
+
+        Bitfield<debug::Category> stdout_log_categories = debug::category::all;
+        debug::Level stdout_log_level = debug::level::all;
 
         bool exit_sig = false;
 #    if defined(PROTO_PLATFORM_WINDOWS)
