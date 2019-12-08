@@ -20,7 +20,7 @@ namespace proto {
     T * get_asset(AssetContext * asset_context,
                   AssetHandle handle);
 
-       AssetMetadata * get_metadata(AssetHandle handle);
+    AssetMetadata * get_metadata(AssetHandle handle);
     AssetMetadata * get_metadata(AssetContext * asset_context,
                                  AssetHandle handle);
     // just proxies

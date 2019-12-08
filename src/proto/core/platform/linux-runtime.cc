@@ -361,6 +361,9 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
     set_debug_marker(_context.textures, "context.textures", "main texture array");
     _context.textures.init(100, &_context.memory);
 
+    set_debug_marker(_context.cubemaps, "context.cubemaps", "main cubemaps array");
+    _context.cubemaps.init(10, &_context.memory);
+
     // Context
 
     if(settings.asset_paths &&
@@ -388,16 +391,16 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
 
     _context.default_ambient_map =
         create_asset("default_ambient_map", "",
-                     AssetType<Texture>::index);
+                     AssetType<Texture2D>::index);
     _context.default_diffuse_map =
         create_asset("default_diffuse_map", "",
-                     AssetType<Texture>::index);
+                     AssetType<Texture2D>::index);
     _context.default_specular_map =
         create_asset("default_specular_map", "",
-                     AssetType<Texture>::index);
+                     AssetType<Texture2D>::index);
     _context.default_bump_map =
         create_asset("default_bump_map", "",
-                     AssetType<Texture>::index);
+                     AssetType<Texture2D>::index);
 
     if(!_context.default_ambient_map) 
         debug_warn(debug::category::main,
@@ -414,29 +417,29 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
 
 
 
-    Texture * default_ambient_texture =
-        get_asset<Texture>(_context.default_ambient_map);
+    Texture2D * default_ambient_texture =
+        get_asset<Texture2D>(_context.default_ambient_map);
     assert(default_ambient_texture);
     default_ambient_texture->data = (void*)emergency_white_texture_data;
     default_ambient_texture->size = ivec2(2,2);
     default_ambient_texture->channels = 4;
 
-    Texture * default_diffuse_texture =
-        get_asset<Texture>(_context.default_diffuse_map);
+    Texture2D * default_diffuse_texture =
+        get_asset<Texture2D>(_context.default_diffuse_map);
     assert(default_diffuse_texture);
     default_diffuse_texture->data = (void*)emergency_texture_data;
     default_diffuse_texture->size = ivec2(2,2);
     default_diffuse_texture->channels = 4;
 
-    Texture * default_specular_texture =
-        get_asset<Texture>(_context.default_specular_map);
+    Texture2D * default_specular_texture =
+        get_asset<Texture2D>(_context.default_specular_map);
     assert(default_specular_texture);
-    default_specular_texture->data = (void*)emergency_white_texture_data;
+    default_specular_texture->data = (void*)emergency_black_texture_data;
     default_specular_texture->size = ivec2(2,2);
     default_specular_texture->channels = 4;
 
-    Texture * default_bump_texture =
-        get_asset<Texture>(_context.default_bump_map);
+    Texture2D * default_bump_texture =
+        get_asset<Texture2D>(_context.default_bump_map);
     assert(default_bump_texture);
     default_bump_texture->data = (void*)emergency_black_texture_data;
     default_bump_texture->size = ivec2(2,2);

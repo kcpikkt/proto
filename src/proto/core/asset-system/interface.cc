@@ -1,5 +1,8 @@
 #include "proto/core/asset-system/interface.hh"
 #include "proto/core/math/hash.hh"
+#include "proto/core/graphics/Texture2D.hh"
+#include "proto/core/graphics/Cubemap.hh"
+#include "proto/core/graphics/Mesh.hh"
 
 namespace proto {
 AssetHandle make_handle(StringView name, AssetTypeIndex type){
@@ -42,7 +45,8 @@ AssetHandle create_asset(AssetContext * asset_context,
     switch(type) {
     case AssetType<Mesh>::index:     { insert_arr = &reg.meshes;   } break;
     case AssetType<Material>::index: { insert_arr = &reg.materials;} break;
-    case AssetType<Texture>::index:  { insert_arr = &reg.textures; } break;
+    case AssetType<Texture2D>::index:{ insert_arr = &reg.textures; } break;
+    case AssetType<Cubemap>::index:  { insert_arr = &reg.cubemaps; } break;
     default:
         debug_warn(1, "requested asset of unsupported type");
     }
@@ -90,18 +94,30 @@ AssetHandle create_asset(AssetContext * asset_context,
             material->handle = metadata->handle;
 
                    } break;
-        case AssetType<Texture>::index:  {
+        case AssetType<Texture2D>::index:  {
             ctx.textures.push_back();
 
-            Texture * texture = &ctx.textures.back();
+            Texture2D * texture = &ctx.textures.back();
             assert(texture);
 
             texture->init(&context->memory);
 
             texture->handle = metadata->handle;
         } break;
+        case AssetType<Cubemap>::index:  {
+            ctx.cubemaps.push_back();
+
+            Cubemap * cubemap = &ctx.cubemaps.back();
+            assert(cubemap);
+
+            cubemap->init();
+
+            cubemap->handle = metadata->handle;
+        } break;
         default:
-            debug_warn(1, "requested asset of unsupported type");
+            debug_warn(1, "requested asset of unsupported type: ",
+                       AssetType(type).name);
+
         }
                 return metadata->handle;
     }
@@ -137,7 +153,7 @@ void destroy_asset(AssetContext * asset_context,
     case AssetType<Material>::index: {
         PROTO_NOT_IMPLEMENTED;
     } break;
-    case AssetType<Texture>::index:  {
+    case AssetType<Texture2D>::index:  {
         //Texture * texture = get_asset<Texture>(handle);
         PROTO_NOT_IMPLEMENTED;
     } break;
@@ -196,7 +212,7 @@ T * get_asset(AssetHandle handle) {
 
 template<typename T>
 T * get_asset(AssetContext * asset_context,
-                     AssetHandle handle) {
+              AssetHandle handle) {
     AssetContext & ctx = *asset_context;
 
     static_assert(meta::is_base_of_v<Asset, T>);
@@ -208,8 +224,18 @@ T * get_asset(AssetContext * asset_context,
     } else if constexpr (meta::is_same_v<T, Material>) {
         lookup_arr =  &ctx.materials;
 
-    } else if constexpr (meta::is_same_v<T, Texture>) {
+    } else if constexpr (meta::is_same_v<T, TextureInterface>) {
+        /**/ if(handle.type == AssetType<Texture2D>::index)
+            return get_asset<Texture2D>(&ctx, handle);
+        else if(handle.type == AssetType<Cubemap>::index)
+            return get_asset<Cubemap>(&ctx, handle);
+        else
+            lookup_arr = nullptr;
+    } else if constexpr (meta::is_same_v<T, Texture2D>) {
         lookup_arr =  &ctx.textures;
+
+    } else if constexpr (meta::is_same_v<T, Cubemap>) {
+        lookup_arr =  &ctx.cubemaps;
 
     } else {
         assert(0 && "this should not even be instantiatied");
@@ -224,9 +250,11 @@ T * get_asset(AssetContext * asset_context,
     return nullptr;
 }
 
-template Mesh *     get_asset<Mesh>(AssetHandle handle);
-template Material * get_asset<Material>(AssetHandle handle);
-template Texture *  get_asset<Texture>(AssetHandle handle);
+template Mesh *      get_asset<Mesh>(AssetHandle handle);
+template Material *  get_asset<Material>(AssetHandle handle);
+template Texture2D * get_asset<Texture2D>(AssetHandle handle);
+template Cubemap * get_asset<Cubemap>(AssetHandle handle);
+template TextureInterface * get_asset<TextureInterface>(AssetHandle handle);
 
 AssetMetadata * get_metadata(AssetHandle handle) {
     return get_metadata(context, handle);
@@ -242,7 +270,8 @@ AssetMetadata * get_metadata(AssetContext * asset_context,
     switch(handle.type) {
     case AssetType<Mesh>::index:     { lookup_arr = &reg.meshes;    } break;
     case AssetType<Material>::index: { lookup_arr = &reg.materials; } break;
-    case AssetType<Texture>::index:  { lookup_arr = &reg.textures;  } break;
+    case AssetType<Texture2D>::index:{ lookup_arr = &reg.textures;  } break;
+    case AssetType<Cubemap>::index:  { lookup_arr = &reg.cubemaps;  } break;
     default:
         debug_warn(1, "requested metadata of asset of unsupported type");
     }

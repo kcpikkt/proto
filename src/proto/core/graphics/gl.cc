@@ -1,7 +1,7 @@
 #include "proto/core/graphics/gl.hh"
 #include "proto/core/graphics/common.hh"
 #include "proto/core/context.hh"
-#include "proto/core/graphics/Texture.hh"
+#include "proto/core/graphics/Texture2D.hh"
 #include "proto/core/graphics/Cubemap.hh"
 #include "proto/core/asset-system/interface.hh"
 #include "proto/core/debug/logging.hh"
@@ -12,16 +12,30 @@ namespace graphics{
 namespace gl{
 
     s32 bind_texture(AssetHandle texture_handle) {
-        if(!texture_handle) {
-            debug_warn(debug::category::graphics,
-                       "Texture handle passed to ", __PRETTY_FUNCTION__,
-                       " is invalid, no bindig performed");
-            return -1;
-        }
-        return bind_texture(get_asset<Texture>(texture_handle));
+        assert(!glGetError());
+        auto fail =
+            [](){
+                debug_warn(debug::category::graphics,
+                           "Texture handle passed to ", __PRETTY_FUNCTION__,
+                           " is invalid, no bindig performed");
+                return -1;};
+        auto type = AssetType(texture_handle.type).index;
+
+        if(!texture_handle) return fail();
+
+        /**/ if(type == AssetType<Texture2D>::index)
+            return bind_texture(get_asset<Texture2D>(texture_handle));
+        else if(type == AssetType<Cubemap>::index)
+            return bind_texture(get_asset<Cubemap>(texture_handle));
+        else
+            return fail();
     }
 
-    s32 bind_texture(Texture * texture) {
+    template<typename T>
+    auto bind_texture(T * texture) ->
+        meta::enable_if_t<meta::is_base_of_v<TextureInterface, T>,s32>
+    {
+        assert(!glGetError());
         if(!texture) {
             debug_warn(debug::category::graphics,
                        "Pointer to texture passed to ", __PRETTY_FUNCTION__,
@@ -31,13 +45,16 @@ namespace gl{
         return bind_texture(*texture);
     }
 
-    s32 bind_texture(Texture & texture) {
+    template<typename T>
+    auto bind_texture(T & texture) ->
+        meta::enable_if_t<meta::is_base_of_v<TextureInterface, T>,s32>
+    {
         assert(proto::context);
         auto& ctx = *proto::context;
 
         using Slot = OpenGLContext::TextureSlot;
         
-        if(texture.flags.check(Texture::bound_bit)) {
+        if(texture.flags.check(TextureInterface::bound_bit)) {
             assert(belongs(texture.bound_unit, 0, (s32)ctx.texture_slots.size()));
             auto& slot = ctx.texture_slots[texture.bound_unit];
 
@@ -61,29 +78,42 @@ namespace gl{
         AssetHandle prev_handle = slot.texture;
 
         if(prev_handle) {
-            Texture * prev_texture = get_asset<Texture>(prev_handle);
+            TextureInterface * prev_texture =
+                get_asset<TextureInterface>(prev_handle);
             assert(prev_texture);
-            if(!(prev_texture->bound_unit == modindex)) {
+            if(!(prev_texture->bound_unit == (s32)modindex)) {
                 debug_print_texture_slots();
                 vardump(prev_texture->bound_unit);
                 vardump((u8)modindex);
                 vardump(get_metadata(prev_texture->handle)->name);
             }
 
-            assert(prev_texture->bound_unit == modindex);
+            assert(prev_texture->bound_unit == (s32)modindex);
 
             prev_texture->bound_unit = -1;
-            prev_texture->flags.unset(Texture::bound_bit);
+            prev_texture->flags.unset(TextureInterface::bound_bit);
         }
 
         assert(texture.gl_id >= 0);
         glActiveTexture(GL_TEXTURE0 + modindex);
-        glBindTexture(GL_TEXTURE_2D, texture.gl_id);
+        assert(!glGetError());
+
+        /*  */ if constexpr(meta::is_same_v<T, Texture2D>) {
+            slot.type = AssetType<Texture2D>::index;
+            glBindTexture(GL_TEXTURE_2D, texture.gl_id);
+            assert(!glGetError());
+        } else if constexpr(meta::is_same_v<T, Cubemap>) {
+            slot.type = AssetType<Cubemap>::index;
+            glBindTexture(GL_TEXTURE_CUBE_MAP, texture.gl_id);
+            assert(!glGetError());
+        }
+        assert(!glGetError());
+
         slot.texture = texture.handle;
 
         texture.bound_unit = (s32)modindex;
 
-        texture.flags.set(Texture::bound_bit);
+        texture.flags.set(TextureInterface::bound_bit);
         slot.flags.set(Slot::bound_bit | Slot::fresh_bit);
         // cant bind reserved slot!
         assert(!slot.flags.check(Slot::reserved_bit));
@@ -92,6 +122,94 @@ namespace gl{
 
         return modindex;
     }
+
+    ////////////////////////////////////////////////////////////////////
+
+    s32 unbind_texture(AssetHandle texture_handle) {
+        assert(!glGetError());
+        auto fail =
+            [](){
+                debug_warn(debug::category::graphics,
+                           "Texture handle passed to ", __PRETTY_FUNCTION__,
+                           " is invalid, no unbindig performed");
+                return -1;};
+        auto type = AssetType(texture_handle.type).index;
+
+        if(!texture_handle) return fail();
+
+        /**/ if(type == AssetType<Texture2D>::index)
+            return unbind_texture(get_asset<Texture2D>(texture_handle));
+        else if(type == AssetType<Cubemap>::index)
+            return unbind_texture(get_asset<Cubemap>(texture_handle));
+        else
+            return fail();
+    }
+
+    template<typename T>
+    auto unbind_texture(T * texture) ->
+        meta::enable_if_t<meta::is_base_of_v<TextureInterface, T>,s32>
+    {
+        assert(!glGetError());
+        if(!texture) {
+            debug_warn(debug::category::graphics,
+                       "Pointer to texture passed to ", __PRETTY_FUNCTION__,
+                       " is null, no bindig performed");
+            return -1;
+        }
+        return unbind_texture(*texture);
+    }
+
+    template<typename T>
+    auto unbind_texture(T & texture) ->
+        meta::enable_if_t<meta::is_base_of_v<TextureInterface, T>,s32>
+    {
+        assert(proto::context);
+        auto& ctx = *proto::context;
+
+        using Slot = OpenGLContext::TextureSlot;
+        s32 slot_index;
+        
+        if(texture.flags.check(TextureInterface::bound_bit)) {
+            assert(belongs(texture.bound_unit, 0, (s32)ctx.texture_slots.size()));
+
+            slot_index = texture.bound_unit;
+            auto& slot = ctx.texture_slots[texture.bound_unit];
+
+            assert(slot.flags.check(Slot::bound_bit));
+            assert(slot.texture == texture.handle);
+
+            slot.flags.unset(Slot::fresh_bit);
+            slot.flags.unset(Slot::bound_bit);
+            slot.texture = invalid_asset_handle;
+
+            texture.flags.unset(TextureInterface::bound_bit);
+            texture.bound_unit = -1;
+        } else {
+            auto * metadata = get_metadata(texture.handle);
+            assert(metadata);
+            debug_warn(debug::category::graphics,
+                       "Tried to unbind not bound texture ", metadata->name);
+            return -1;
+        }
+        return slot_index;
+    }
+ 
+
+    template s32 bind_texture<Texture2D>(Texture2D*);
+    template s32 bind_texture<Cubemap>(Cubemap*);
+    template s32 bind_texture<TextureInterface>(TextureInterface*);
+
+    template s32 bind_texture<Texture2D>(Texture2D&);
+    template s32 bind_texture<Cubemap>(Cubemap&);
+
+
+    template s32 unbind_texture<Texture2D>(Texture2D*);
+    template s32 unbind_texture<Cubemap>(Cubemap*);
+    template s32 unbind_texture<TextureInterface>(TextureInterface*);
+
+    template s32 unbind_texture<Texture2D>(Texture2D&);
+    template s32 unbind_texture<Cubemap>(Cubemap&);
+
 
     void unbind_texture_slot(s32 index) {
         assert(proto::context);
@@ -103,12 +221,12 @@ namespace gl{
         auto& slot = ctx.texture_slots[index];
 
         if(slot.flags.check(Slot::bound_bit)) {
-            Texture * texture = get_asset<Texture>(slot.texture);
+            Texture2D * texture = get_asset<Texture2D>(slot.texture);
             assert(texture);
-            assert(texture->flags.check(Texture::bound_bit));
+            assert(texture->flags.check(Texture2D::bound_bit));
             assert(index == texture->bound_unit);
 
-            texture->flags.unset(Texture::bound_bit);
+            texture->flags.unset(Texture2D::bound_bit);
             texture->bound_unit = -1;
             slot.flags.unset(Slot::bound_bit);
             slot.flags.unset(Slot::fresh_bit);
@@ -134,13 +252,12 @@ namespace gl{
         printf("Texture units state\n");
         using Slot = OpenGLContext::TextureSlot;
 
-        for(s32 i=0; i<context->texture_slots.size(); i++) {
-            printf("[%.2d]", i);
+        for(u32 i=0; i<context->texture_slots.size(); i++) {
             auto& s = context->texture_slots[i];
-
+            printf("[%.2d:%s]", i, AssetType(s.type).name);
             if(s.texture) {
                 auto * metadata = get_metadata(s.texture);
-                auto * texture = get_asset<Texture>(s.texture);
+                auto * texture = get_asset<TextureInterface>(s.texture);
                 printf(" %d %s", texture->bound_unit, metadata->name);
                 if(s.flags.check(Slot::fresh_bit)) printf(" (fresh)");
                 puts("");
@@ -152,7 +269,7 @@ namespace gl{
 
     template<typename T> void gpu_upload(T *);
 
-    template<> void gpu_upload<Texture>(Texture * tex) {
+    template<> void gpu_upload<Texture2D>(Texture2D * tex) {
         assert(tex);
         if(!tex->data) {
             debug_warn(debug::category::graphics,

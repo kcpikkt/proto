@@ -1,0 +1,156 @@
+#version 450
+
+in struct VertOut {
+    vec3 position;
+    vec3 normal;
+    vec2 uv;
+} frag_in;
+
+uniform struct GBuffer {
+    sampler2D position;
+    sampler2D normal;
+    sampler2D albedo_spec;
+} gbuf;
+
+uniform struct Material {
+    vec3 diffuse;
+    vec3 ambient;
+    vec3 specular;
+    float shininess;
+    sampler2D diffuse_map;
+    sampler2D ambient_map;
+    sampler2D specular_map;
+    sampler2D bump_map;
+} u_material;
+
+uniform struct DirectionalLight {
+    mat4 matrix;
+    sampler2D shadow_map;
+    float far;
+    vec3 direction;
+    vec3 color;
+    float intensity;
+} u_dirlight[1];
+
+const int pointlight_count = 3;
+uniform struct PointLight {
+    vec3 position;
+    vec3 color;
+    samplerCube shadow_map;
+    float far;
+    float intensity;
+    int on;
+} u_pointlight[pointlight_count];
+
+uniform float u_time;
+uniform vec3 u_cam_pos;
+uniform mat4 u_model;
+
+out vec4 frag_color;
+
+#define clamp01(X) clamp(X, 0.0, 1.0)
+
+// blinn-phong accumulators
+vec3 frag_ambient = vec3(0.0),
+     frag_diffuse = vec3(0.0),
+     frag_specular = vec3(0.0);
+
+vec3 frag_light = vec3(0.0);
+
+// in loop temporals
+vec3 light;
+vec3 diffuse;
+vec3 specular;
+float angle_factor;
+
+vec3 frag2light;
+float frag2light_dist;
+float light_intensity;
+float shadowmap_depth;
+float frag_depth;
+
+float shadow_bias = 0.05;
+float shadow;
+float bias = 0.001;
+float normal_offset = 0.05;
+vec4 dirlight_space_frag_pos;
+vec3 dirlight_proj_coords;
+
+void main() {
+    // gbuffer
+    vec3  g_frag_pos = texture(gbuf.position, frag_in.uv).rgb;
+    vec3  g_normal   = texture(gbuf.normal, frag_in.uv).rgb;
+    vec3  g_albedo   = texture(gbuf.albedo_spec, frag_in.uv).rgb;
+    float g_specular = texture(gbuf.albedo_spec, frag_in.uv).a;
+
+    vec3 frag2cam = normalize(u_cam_pos - g_frag_pos);
+
+    frag_ambient = g_albedo * 0.14;
+    // DIRECTIONAL LIGHT
+    dirlight_space_frag_pos = (u_dirlight[0].matrix * vec4(g_frag_pos,1.0));
+    dirlight_proj_coords = dirlight_space_frag_pos.xyz / dirlight_space_frag_pos.w;
+    dirlight_proj_coords = dirlight_proj_coords * 0.5 + 0.5;
+    frag_depth = dirlight_proj_coords.z;
+
+    shadowmap_depth = texture(u_dirlight[0].shadow_map,
+                              dirlight_proj_coords.xy).r;
+
+    if(frag_depth - bias < shadowmap_depth) {
+        angle_factor = clamp(dot(g_normal, -u_dirlight[0].direction), 0.0, 1.0);
+
+        light = u_dirlight[0].color * u_dirlight[0].intensity;
+
+        diffuse = light * angle_factor * g_albedo;
+
+        angle_factor = clamp(dot(g_normal, -u_dirlight[0].direction), 0.0, 1.0);
+
+        angle_factor = dot(reflect(normalize(-u_dirlight[0].direction),
+                                g_normal), -frag2cam);
+        angle_factor = clamp(angle_factor, 0.0, 1.0);
+        angle_factor = pow(angle_factor, max(1.0,u_material.shininess));
+
+        diffuse *= (1.0 - angle_factor);
+
+        specular = light * angle_factor * g_specular;
+
+        frag_diffuse += diffuse;
+        frag_specular += specular;
+    }
+
+    // POINT LIGHTS
+    for(int i=0; i<pointlight_count-2; i++) {
+        if(u_pointlight[i].on != 0) {
+            frag2light = u_pointlight[i].position -
+                          (g_frag_pos + g_normal * normal_offset);
+
+            shadowmap_depth = texture(u_pointlight[i].shadow_map,
+                                      -frag2light).r * u_pointlight[i].far;
+
+            
+            if(length(frag2light) > shadowmap_depth) continue;
+            // diffuse angle factor
+            angle_factor = clamp(dot(g_normal, frag2light), 0.0, 1.0);
+
+            frag2light_dist = length(frag2light);
+            light_intensity = u_pointlight[i].intensity / pow(frag2light_dist, 2.0);
+            light = light_intensity * u_pointlight[i].color;
+            diffuse = light * angle_factor * g_albedo;
+            // specular angle factor
+            
+            angle_factor = dot(reflect(normalize(frag2light), g_normal), -frag2cam);
+            angle_factor = clamp(angle_factor, 0.0, 1.0);
+            angle_factor = pow(angle_factor, max(1.0,u_material.shininess));
+
+            diffuse *= (1.0 - angle_factor);
+
+            specular = light * angle_factor * g_specular;
+
+            frag_diffuse += diffuse;
+            frag_specular += specular;
+        }
+    }
+
+    frag2light = u_pointlight[0].position - g_frag_pos;
+
+    frag_color = vec4(frag_diffuse + frag_specular + frag_ambient , 1.0);
+}

@@ -1,3 +1,4 @@
+// DEPRECATED, BE SANE, USE ASSIMP OR SOMETHING
 #pragma once
 #include "proto/core/platform/common.hh"
 #include "proto/core/common.hh"
@@ -6,7 +7,7 @@
 #include "proto/core/debug/logging.hh"
 #include "proto/core/debug/markers.hh"
 #include "proto/core/graphics/Mesh.hh"
-#include "proto/core/graphics/Texture.hh"
+#include "proto/core/graphics/Texture2D.hh"
 #include "proto/core/asset-system/interface.hh"
 #include "proto/core/context.hh"
 #include "proto/core/platform/api.hh"
@@ -69,15 +70,15 @@ namespace proto{
 
         AssetHandle handle = create_asset(name,
                                           sys::dirname_view(filepath),
-                                          AssetType<Texture>::index);
+                                          AssetType<Texture2D>::index);
         if(!handle) {
             debug_warn(debug::category::data,
                        "Could not create asset for ", name,
                        " in file ", filepath);
             return handle;
         }
-        Texture * texture =
-            get_asset<Texture>(handle);
+        Texture2D * texture =
+            get_asset<Texture2D>(handle);
 
         //TODO(kacper): proper message
         if(!texture) debug_warn(1, "texture is null");
@@ -188,7 +189,7 @@ namespace proto{
                 } else if(!strncmp(cursor, "map_", 4)) {
                     cursor+=4;
                     AssetMetadata * metadata = get_metadata(handle);
-                    Texture * texture_already = nullptr;
+                    Texture2D * texture_already = nullptr;
                     AssetHandle * map = nullptr;
                     StringView texpath;
 
@@ -216,9 +217,9 @@ namespace proto{
                     if(map && texpath) {
                         AssetHandle handle =
                             make_handle(sys::basename_view(texpath),
-                                        AssetType<Texture>::index);
+                                        AssetType<Texture2D>::index);
 
-                        texture_already = get_asset<Texture>(handle);
+                        texture_already = get_asset<Texture2D>(handle);
 
                         if(!texture_already) textures_count++;
 

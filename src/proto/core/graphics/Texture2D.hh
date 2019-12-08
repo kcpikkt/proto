@@ -3,14 +3,14 @@
 #include "proto/core/containers/Array.hh"
 #include "proto/core/memory/common.hh"
 #include "proto/core/graphics/common.hh"
-#include "proto/core/util/Bitfield.hh"
+#include "proto/core/graphics/TextureInterface.hh"
 
 namespace proto {
-    struct Texture;
+    struct Texture2D;
 namespace serialization {
 
     template<>
-    struct AssetHeader<Texture> {
+    struct AssetHeader<Texture2D> {
         ivec2 size;
         u8 channels;
         u64 data_offset;
@@ -18,17 +18,12 @@ namespace serialization {
     };
 } // namespace proto {
 
-struct Texture : Asset, DataholderCRTP<Texture> {
+struct Texture2D :
+        DataholderCRTP<Texture2D>,
+        TextureInterface
+{
     memory::Allocator * _allocator;
-    u8 channels;
-    u32 gl_id;
-    s32 bound_unit = -1;
     void * data;
-    ivec2 size;
-    Bitfield<u8> flags;
-    constexpr static u8 gpu_uploaded_bit = BIT(1);
-    constexpr static u8 bound_bit        = BIT(2);
-
    
     u64 serialized_data_size() {
         return size.x * size.y * channels * sizeof(u8);
@@ -36,36 +31,32 @@ struct Texture : Asset, DataholderCRTP<Texture> {
 
     u64 serialized_size() {
         return
-            next_multiple(16, sizeof(serialization::AssetHeader<Texture>)) +
+            next_multiple(16, sizeof(serialization::AssetHeader<Texture2D>)) +
             next_multiple(16, serialized_data_size());
     }
 
-    serialization::AssetHeader<Texture> serialization_header_map() {
-        serialization::AssetHeader<Texture> ret;
+    serialization::AssetHeader<Texture2D> serialization_header_map() {
+        serialization::AssetHeader<Texture2D> ret;
         ret.size = size;
         ret.channels = channels;
-        ret.data_offset = sizeof(serialization::AssetHeader<Texture>);
+        ret.data_offset = sizeof(serialization::AssetHeader<Texture2D>);
         ret.data_size = serialized_data_size();
         return ret;
     }
-    void _move(Texture&& other) {
+    void _move(Texture2D&& other) {
+        TextureInterface::_move(meta::move(other));
         _allocator = other._allocator;
-        channels   = other.channels;
-        gl_id      = other.gl_id;
-        bound_unit = other.bound_unit;
         data       = other.data;
-        size       = other.size;
-        flags      = other.flags;
     }
 
-    Texture() {}
+    Texture2D() {}
 
-    Texture(Texture&& other) {
-        _move(meta::forward<Texture>(other));
+    Texture2D(Texture2D&& other) {
+        _move(meta::forward<Texture2D>(other));
     }
 
-    Texture& operator=(Texture&& other) {
-        _move(meta::forward<Texture>(other));
+    Texture2D& operator=(Texture2D&& other) {
+        _move(meta::forward<Texture2D>(other));
         return *this;
     }
 

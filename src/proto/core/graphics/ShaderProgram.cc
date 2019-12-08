@@ -258,30 +258,30 @@ void ShaderProgram::set_material(Material * material) {
                 material->shininess);
 
 
-    Texture * map;
+    Texture2D * map;
 
-    if( (map = get_asset<Texture>(material->ambient_map)) )
+    if( (map = get_asset<Texture2D>(material->ambient_map)) )
         set_uniform<GL_SAMPLER_2D>
             ("u_material.ambient_map", gl::bind_texture(map));
     else
         set_uniform<GL_SAMPLER_2D>
             ("u_material.ambient_map", gl::bind_texture(ctx.default_ambient_map));
 
-    if( (map = get_asset<Texture>(material->diffuse_map)) )
+    if( (map = get_asset<Texture2D>(material->diffuse_map)) )
         set_uniform<GL_SAMPLER_2D>
             ("u_material.diffuse_map", gl::bind_texture(map));
     else
         set_uniform<GL_SAMPLER_2D>
             ("u_material.diffuse_map", gl::bind_texture(ctx.default_diffuse_map));
 
-    if( (map = get_asset<Texture>(material->specular_map)) )
+    if( (map = get_asset<Texture2D>(material->specular_map)) )
         set_uniform<GL_SAMPLER_2D>
             ("u_material.specular_map", gl::bind_texture(map));
     else
         set_uniform<GL_SAMPLER_2D>
             ("u_material.specular_map", gl::bind_texture(ctx.default_specular_map));
 
-    if( (map = get_asset<Texture>(material->bump_map)) )
+    if( (map = get_asset<Texture2D>(material->bump_map)) )
         set_uniform<GL_SAMPLER_2D>
             ("u_material.bump_map", gl::bind_texture(map));
     else

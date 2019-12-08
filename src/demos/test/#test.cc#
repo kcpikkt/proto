@@ -86,7 +86,6 @@ u32 gbuf_position_tex, gbuf_normal_tex, gbuf_albedo_spec_tex;
 
 u32 ssao_FBO;
 
-
 u32 shadow_cubemap;
 ivec2 shadow_cubemap_size;
 AssetHandle shadow_map;

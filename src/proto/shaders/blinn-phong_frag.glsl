@@ -188,7 +188,6 @@ void main() {
         texture(u_material.diffuse_map, uv).xyz;
 
     vec3 to_cam_dir = normalize(u_cam_pos - frag_in.position);
-
     angle_factor = dot(reflect(-to_dirlight_dir, normal), to_cam_dir);
     angle_factor = clamp(angle_factor, 0.0, 1.0);
     angle_factor = pow(angle_factor, max(1.0,u_material.shininess));

@@ -116,7 +116,7 @@ namespace serialization {
     }
  
     template<>
-    void serialize_specific_asset_to_buffer<Texture>(Texture* texture,
+    void serialize_specific_asset_to_buffer<Texture2D>(Texture2D* texture,
                                                      MemBuffer buffer)
     {
         assert(buffer.size >= texture->serialized_size());
@@ -124,11 +124,11 @@ namespace serialization {
 
         u8 * texture_header_ptr = buffer.data8;
 
-        AssetHeader<Texture> texture_header = texture->serialization_header_map();
+        AssetHeader<Texture2D> texture_header = texture->serialization_header_map();
 
         u8 * texture_data_ptr = texture_header_ptr + texture_header.data_offset;
 
-        memcpy(texture_header_ptr, &texture_header, sizeof(AssetHeader<Texture>));
+        memcpy(texture_header_ptr, &texture_header, sizeof(AssetHeader<Texture2D>));
         memcpy(texture_data_ptr, texture->data, texture_header.data_size);
     }
  
@@ -136,12 +136,12 @@ namespace serialization {
     void deserialize_specific_asset_buffer(T * asset, MemBuffer buffer);
 
     template<>
-    void deserialize_specific_asset_buffer<Texture>(Texture * texture,
+    void deserialize_specific_asset_buffer<Texture2D>(Texture2D * texture,
                                                     MemBuffer buffer)
     {
         assert(texture);
-        AssetHeader<Texture> texture_header;
-        u64 texture_header_size = sizeof(AssetHeader<Texture>);
+        AssetHeader<Texture2D> texture_header;
+        u64 texture_header_size = sizeof(AssetHeader<Texture2D>);
         memcpy(&texture_header, buffer.data, texture_header_size);
 
         u8 * tex_data_ptr = buffer.data8 + texture_header.data_offset;
@@ -196,8 +196,8 @@ namespace serialization {
             //    assert(asset);
             //    deserialize_specific_asset_buffer(asset, buffer);
             //} break;
-        case AssetType<Texture>::index: {
-            Texture * asset = get_asset<Texture>(handle);
+        case AssetType<Texture2D>::index: {
+            Texture2D * asset = get_asset<Texture2D>(handle);
             assert(asset);
             deserialize_specific_asset_buffer(asset, buffer);
         } break;
@@ -270,7 +270,7 @@ namespace serialization {
         return 0;
     }
     template int save_asset<Mesh>(Mesh*, const char*, AssetContext*);
-    template int save_asset<Texture>(Texture*, const char*, AssetContext*);
+    template int save_asset<Texture2D>(Texture2D*, const char*, AssetContext*);
 
     int save_asset(AssetHandle handle,
                    const char * path,
@@ -287,8 +287,8 @@ namespace serialization {
             //    assert(asset);
             //    return save_asset(asset, path);
             //} break;
-        case AssetType<Texture>::index: {
-            Texture * asset = get_asset<Texture>(handle);
+        case AssetType<Texture2D>::index: {
+            Texture2D * asset = get_asset<Texture2D>(handle);
             assert(asset);
             return save_asset(asset, path);
         } break;

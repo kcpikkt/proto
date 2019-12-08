@@ -11,8 +11,9 @@
 #endif
 
 #include "proto/core/graphics/Mesh.hh"
-#include "proto/core/graphics/Texture.hh"
+#include "proto/core/graphics/Texture2D.hh"
 #include "proto/core/graphics/Material.hh"
+#include "proto/core/graphics/Cubemap.hh"
 #include "proto/core/graphics/ShaderProgram.hh"
 #include "proto/core/memory/LinkedListAllocator.hh"
 #include "proto/core/containers/Array.hh"
@@ -46,6 +47,7 @@ namespace proto {
             s32 gl_tex_unit;
             s32 gl_id_bound;
             Bitfield<u8> flags;
+            AssetTypeIndex type;
             constexpr static u8 bound_bit = BIT(0);
             constexpr static u8 fresh_bit = BIT(1);
             constexpr static u8 reserved_bit = BIT(2);
@@ -73,7 +75,8 @@ namespace proto {
 
         Array<Mesh> meshes;
         Array<Material> materials;
-        Array<Texture> textures;
+        Array<Texture2D> textures;
+        Array<Cubemap> cubemaps;
 
         StringArena asset_paths;
     };
