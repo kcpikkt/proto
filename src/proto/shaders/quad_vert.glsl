@@ -10,12 +10,15 @@ out struct VertOut {
 } frag_in;
 
 uniform float u_time;
+uniform mat3 u_matrix;
 
 void main() {
     frag_in.position = a_position;
     frag_in.normal = a_normal; 
-    frag_in.uv = a_uv; 
-    gl_Position = vec4(a_position,1.0);
+    frag_in.uv = a_uv;
+
+    vec3 pos = u_matrix * vec3(a_position.xy, 1.0);
+    gl_Position = vec4(pos.x, pos.y, 0.0, 1.0);
 }
  
 

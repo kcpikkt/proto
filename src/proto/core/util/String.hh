@@ -8,8 +8,12 @@
 
 namespace proto {
     
-    // NOT NECESSARILY NULL TERMINATED!
     struct String : Array<char> {
+
+        void init(memory::Allocator * allocator) {
+            init_resize(1, allocator);
+            _data[0] = '\0';
+        }
 
         void init(StringView view, memory::Allocator * allocator) {
             init_resize(view.length() + 1, allocator);
@@ -20,7 +24,9 @@ namespace proto {
             return StringView(_data, strlen(_data)); 
         }
 
-        operator bool() { return _data; }
+        operator bool() {
+            return _data && is_initialized();
+        }
 
         operator StringView() {
             return view();

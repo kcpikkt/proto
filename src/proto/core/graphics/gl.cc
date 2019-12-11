@@ -249,6 +249,13 @@ namespace graphics{
         for(auto& s : context->texture_slots) s.flags.unset(Slot::fresh_bit);
     }
 
+    u32 bind_framebuffer(Framebuffer * target) {
+        glBindFramebuffer(GL_FRAMEBUFFER, target->FBO);
+        context->current_read_framebuffer = target;
+        context->current_draw_framebuffer = target;
+        return target->FBO;
+    }
+
     void debug_print_texture_slots() {
         printf("Texture units state\n");
         using Slot = RenderContext::TextureSlot;

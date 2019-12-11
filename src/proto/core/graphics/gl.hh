@@ -7,7 +7,7 @@
 
 namespace proto {
 namespace graphics{
-    //namespace gl{
+
     const char * error_message();
 
     void stale_all_texture_slots();
@@ -36,6 +36,8 @@ namespace graphics{
     auto unbind_texture(T & texture) ->
         meta::enable_if_t<meta::is_base_of_v<TextureInterface, T>,s32>;
 
+    // TODO(kacper): read/write/both mode
+    u32 bind_framebuffer(Framebuffer * target);
 
     void debug_print_texture_slots();
 
@@ -43,6 +45,5 @@ namespace graphics{
     template<> void gpu_upload<Texture2D>(Texture2D *);
 
     const char * error_message();
-    //} // namespace gl
 } // namespace graphics
 } // namespace proto

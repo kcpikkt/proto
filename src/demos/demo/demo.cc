@@ -7,6 +7,8 @@
 #include "proto/core/entity-system/interface.hh"
 #include "proto/core/graphics/rendering.hh"
 #include "proto/core/graphics/Camera.hh"
+#include "proto/core/graphics/Framebuffer.hh"
+#include "proto/core/util/namespace-shorthands.hh"
 #include "proto/core/meta.hh"
 
 using namespace proto;
@@ -17,52 +19,70 @@ PROTO_SETUP { // (RuntimeSettings * settings)
 AssetHandle prev_shader_h;
 ShaderProgram * prev_shader;
 Entity e;
+Texture2D gbuf_position;
+Texture2D gbuf_normal;
+Texture2D gbuf_albedo;
+Framebuffer gbuffer;
 
 PROTO_INIT {
     vardump(1);
     auto& ctx = *proto::context;
-    Array<int> testarr;
-    testarr.init(0, &ctx.memory);
-    #if 0 
-    serialization::load_asset_dir("outmesh/");
-
-    #if 0
-    prev_shader_h = create_asset<ShaderProgram>("simple-shader");
-    prev_shader = get_asset<ShaderProgram>(prev_shader_h);
-
-    prev_shader->attach_shader_file(ShaderType::Vert, "prev_vert.glsl");
-    prev_shader->attach_shader_file(ShaderType::Frag, "prev_frag.glsl");
-    prev_shader->link();
-    #endif
-
-    for(auto& m : ctx.meshes) graphics::gpu_upload(&m);
 
     ctx.camera.fov = (float)M_PI * 2.0f / 3.0f;
     ctx.camera.aspect = (float)ctx.window_size.x/ctx.window_size.y;
     ctx.camera.near = 0.01f;
     ctx.camera.far = 100.f;
 
-    vardump(1);
+    serialization::load_asset_dir("outmesh/");
+
+    auto& scr_size = context->window_size;
+    Framebuffer gbuffer;
+    gbuf_position.init(scr_size, GL_RGB16F, GL_RGB);
+    gbuf_normal.init(scr_size, GL_RGB16F, GL_RGB);
+    gbuf_albedo.init(scr_size, GL_RGBA, GL_RGB);
+
+    gfx::bind_framebuffer(&gbuffer);
+    gbuffer.init(scr_size, 3);
+    gbuffer.add_color_attachment(&gbuf_position);
+    gbuffer.add_color_attachment(&gbuf_normal);
+    gbuffer.add_color_attachment(&gbuf_albedo);
+    gbuffer.finalize();
+
+    u32 gbuf_depth;
+    glGenRenderbuffers(1, &gbuf_depth);
+    glBindRenderbuffer(GL_RENDERBUFFER, gbuf_depth);
+    glRenderbufferStorage
+        (GL_RENDERBUFFER, GL_DEPTH_COMPONENT, scr_size.x, scr_size.y);
+    glFramebufferRenderbuffer
+        (GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, gbuf_depth);
+
+    if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        debug_warn(debug::category::graphics,
+                   "Incomplete framebuffer");
+    }
+
     e = create_entity();
     add_component<TransformComp>(e);
     add_component<RenderMeshComp>(e).mesh = ctx.meshes[1].handle;
-    #endif
 }
 
 PROTO_UPDATE {
-    #if 0
     auto& ctx = *proto::context;
     float& time = ctx.clock.elapsed_time;
-    vardump(1);
 
     glViewport(0, 0, ctx.window_size.x, ctx.window_size.y);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     //get_asset_ref<ShaderProgram>(ctx.quad_shader_h).use();
+    vec2 halfscr = (vec2)ctx.window_size/2.0f;
 
-    //graphics::render_quad();
+    gfx::render_quad(gfx::bind_texture(ctx.default_checkerboard_texture_h),
+                     vec2(0.0), halfscr);
+    gfx::render_quad(gfx::bind_texture(ctx.default_checkerboard_texture_h),
+                     vec2(0.0, halfscr.y), halfscr);
+    gfx::render_quad(gfx::bind_texture(ctx.default_checkerboard_texture_h),
+                     halfscr, halfscr);
     ///graphics::render_scene();
-    #endif
 }
 
 PROTO_LINK {}

@@ -38,7 +38,7 @@
 
 // switches
 #define DEFAULT_TEXTURES 1
-#define DEFAULT_SHADERS 0
+#define DEFAULT_SHADERS 1
 
 void breakpoint() {};
 
@@ -435,6 +435,7 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
     default_white_texture->data = (void*)default_white_texture_data;
     default_white_texture->size = ivec2(1,1);
     default_white_texture->channels = 4;
+    graphics::gpu_upload(default_white_texture);
 
     Texture2D * default_black_texture =
         get_asset<Texture2D>(_context.default_black_texture_h);
@@ -442,6 +443,7 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
     default_black_texture->data = (void*)default_black_texture_data;
     default_black_texture->size = ivec2(1,1);
     default_black_texture->channels = 4;
+    graphics::gpu_upload(default_black_texture);
 
     Texture2D * default_checkerboard_texture =
         get_asset<Texture2D>(_context.default_checkerboard_texture_h);
@@ -449,6 +451,7 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
     default_checkerboard_texture->data = (void*)default_checkerboard_texture_data;
     default_checkerboard_texture->size = ivec2(2,2);
     default_checkerboard_texture->channels = 4;
+    graphics::gpu_upload(default_checkerboard_texture);
 
     // DEFAULT MESHES
     _context.quad_h = create_asset<Mesh>("default_quad");
@@ -469,9 +472,9 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
     _context.gbuffer_shader_h =
         create_asset<ShaderProgram>("default_gbuffer_shader");
     auto& gbuffer_shader = get_asset_ref<ShaderProgram>(_context.gbuffer_shader_h);
-    gbuffer_shader.attach_shader_file(ShaderType::Vert, "gbuffer_vert.glsl");
-    //gbuffer_shader.attach_shader_file(ShaderType::Frag, "gbuffer_frag.glsl");
-    //gbuffer_shader.link();
+    gbuffer_shader.attach_shader_file(ShaderType::Vert, "g-buffer_vert.glsl");
+    gbuffer_shader.attach_shader_file(ShaderType::Frag, "g-buffer_frag.glsl");
+    gbuffer_shader.link();
 #endif
 
     glEnable(GL_BLEND);

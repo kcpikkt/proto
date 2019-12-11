@@ -274,7 +274,7 @@ namespace serialization {
 
     int save_asset(AssetHandle handle,
                    const char * path,
-                   AssetContext * context )
+                   [[maybe_unused]]AssetContext * context )
     {
         switch(handle.type){
         case AssetType<Mesh>::index: {
@@ -333,7 +333,7 @@ namespace serialization {
                             AssetContext * asset_context)
     {
         assert(asset_context);
-        AssetContext & ctx = *asset_context;
+        //AssetContext & ctx = *asset_context;
         namespace sys = proto::platform;
         // TODO(kacper): access check file exists
 
@@ -395,9 +395,9 @@ namespace serialization {
  
 
     AssetHandle load_asset(StringView path,
-                           AssetContext * context)
+                           [[maybe_unused]]AssetContext * context)
     {
-        AssetContext & ctx = *context;
+        //AssetContext & ctx = *context;
         namespace sys = proto::platform;
         assert(!strncmp(sys::extension_substr(path), "past", 4));
         sys::File file;

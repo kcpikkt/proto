@@ -60,6 +60,7 @@ struct Texture2D :
         return *this;
     }
 
+
     void init(){
         glGenTextures(1, &gl_id);
         assert(gl_id >= 0);
@@ -74,6 +75,13 @@ struct Texture2D :
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
         glBindTexture(GL_TEXTURE_2D, 0);
+    }
+
+    void init(ivec2 size, u32 format, u32 gpu_format){
+        init();
+        this->format = format;
+        this->gpu_format = gpu_format;
+        this->size = size;
     }
    
     void init(memory::Allocator * allocator){

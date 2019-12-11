@@ -44,8 +44,25 @@ void render_mesh(Mesh * mesh, bool simple = false) {
     for(u32 i=0; i<mesh->spans.size(); i++) render_span(mesh, i, simple);
 }
 
-void render_quad() {
+void render_quad(s32 texture_unit,
+                 vec2 pos = vec2(0.0),
+                 vec2 size = context->window_size) {
+    auto& quad_shader = get_asset_ref<ShaderProgram>(context->quad_shader_h);
+    quad_shader.use();
+
+    size /= context->window_size;
+    pos /= context->window_size; 
+    pos *= 2.0f; // <- multiplying by 2 here instead of in matrix
+
+    // premultiplied goto origin, scale goback, translate
+    mat3 matrix = {{               size.x,                  0.0, 0.0},
+                   {                  0.0,               size.y, 0.0},
+                   { size.x + pos.x - 1.0, size.y + pos.y - 1.0, 1.0}};
+
+    quad_shader.set_uniform<GL_FLOAT_MAT3>("u_matrix", &matrix);
+    quad_shader.set_uniform<GL_SAMPLER_2D>("u_tex", texture_unit);
     get_asset_ref<Mesh>(proto::context->quad_h).bind();
+   
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 }
 

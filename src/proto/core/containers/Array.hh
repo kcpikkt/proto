@@ -10,7 +10,7 @@ namespace proto{
 template<typename T,
          bool is_dataholder = meta::is_base_of_v<DataholderCRTP<T>, T> >
 struct Array
-    :DataholderCRTP<Array<T>>, debug::Marker {
+    : DataholderCRTP<Array<T>>, debug::Marker {
 
     using DataType = T;
     using DataholderBase = DataholderCRTP<Array<T>>;
@@ -42,7 +42,7 @@ struct Array
         }
     };
 
-    constexpr static u64 default_init_capacity = 1;
+    constexpr static u64 default_init_capacity = 0;
     T * _data = nullptr;
     u64 _size = 0;
     u64 _capacity = 0;
@@ -74,7 +74,6 @@ struct Array
 
     void init(u64 init_capacity, memory::Allocator * allocator) {
         DataholderBase::dataholder_init();
-
         assert(allocator);
         _allocator = allocator;
 
@@ -206,13 +205,13 @@ struct Array
     void destroy_shallow() {}
 
     void destroy_deep() {
-        assert(_data);
         assert(_allocator);
         if constexpr(is_dataholder) {
             for(u64 i=0; i<_size; i++)
                 _data[i].~T();
         }
-        _allocator->free(_data);
+        if(_data)
+            _allocator->free(_data);
         _size = 0;
         _capacity = 0;
     }

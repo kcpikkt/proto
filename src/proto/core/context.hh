@@ -23,6 +23,7 @@
 #include "proto/core/asset-system/AssetRegistry.hh"
 
 #include "proto/core/graphics/Camera.hh"
+#include "proto/core/graphics/Framebuffer.hh"
 
 #include "proto/core/entity-system/common.hh"
 
@@ -57,6 +58,12 @@ namespace proto {
         ModCounter<u32> texture_slots_index;
 
         ShaderProgram * current_shader = nullptr; //tmp
+
+        Array<Framebuffer> render_targets;
+        Framebuffer * current_read_framebuffer = nullptr;
+        Framebuffer * current_draw_framebuffer = nullptr;
+
+        Framebuffer * default_frambuffer = nullptr;
 
         AssetHandle default_black_texture_h;
         AssetHandle default_white_texture_h;

@@ -12,10 +12,9 @@ uniform float u_time;
 out vec4 frag_color;
 
 void main() {
-    float gamma = 2.2;
     float segs = 11.0;
-    float val = floor(frag_in.uv.x * segs) / segs;
-    val = frag_in.uv.x;
+    vec2 uv = floor(frag_in.uv * segs) / segs;
 
-    frag_color = vec4(vec3(val), 1.0);
+    frag_color = vec4(uv.x, 0.0, uv.y, 1.0);
+    frag_color = texture(u_tex, frag_in.uv);
 }

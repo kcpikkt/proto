@@ -83,7 +83,7 @@ void ShaderProgram::attach_shader_file(ShaderType type, StringView path) {
     String filepath =
         platform::search_for_file(proto::context->shader_paths, path);
 
-    if(!filepath.view()) {
+    if(!filepath) {
         debug_error(debug::category::graphics,
                     "Could not find shader file ", path); return; }
 

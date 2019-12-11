@@ -120,6 +120,7 @@ ifdef client_src_dir
 	client_srcs = $(shell find $(client_src_dir) -name *.cc)
 	client_obj_dir = $(client_src_dir)/obj
 	client_objs = $(client_srcs:$(client_src_dir)/%.cc=$(client_obj_dir)/%.o)
+	client_deps := $(client_objs:.o=.d)
 endif
 
 # TARGETS
@@ -202,3 +203,4 @@ clean:
 	$(call remove, $(runtime) $(proto_objs) $(proto_ar_objs) $(proto_deps) $(TESTOBJS) $(CATCH2GCH) $(OBJDIR)/glfw3.o)
 
 -include $(proto_deps)
+-include $(client_deps)

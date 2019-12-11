@@ -9,7 +9,11 @@
 namespace proto {
 
 struct TextureInterface : Asset {
-    u8 channels;
+    u8 channels; // deprecate, use format instead
+    
+    u32 format;
+    u32 gpu_format;
+
     u32 gl_id;
     s32 bound_unit = -1;
     ivec2 size;
