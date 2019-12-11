@@ -30,6 +30,7 @@
 #include "proto/core/math/geometry.hh"
 #include "proto/core/math/common.hh"
 
+namespace gl = proto::graphics::gl;
 
 float quad_vertices[] = {
     -1.0f,-1.0f, 0.0f, 0.0f, 0.0f,
@@ -43,6 +44,7 @@ using namespace proto;
 PROTO_SETUP {
     settings->asset_paths = "res/:res/external/crytek-sponza:res/external/cube";
 }
+
 graphics::ShaderProgram
     main_shader,
     quad_shader,
@@ -57,10 +59,6 @@ graphics::ShaderProgram
     TBN_shader;
 
 GLuint quad_VAO, quad_VBO;
-GLuint dragon_VAO, dragon_VBO, dragon_EBO;
-GLuint sponza_VAO, sponza_VBO, sponza_EBO;
-GLuint test_VAO, test_VBO, test_EBO;
-using Foo = void(*)(void);
 
 proto::Context * ctx;
 
@@ -68,7 +66,6 @@ KeyInputSink key_input_sink;
 MouseMoveInputSink mouse_move_input_sink;
 MouseButtonInputSink mouse_button_input_sink;
 
-proto::vec3 dragon_pos(0.0,0.0,0.0);
 proto::vec3 cam_pos(46.0,26.0,3.0);
 proto::vec3 cam_rot(0.0,M_PI/2.0f,0.0);
 proto::vec3 light_rot(0.0,0.0,0.0);
@@ -471,12 +468,6 @@ namespace ser = proto::serialization;
 
 Texture2D tex;
 
-Array<int> test() {
-    Array<int> ret;
-    ret.init_resize(10,&context->memory);
-    return ret;
-}
-
 GLuint main_shader_ssbo;
 struct _MainShaderSSBOStruct {
     u32 hash = invalid_asset_handle.hash;
@@ -504,6 +495,7 @@ Array<vec3> ssao_kernel;
 
 PROTO_INIT {
     ctx = proto::context;
+
     ctx->texture_slots[0].flags.set(OpenGLContext::TextureSlot::reserved_bit);
     ctx->texture_slots[1].flags.set(OpenGLContext::TextureSlot::reserved_bit);
     ctx->texture_slots[2].flags.set(OpenGLContext::TextureSlot::reserved_bit);
@@ -519,17 +511,13 @@ PROTO_INIT {
     mouse_button_input_sink.init(ctx->mouse_button_input_channel,
                                  mouse_button_callback);
 
-    ser::load_asset_dir("res/models/crytek-sponza");
-    ///cube = create_asset("cube", "", AssetType<Mesh>::index);
+    //ser::load_asset_dir("res/models/crytek-sponza");
+    ser::load_asset_dir("outmesh/");
+
     cube = parse_asset_file_rec("external/cube/cube.obj");
-    Mesh * cube_mesh = get_asset<Mesh>(cube);
     //for(auto& v : cube_mesh->vertices) {
     //    printf("(%f, %f, %f)\n", v.position.x, v.position.y, v.position.z);
     //}
-
-    //cube_mesh.
-    //vardump(sizeof(cube_vertices) / sizeof(float));
-
     lightbulb  = parse_asset_file_rec("external/lightbulb.png");
     
     auto cubemap_rt = parse_asset_file_rec("external/sor_sea/sea_rt.JPG");
@@ -571,6 +559,8 @@ PROTO_INIT {
     glTexImage2D(GL_TEXTURE_CUBE_MAP_NEGATIVE_X, 0, GL_RGB,
                  cubemap_bk_texture.size.x, cubemap_bk_texture.size.y,
                  0, GL_RGB, GL_UNSIGNED_BYTE, cubemap_bk_texture.data);
+
+
 
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -840,18 +830,12 @@ PROTO_INIT {
 ///////////////////////////////////////////////////////////////////////////////
 int count = 0;
 PROTO_UPDATE {
+    auto& ctx = *proto::context;
 
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture
-        (GL_TEXTURE_2D,
-         get_asset<Texture2D>(ctx->meshes[0].spans[377]
-                              .material.diffuse_map)->gl_id);
+    //debug_info(1, proto::context->window_size.x);
     proto::mat4 identity(1.0f);
 
     proto::mat4 model = identity;
-    //dragon_pos = proto::vec3(sin(ctx->clock.elapsed_time),0.0,0.0);
-    dragon_pos = proto::vec3(0.0,0.0,0.0);
-    model = glm::translate(model, dragon_pos);
     //model = glm::translate(model, vec3());
 
     proto::mat4 view = identity;
@@ -862,8 +846,7 @@ PROTO_UPDATE {
     view = glm::translate(view, -cam_pos);
 
     proto::mat4 projection =
-        perspective(45.0f,
-                         (float)ctx->window_size.x / ctx->window_size.y,
+        perspective(45.0f, (float)ctx.window_size.x / ctx.window_size.y,
                          1.1f, 3000.0f);
     proto::mat4 mvp = projection * view * model;
 
@@ -887,7 +870,7 @@ PROTO_UPDATE {
     depth_shader.use();
 
     depth_shader.set_uniform <GL_FLOAT_MAT4> ("u_mv", &dirlight_mv_matrix);
-    gfx::render_mesh(&ctx->meshes[mesh_index], true);
+    gfx::render_mesh(&ctx.meshes[mesh_index], true);
 
     float time = 1.2f * context->clock.elapsed_time;
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -917,7 +900,7 @@ PROTO_UPDATE {
     lamp_pos = vec3(0.0);
     float aspect = (float)shadow_cubemap_size.x / (float)shadow_cubemap_size.y;
     float near = 3.0f, far = 80.0f;
-    Array<mat4> shadow_transforms; shadow_transforms.init(6, &ctx->memory);
+    Array<mat4> shadow_transforms; shadow_transforms.init(6, &ctx.memory);
 
     mat4 shadow_proj = perspective(M_PI/2, 1.0, near, far);
 
@@ -962,7 +945,7 @@ PROTO_UPDATE {
 
         lamp_shader.set_uniform<GL_FLOAT_MAT4>("u_model", &shadowmap_model);
 
-        gfx::render_mesh(&ctx->meshes[mesh_index], true);
+        gfx::render_mesh(&ctx.meshes[mesh_index], true);
 
         gl::stale_texture_slot(texslot);
     }
@@ -972,7 +955,7 @@ PROTO_UPDATE {
 
     glClearColor(1.0f,1.0f,1.0f,1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glViewport(0, 0, ctx->window_size.x, ctx->window_size.y);
+    glViewport(0, 0, ctx.window_size.x, ctx.window_size.y);
 
     glDepthMask(GL_FALSE);
     glCullFace(GL_FRONT);
@@ -988,10 +971,11 @@ PROTO_UPDATE {
     //skybox_shader.set_uniform<GL_SAMPLER_2D>("u_skybox",
     //        gl::bind_texture(pointlights[0].shadow_map));
 
-
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, skybox_cubemap_gl_id);
     glDrawArrays(GL_TRIANGLES, 0, cube_mesh.vertices.size());
+    
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glDepthMask(GL_TRUE);
     glCullFace(GL_BACK);
@@ -1013,20 +997,19 @@ PROTO_UPDATE {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     gbuffer_shader.use();
 
-    gbuffer_shader.set_uniform<GL_FLOAT> ("u_time", ctx->clock.elapsed_time);
+    gbuffer_shader.set_uniform<GL_FLOAT> ("u_time", ctx.clock.elapsed_time);
     gbuffer_shader.set_uniform<GL_FLOAT_MAT4> ("u_mvp", &mvp);
     gbuffer_shader.set_uniform<GL_FLOAT_MAT4> ("u_model", &model);
     gbuffer_shader.set_uniform<GL_FLOAT_MAT4> ("u_view", &view);
     gbuffer_shader.set_uniform<GL_FLOAT_MAT4> ("u_projection", &projection);
 
-    gfx::render_mesh(&ctx->meshes[mesh_index]);
+    gfx::render_mesh(&ctx.meshes[mesh_index]);
     //gfx::render_mesh(get_asset<Mesh>(cube));
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // SSAO
     ssao_shader.use();
-    #if 0
     // DEFERRED RENDER
     deferred_shader.use();
 
@@ -1042,7 +1025,7 @@ PROTO_UPDATE {
     deferred_shader.set_uniform<GL_SAMPLER_2D> ("gbuf.normal"     , 2);
     deferred_shader.set_uniform<GL_SAMPLER_2D> ("gbuf.albedo_spec", 3);
 
-    deferred_shader.set_uniform<GL_FLOAT> ("u_time", ctx->clock.elapsed_time);
+    deferred_shader.set_uniform<GL_FLOAT> ("u_time", ctx.clock.elapsed_time);
     deferred_shader.set_uniform<GL_FLOAT_MAT4> ("u_mvp", &mvp);
     deferred_shader.set_uniform<GL_FLOAT_VEC3> ("u_cam_pos", &cam_pos);
     deferred_shader.set_uniform <GL_FLOAT_MAT4> ("u_dirlight[0].matrix",
@@ -1079,7 +1062,6 @@ PROTO_UPDATE {
     }
     glBindVertexArray(quad_VAO);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    #endif
 
     ////////////////////////////////////////////////////////////////////
  
@@ -1130,13 +1112,13 @@ PROTO_UPDATE {
         highlight_shader.set_uniform<GL_FLOAT_MAT4> ("u_mvp", &mvp);
 
         vec4 highlight_color = vec4(1.0, 1.0, 1.0,
-                 min(0.1, ctx->clock.elapsed_time - span_change_timestamp));
+                 min(0.1, ctx.clock.elapsed_time - span_change_timestamp));
 
         highlight_shader.set_uniform<GL_FLOAT_VEC4> ("u_highlight_color",
                                                      &highlight_color);
 
-        ctx->meshes[mesh_index].bind();
-        gfx::render_span(&ctx->meshes[mesh_index], span_index, true);
+        ctx.meshes[mesh_index].bind();
+        gfx::render_span(&ctx.meshes[mesh_index], span_index, true);
         #endif
 
         vec2 scale, position;
@@ -1155,7 +1137,7 @@ PROTO_UPDATE {
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
         quad_shader.set_uniform<GL_FLOAT> ("u_alpha", 1.0f);
-        Material& material = ctx->meshes[mesh_index].spans[span_index].material;
+        Material& material = ctx.meshes[mesh_index].spans[span_index].material;
 
         scale = vec2(32.0);
         position = vec2(16.0,resolution.y - 32.0);
@@ -1172,7 +1154,7 @@ PROTO_UPDATE {
         s32 index = 0;
         for(auto& slot : context->texture_slots) {
             position.y -= scale.y;
-            using Slot = OpenGLContext::TextureSlot;
+            //using Slot = OpenGLContext::TextureSlot;
             quad_shader.set_uniform<GL_FLOAT_VEC2> ("u_position", &position);
             quad_shader.set_uniform<GL_SAMPLER_2D> ("quad_tex", index);
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
@@ -1231,7 +1213,7 @@ PROTO_UPDATE {
         //TBN_shader.set_uniform<GL_FLOAT_MAT4> ("u_model", &model);
         //TBN_shader.set_uniform<GL_FLOAT_MAT4> ("u_mvp", &mvp);
         //TBN_shader.set_uniform<GL_FLOAT_VEC3> ("u_cam_pos", &cam_pos);
-        //gfx::render_span(&ctx->meshes[mesh_index], span_index, true);
+        //gfx::render_span(&ctx.meshes[mesh_index], span_index, true);
 
         glEnable(GL_DEPTH_TEST);
     }

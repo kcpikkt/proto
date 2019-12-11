@@ -103,6 +103,8 @@ struct StringArena : DataholderCRTP<StringArena>, debug::Marker{
 
     void store(StringView str);
 
+    bool contains(StringView str);
+
     void destroy_shallow();
 
     void destroy_deep();

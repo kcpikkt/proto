@@ -1,3 +1,6 @@
+#pragma once
+namespace proto {
+
 float cube_vertices[] = {
     // positions          
     -1.0f,  1.0f, -1.0f,
@@ -42,3 +45,14 @@ float cube_vertices[] = {
     -1.0f, -1.0f,  1.0f,
      1.0f, -1.0f,  1.0f
 };
+
+
+float quad_vertices[] =
+{//  positions          normals         uvs
+    -1.0f,-1.0f, 0.0f,  0.0, 0.0,-1.0,  0.0f, 0.0f,
+     1.0f,-1.0f, 0.0f,  0.0, 0.0,-1.0,  1.0f, 0.0f,
+    -1.0f, 1.0f, 0.0f,  0.0, 0.0,-1.0,  0.0f, 1.0f,
+     1.0f, 1.0f, 0.0f,  0.0, 0.0,-1.0,  1.0f, 1.0f
+};
+
+} // namespace proto 

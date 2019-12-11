@@ -74,7 +74,7 @@ struct Array
 
     void init(u64 init_capacity, memory::Allocator * allocator) {
         DataholderBase::dataholder_init();
-        assert(init_capacity);
+
         assert(allocator);
         _allocator = allocator;
 

@@ -161,7 +161,7 @@ bool is_directory(StringView path) {
 String search_for_file(StringArena& dirs, StringView filename) {
     String ret;
 
-    char filepath[512];
+    static char filepath[PROTO_MAX_PATH];
     strview_copy(filepath, filename);
 
     if(access(filepath, F_OK) == -1) {
@@ -217,6 +217,30 @@ StringArena ls(StringView dirpath) {
     }
     return arena;
 }
+
+
+    //void watch_file(StringView filepath, void(callback*)()) {
+    //    if(proto::context->inotify_fd == -1) {
+    //        debug_error(debug::category::main,
+    //                    "Cannot watch file ", path,
+    //                    ", inotify instance not initialized.");
+    //        return;
+    //    }
+    //    
+    //    static char _filepath[PROTO_MAX_PATH];
+    //    strview_copy(_filepath, filepath);
+    //
+    //    int watch_fd =
+    //        inotify_add_watch(_context.inotify_fd, _filepath, IN_MODIFY);
+    //
+    //    if(watch_fd == -1) {
+    //        debug_error(debug::category::main,
+    //                    "inofify_add_watch() failed for file ", filepath);
+    //        return;
+    //    }
+    //
+    //    context->watched_files.push_back(watch_fd);
+    //}
 
 const char *
 path_ncat(char * dest,

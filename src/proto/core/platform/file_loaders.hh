@@ -285,7 +285,6 @@ namespace proto{
 
         //TEMP
         bool optimize_for_space = false;
-        constexpr auto dbgctg = debug::category::data;
 
         namespace sys = proto::platform;
 
@@ -757,6 +756,7 @@ namespace proto{
                          AssetContext * asset_context,
                          AssetMetadata * dependant_asset)
     {
+        //PROTO_DEPRECATED;
         namespace sys = proto::platform;
         assert(proto::context);
         auto& ctx = *proto::context;

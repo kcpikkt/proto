@@ -21,6 +21,11 @@
 #include "proto/core/event-system.hh"
 #include "proto/core/asset-system/common.hh"
 #include "proto/core/asset-system/AssetRegistry.hh"
+
+#include "proto/core/graphics/Camera.hh"
+
+#include "proto/core/entity-system/common.hh"
+
 #include "proto/core/input.hh"
 #include "proto/core/util/Bitfield.hh"
 #include "proto/core/util/ModCounter.hh"
@@ -36,12 +41,7 @@ namespace proto {
     // this is because there are some cases when its handy to have
     // temporary context or oftentimes only a specific part of it
 
-#if defined(PROTO_OPENGL)
-    //NOTE(kacper): Context ofc in proto, not OpenGL, sense of the word,
-    //              (though in both cases they mean more or less the same thing)
-    //              it therefore is not supposed to reflect OpenGL context but
-    //              rather just store whatever OpenGL-specific data we need to.
-    struct OpenGLContext {
+    struct RenderContext {
         struct TextureSlot {
             AssetHandle texture = invalid_asset_handle;
             s32 gl_tex_unit;
@@ -56,16 +56,38 @@ namespace proto {
         // temp
         ModCounter<u32> texture_slots_index;
 
-        graphics::ShaderProgram * current_shader = nullptr; //tmp
-        AssetHandle default_ambient_map;
-        AssetHandle default_diffuse_map;
-        AssetHandle default_specular_map;
-        AssetHandle default_bump_map;
+        ShaderProgram * current_shader = nullptr; //tmp
 
-        AssetHandle black_texture;
-        AssetHandle white_texture;
+        AssetHandle default_black_texture_h;
+        AssetHandle default_white_texture_h;
+        AssetHandle default_checkerboard_texture_h;
+
+        AssetHandle quad_h;
+        AssetHandle quad_shader_h;
+
+        AssetHandle gbuffer_shader_h;
+        //tmp
+        u32 gbuf_FBO;
+        u32 gbuf_position_tex;
+        u32 gbuf_normal_tex;
+        u32 gbuf_albedo_spec_tex;
+
+        Camera camera;
     };
-#endif
+
+    struct EntityContext {
+        struct {
+            EntityId _id = 0;
+        } entity_generator_data;
+
+        Array<Entity> entities;
+
+        // TODO(kacper): get yourself some hashmaps
+        struct {
+            Array<RenderMeshComp> render_mesh;
+            Array<TransformComp> transform;
+        } comp;
+    };
 
     struct AssetContext {
         AssetRegistry assets;
@@ -76,16 +98,16 @@ namespace proto {
         Array<Material> materials;
         Array<Texture2D> textures;
         Array<Cubemap> cubemaps;
+        Array<ShaderProgram> shader_programs;
 
         StringArena asset_paths;
+        StringArena shader_paths;
     };
 
     struct Context :
         AssetContext,
-
-#   if defined(PROTO_OPENGL)
-        OpenGLContext,
-#   endif
+        EntityContext,
+        RenderContext,
 
 #   if defined(PROTO_PLATFORM_WINDOWS)
         platform::WindowsContext
@@ -93,13 +115,13 @@ namespace proto {
         platform::LinuxContext
 #   endif
     {
+        int test = 12;
         memory::LinkedListAllocator memory;
         memory::LinkedListAllocator gp_file_buffering_allocator;
         memory::LinkedListAllocator gp_string_allocator;
         memory::LinkedListAllocator gp_debug_strings_allocator;
-        StringArena cmdline;
+        Array<StringView> cmdline;
 
-        int count = 0;
         proto::ivec2 window_size;
 
         StringView clientlib_path;

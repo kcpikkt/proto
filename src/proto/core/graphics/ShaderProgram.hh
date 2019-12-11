@@ -1,29 +1,32 @@
 #pragma once
 #include "proto/core/graphics/common.hh"
 #include "proto/core/util/StringView.hh"
-#include "proto/core/graphics/Material.hh"
+#include "proto/core/asset-system/common.hh"
 
 namespace proto {
-namespace graphics {
+
+struct Material;
 
 enum ShaderType {
-    Vertex = 0, Vert = 0,
-    Fragment = 1, Frag = 1,
-    Geometry = 2, Geom = 2,
-    TesselationControl = 3, TessCtrl = 3,
-    TesselationEvaluation = 4, TessEval = 4,
-    Compute = 5, Comp = 5
+    Vert = 0,
+    Frag = 1,
+    Geom = 2,
+    TessCtrl = 3,
+    TessEval = 4,
+    Comp = 5
 };
     
-
-struct ShaderProgram {
-    GLuint _program;
-    GLuint shaders[6] = {};
+struct ShaderProgram : Asset {
+    u32 _program;
+    u32 shaders[6] = {};
 
     void init();
     void set_shader_source(ShaderType type, const char * src);
     void compile_shader(ShaderType type);
-    void attach_shader(ShaderType type);
+
+    void attach_shader_file(ShaderType type, StringView path);
+    void attach_shader_src(ShaderType type, const char * src);
+
     void create_shader(ShaderType type, const char * src);
     void create_shader_from_file(ShaderType type, StringView path);
     void link();
@@ -35,7 +38,6 @@ struct ShaderProgram {
     void set_uniform(const char * name, UniformValueType value );
 };
 
-} // namespace graphics
 } // namespace proto 
 
 

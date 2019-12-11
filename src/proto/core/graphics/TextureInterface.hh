@@ -13,7 +13,7 @@ struct TextureInterface : Asset {
     u32 gl_id;
     s32 bound_unit = -1;
     ivec2 size;
-    Bitfield<u8> flags;
+    Bitfield<u8> flags = 0;
     constexpr static u8 gpu_uploaded_bit = BIT(1);
     constexpr static u8 bound_bit        = BIT(2);
 

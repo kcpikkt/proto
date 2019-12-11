@@ -9,14 +9,10 @@
 #include "proto/core/asset-system/common.hh"
 #include "proto/core/graphics/Material.hh"
 #include "proto/core/DataholderCRTP.hh"
+#include "proto/core/graphics/Vertex.hh"
 #include <unistd.h>
 namespace proto {
 
-struct Vertex {
-    proto::vec3 position;
-    proto::vec3 normal;
-    proto::vec2 uv;
-};
 struct Mesh;
 
 template<>
@@ -42,12 +38,16 @@ struct Mesh : Asset, DataholderCRTP<Mesh>{
     };
 
     u32 VAO, VBO, EBO;
+
     // TODO(kacper): is on gpu
     memory::Allocator * _allocator;
-
-    proto::Array<Vertex> vertices;
+    proto::Array<struct Vertex> vertices;
     proto::Array<u32> indices;
     proto::Array<Span> spans;
+
+    Bitfield<u8> flags;
+    constexpr static u8 on_gpu_bit = BIT(0);
+
 
     u64 serialized_vertices_size() {
         return vertices.size() * sizeof(decltype(vertices)::DataType);
@@ -121,6 +121,7 @@ struct Mesh : Asset, DataholderCRTP<Mesh>{
         glGenBuffers     (1, &EBO);
         dataholder_init();
     }
+
     void destroy_shallow() {
         glDeleteVertexArrays(1, &VAO);
         glDeleteBuffers     (1, &VBO);
@@ -155,7 +156,7 @@ struct Mesh : Asset, DataholderCRTP<Mesh>{
 
 
         glBufferData(GL_ARRAY_BUFFER,
-                    sizeof(proto::Vertex) * vertices.size(),
+                    sizeof(struct Vertex) * vertices.size(),
                     vertices.raw(), GL_STATIC_DRAW);
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
@@ -164,16 +165,16 @@ struct Mesh : Asset, DataholderCRTP<Mesh>{
                     indices.raw(), GL_STATIC_DRAW);
 
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(proto::Vertex),
-                            (void*) (offsetof(proto::Vertex, position)) );
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(struct Vertex),
+                            (void*) (offsetof(struct Vertex, position)) );
 
         glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(proto::Vertex),
-                                (void*) (offsetof(proto::Vertex, normal)) );
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(struct Vertex),
+                                (void*) (offsetof(struct Vertex, normal)) );
 
         glEnableVertexAttribArray(2);
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(proto::Vertex),
-                                (void*) (offsetof(proto::Vertex, uv)) );
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(struct Vertex),
+                                (void*) (offsetof(struct Vertex, uv)) );
 
     }
     void bind() {

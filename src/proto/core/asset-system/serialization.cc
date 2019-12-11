@@ -92,7 +92,6 @@ namespace serialization {
 
         serialize_specific_asset_to_buffer (asset, asset_buffer); 
 
-        vardump(main_header.data_offset);
         return buffer;
     }
 
@@ -157,6 +156,7 @@ namespace serialization {
         assert(texture_header.data_size = texture->serialized_data_size());
 
         memcpy(texture->data, tex_data_ptr, texture_header.data_size);
+        allocator->free(data);
     }
  
     template<>
@@ -355,8 +355,7 @@ namespace serialization {
         char filepath[PROTO_ASSET_MAX_PATH_LEN];
         for(u32 i=0; i<savelist.size(); i++) {
             AssetMetadata * metadata = get_metadata(savelist[i]);
-
-            strview_copy(filepath, dirpath);
+                   strview_copy(filepath, dirpath);
             sys::path_ncat(filepath, metadata->name, PROTO_ASSET_MAX_PATH_LEN);
             strview_cat(filepath, "_");
             strview_cat(filepath, AssetType(savelist[i]).name);

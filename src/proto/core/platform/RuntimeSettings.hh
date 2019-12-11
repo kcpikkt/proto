@@ -6,16 +6,21 @@
 
 namespace proto {
 
+    // remember to copy 
 struct RuntimeSettings {
     constexpr static u8 terminal_mode_bit = BIT(0);
-    constexpr static u8 graphics_mode_bit = BIT(1);
-
-    Bitfield<u8> mode = terminal_mode_bit | graphics_mode_bit;
+    constexpr static u8 window_mode_bit = BIT(1);
+    constexpr static u8 opengl_mode_bit = BIT(2);
+    Bitfield<u8> mode =
+        terminal_mode_bit |
+        window_mode_bit |
+        opengl_mode_bit;
 
     Bitfield<debug::Category> init_stdout_log_categories = debug::category::all;
     debug::Level init_stdout_log_level = debug::level::all;
 
     StringView asset_paths;
+    StringView shader_paths;
 };
 
 } // namespace proto

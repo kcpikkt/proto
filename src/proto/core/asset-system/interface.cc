@@ -3,6 +3,7 @@
 #include "proto/core/graphics/Texture2D.hh"
 #include "proto/core/graphics/Cubemap.hh"
 #include "proto/core/graphics/Mesh.hh"
+#include "proto/core/graphics/ShaderProgram.hh"
 
 namespace proto {
 AssetHandle make_handle(StringView name, AssetTypeIndex type){
@@ -28,8 +29,8 @@ AssetHandle create_or_get_asset(StringView name,
     return (metadata) ? handle : create_asset(name, filepath, type);
 }
 AssetHandle create_asset(StringView name,
-                                StringView filepath,
-                                AssetTypeIndex type)
+                         StringView filepath,
+                         AssetTypeIndex type)
 {
     return create_asset(context, name, filepath, type);
 }
@@ -47,6 +48,8 @@ AssetHandle create_asset(AssetContext * asset_context,
     case AssetType<Material>::index: { insert_arr = &reg.materials;} break;
     case AssetType<Texture2D>::index:{ insert_arr = &reg.textures; } break;
     case AssetType<Cubemap>::index:  { insert_arr = &reg.cubemaps; } break;
+    case AssetType<ShaderProgram>::index:
+        { insert_arr = &reg.shader_programs; } break;
     default:
         debug_warn(1, "requested asset of unsupported type");
     }
@@ -69,7 +72,7 @@ AssetHandle create_asset(AssetContext * asset_context,
 
         metadata->handle = handle;
 
-        metadata->deps.init(30, &ctx.asset_metadata_allocator);
+        metadata->deps.init(10, &ctx.asset_metadata_allocator);
         
         switch(type) {
         case AssetType<Mesh>::index:     {
@@ -92,8 +95,7 @@ AssetHandle create_asset(AssetContext * asset_context,
             assert(material);
 
             material->handle = metadata->handle;
-
-                   } break;
+        } break;
         case AssetType<Texture2D>::index:  {
             ctx.textures.push_back();
 
@@ -114,16 +116,24 @@ AssetHandle create_asset(AssetContext * asset_context,
 
             cubemap->handle = metadata->handle;
         } break;
+        case AssetType<ShaderProgram>::index:  {
+            ctx.shader_programs.push_back();
+
+            ShaderProgram * shader_program = &ctx.shader_programs.back();
+            assert(shader_program);
+
+            shader_program->init();
+            shader_program->handle = metadata->handle;
+        } break;
         default:
             debug_warn(1, "requested asset of unsupported type: ",
                        AssetType(type).name);
 
         }
-                return metadata->handle;
+        return metadata->handle;
     }
     return invalid_asset_handle;
 }
-
 
 void destroy_asset(AssetContext * asset_context,
                           AssetHandle handle)
@@ -237,6 +247,9 @@ T * get_asset(AssetContext * asset_context,
     } else if constexpr (meta::is_same_v<T, Cubemap>) {
         lookup_arr =  &ctx.cubemaps;
 
+    } else if constexpr (meta::is_same_v<T, ShaderProgram>) {
+        lookup_arr =  &ctx.shader_programs;
+
     } else {
         assert(0 && "this should not even be instantiatied");
     }
@@ -250,11 +263,23 @@ T * get_asset(AssetContext * asset_context,
     return nullptr;
 }
 
-template Mesh *      get_asset<Mesh>(AssetHandle handle);
-template Material *  get_asset<Material>(AssetHandle handle);
-template Texture2D * get_asset<Texture2D>(AssetHandle handle);
-template Cubemap * get_asset<Cubemap>(AssetHandle handle);
-template TextureInterface * get_asset<TextureInterface>(AssetHandle handle);
+template<typename T>
+T * get_asset_must(AssetHandle handle) {
+    T * ret = get_asset<T>(handle);
+    assert(ret); return ret;
+}
+
+template<typename T>
+T & get_asset_ref(AssetHandle handle) {
+    return *get_asset_must<T>(handle);
+}
+
+template Mesh &             get_asset_ref<Mesh>             (AssetHandle handle);
+template Material &         get_asset_ref<Material>         (AssetHandle handle);
+template Texture2D &        get_asset_ref<Texture2D>        (AssetHandle handle);
+template Cubemap &          get_asset_ref<Cubemap>          (AssetHandle handle);
+template TextureInterface & get_asset_ref<TextureInterface> (AssetHandle handle);
+template ShaderProgram &    get_asset_ref<ShaderProgram>    (AssetHandle handle);
 
 AssetMetadata * get_metadata(AssetHandle handle) {
     return get_metadata(context, handle);
@@ -272,6 +297,8 @@ AssetMetadata * get_metadata(AssetContext * asset_context,
     case AssetType<Material>::index: { lookup_arr = &reg.materials; } break;
     case AssetType<Texture2D>::index:{ lookup_arr = &reg.textures;  } break;
     case AssetType<Cubemap>::index:  { lookup_arr = &reg.cubemaps;  } break;
+    case AssetType<ShaderProgram>::index:
+        { lookup_arr = &reg.shader_programs;  } break;
     default:
         debug_warn(1, "requested metadata of asset of unsupported type");
     }

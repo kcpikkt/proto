@@ -13,5 +13,6 @@ void AssetRegistry::init(size_t init_capacity,
     materials.init(init_capacity, allocator);
     textures.init(init_capacity, allocator);
     cubemaps.init(init_capacity, allocator);
+    shader_programs.init(init_capacity, allocator);
 }
 

@@ -6,7 +6,7 @@
 #include "proto/core/memory/common.hh"
 #include "proto/core/asset-system/interface.hh"
 #include "proto/core/graphics/gl.hh"
-//#include "proto/core/platform/common.hh"
+#include "proto/core/util/String.hh"
 
 using namespace proto;
 using namespace proto::graphics;
@@ -70,7 +70,7 @@ void ShaderProgram::compile_shader(ShaderType type) {
     }
 }
 
-void ShaderProgram::create_shader(ShaderType type, const char * src) {
+void ShaderProgram::attach_shader_src(ShaderType type, const char * src) {
     shaders[(int)type] = glCreateShader(gl_shader_type(type));
     auto& shader = shaders[ (int)type ];
     
@@ -79,9 +79,16 @@ void ShaderProgram::create_shader(ShaderType type, const char * src) {
     glAttachShader(_program, shader);
 }
 
-void ShaderProgram::create_shader_from_file(ShaderType type, StringView path) {
+void ShaderProgram::attach_shader_file(ShaderType type, StringView path) {
+    String filepath =
+        platform::search_for_file(proto::context->shader_paths, path);
+
+    if(!filepath.view()) {
+        debug_error(debug::category::graphics,
+                    "Could not find shader file ", path); return; }
+
     platform::File file;
-    assert(!file.open(path, platform::file_read));
+    assert(!file.open(filepath.view(), platform::file_read));
 
     memory::Allocator * allocator = &(context->memory);
     u8 * buf = (u8*)allocator->alloc(file.size() + 1);
@@ -92,7 +99,9 @@ void ShaderProgram::create_shader_from_file(ShaderType type, StringView path) {
     buf[file.size()] = '\0';
 
     const char * src = (const char *)buf;
-    create_shader(type, src);
+    attach_shader_src(type, src);
+
+    allocator->free(buf);
 }
 
 
@@ -262,30 +271,34 @@ void ShaderProgram::set_material(Material * material) {
 
     if( (map = get_asset<Texture2D>(material->ambient_map)) )
         set_uniform<GL_SAMPLER_2D>
-            ("u_material.ambient_map", gl::bind_texture(map));
+            ("u_material.ambient_map", bind_texture(map));
     else
         set_uniform<GL_SAMPLER_2D>
-            ("u_material.ambient_map", gl::bind_texture(ctx.default_ambient_map));
+            ("u_material.ambient_map",
+             bind_texture(ctx.default_black_texture_h));
 
     if( (map = get_asset<Texture2D>(material->diffuse_map)) )
         set_uniform<GL_SAMPLER_2D>
-            ("u_material.diffuse_map", gl::bind_texture(map));
+            ("u_material.diffuse_map", bind_texture(map));
     else
         set_uniform<GL_SAMPLER_2D>
-            ("u_material.diffuse_map", gl::bind_texture(ctx.default_diffuse_map));
+            ("u_material.diffuse_map",
+             bind_texture(ctx.default_black_texture_h));
 
     if( (map = get_asset<Texture2D>(material->specular_map)) )
         set_uniform<GL_SAMPLER_2D>
-            ("u_material.specular_map", gl::bind_texture(map));
+            ("u_material.specular_map", bind_texture(map));
     else
         set_uniform<GL_SAMPLER_2D>
-            ("u_material.specular_map", gl::bind_texture(ctx.default_specular_map));
+            ("u_material.specular_map",
+             bind_texture(ctx.default_black_texture_h));
 
     if( (map = get_asset<Texture2D>(material->bump_map)) )
         set_uniform<GL_SAMPLER_2D>
-            ("u_material.bump_map", gl::bind_texture(map));
+            ("u_material.bump_map", bind_texture(map));
     else
         set_uniform<GL_SAMPLER_2D>
-            ("u_material.bump_map", gl::bind_texture(ctx.default_bump_map));
+            ("u_material.bump_map",
+             bind_texture(ctx.default_black_texture_h));
 }
 

@@ -13,6 +13,7 @@ namespace proto {
         Array<AssetMetadata> materials;
         Array<AssetMetadata> textures;
         Array<AssetMetadata> cubemaps;
+        Array<AssetMetadata> shader_programs;
 
         memory::Allocator * _allocator;
 

@@ -23,7 +23,7 @@ namespace debug {
         constexpr static Category memory   = BIT(2);
         constexpr static Category data     = BIT(3);
         constexpr static Category graphics = BIT(4);
-        constexpr static Category physics  = BIT(5);
+        constexpr static Category serialization = BIT(5);
     }                                           
 
 } // namespace proto {

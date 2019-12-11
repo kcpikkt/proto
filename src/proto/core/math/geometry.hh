@@ -3,4 +3,5 @@
 
 namespace proto {
     mat4 perspective(float fov, float aspect, float near, float far);
+    mat4 translate(mat4 mat,vec3 offset);
 } // namespace proto

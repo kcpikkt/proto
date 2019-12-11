@@ -59,6 +59,9 @@ namespace proto {
         operator bool() {
             return (bool)_str;
         }
+        bool is_cstring() {
+            return (strlen(_str) == _size);
+        }
 
         char operator[](u64 index) {
             assert(_str);

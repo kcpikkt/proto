@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <cstddef>
+#define GLM_SWIZZLE 
 #include <glm/glm.hpp>
 
 //TEMP

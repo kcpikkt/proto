@@ -100,6 +100,13 @@ void StringArena::grow(u64 least_capacity) {
     reserve(2*least_capacity);
 }
 
+bool StringArena::contains(StringView lookup) {
+    for(auto str : *this)
+        if(strview_cmp(str, lookup)) return true;
+
+    return false;
+}
+
 void StringArena::store(StringView str) {
     assert(_cursor >= _data);
     assert((_data + _capacity) >= _cursor);

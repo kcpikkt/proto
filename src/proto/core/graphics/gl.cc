@@ -6,10 +6,11 @@
 #include "proto/core/asset-system/interface.hh"
 #include "proto/core/debug/logging.hh"
 #include "proto/core/util/algo.hh"
+#include "proto/core/graphics/Vertex.hh"
 
 namespace proto {
 namespace graphics{
-namespace gl{
+    //namespace gl{
 
     s32 bind_texture(AssetHandle texture_handle) {
         assert(!glGetError());
@@ -52,7 +53,7 @@ namespace gl{
         assert(proto::context);
         auto& ctx = *proto::context;
 
-        using Slot = OpenGLContext::TextureSlot;
+        using Slot = RenderContext::TextureSlot;
         
         if(texture.flags.check(TextureInterface::bound_bit)) {
             assert(belongs(texture.bound_unit, 0, (s32)ctx.texture_slots.size()));
@@ -88,7 +89,7 @@ namespace gl{
                 vardump(get_metadata(prev_texture->handle)->name);
             }
 
-            assert(prev_texture->bound_unit == (s32)modindex);
+            //assert(prev_texture->bound_unit == (s32)modindex);
 
             prev_texture->bound_unit = -1;
             prev_texture->flags.unset(TextureInterface::bound_bit);
@@ -166,7 +167,7 @@ namespace gl{
         assert(proto::context);
         auto& ctx = *proto::context;
 
-        using Slot = OpenGLContext::TextureSlot;
+        using Slot = RenderContext::TextureSlot;
         s32 slot_index;
         
         if(texture.flags.check(TextureInterface::bound_bit)) {
@@ -217,7 +218,7 @@ namespace gl{
         vardump(index);
         assert(belongs(index, 0, (s32)ctx.texture_slots.size()));
 
-        using Slot = OpenGLContext::TextureSlot;
+        using Slot = RenderContext::TextureSlot;
         auto& slot = ctx.texture_slots[index];
 
         if(slot.flags.check(Slot::bound_bit)) {
@@ -238,19 +239,19 @@ namespace gl{
 
     void stale_texture_slot(u32 index) {
         assert(proto::context);
-        using Slot = proto::OpenGLContext::TextureSlot;
+        using Slot = proto::RenderContext::TextureSlot;
         context->texture_slots[index].flags.unset(Slot::fresh_bit);
     }
 
     void stale_all_texture_slots() {
         assert(proto::context);
-        using Slot = proto::OpenGLContext::TextureSlot;
+        using Slot = proto::RenderContext::TextureSlot;
         for(auto& s : context->texture_slots) s.flags.unset(Slot::fresh_bit);
     }
 
     void debug_print_texture_slots() {
         printf("Texture units state\n");
-        using Slot = OpenGLContext::TextureSlot;
+        using Slot = RenderContext::TextureSlot;
 
         for(u32 i=0; i<context->texture_slots.size(); i++) {
             auto& s = context->texture_slots[i];
@@ -272,6 +273,7 @@ namespace gl{
     template<> void gpu_upload<Texture2D>(Texture2D * tex) {
         assert(tex);
         if(!tex->data) {
+            //vardump(get_metadata(tex->handle)->name);
             debug_warn(debug::category::graphics,
                        "Texture GPU upload failed because passed texture "
                        "does not hold any image data.");
@@ -294,8 +296,10 @@ namespace gl{
                          0, GL_RGBA, GL_UNSIGNED_BYTE, tex->data);
             glGenerateMipmap(GL_TEXTURE_2D);
         } else {
+            vardump((int)tex->channels);
             debug_warn(debug::category::graphics,
-                       "No support for textures with ", tex->channels, " channels");
+                       "No support for textures with ",
+                       (int)tex->channels, " channels");
         }
 
         stale_texture_slot(tex->bound_unit);
@@ -304,6 +308,8 @@ namespace gl{
 
     template<> void gpu_upload<Mesh>(Mesh * mesh) {
         assert(mesh);
+        if(mesh->flags.check(Mesh::on_gpu_bit)) return;
+
         glBindVertexArray(mesh->VAO);
         glBindBuffer(GL_ARRAY_BUFFER, mesh->VBO);
 
@@ -319,16 +325,17 @@ namespace gl{
                     GL_STATIC_DRAW);
 
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(proto::Vertex),
-                            (void*) (offsetof(proto::Vertex, position)) );
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(struct Vertex),
+                            (void*) (offsetof(struct Vertex, position)) );
 
         glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(proto::Vertex),
-                                (void*) (offsetof(proto::Vertex, normal)) );
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(struct Vertex),
+                                (void*) (offsetof(struct Vertex, normal)) );
 
         glEnableVertexAttribArray(2);
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(proto::Vertex),
-                                (void*) (offsetof(proto::Vertex, uv)) );
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(struct Vertex),
+                                (void*) (offsetof(struct Vertex, uv)) );
+        mesh->flags.set(Mesh::on_gpu_bit);
 
     }
 
@@ -362,6 +369,6 @@ namespace gl{
         return message;
     }
 
-} // namespace gl
+    //} // namespace gl
 } // namespace graphics
 } // namespace proto

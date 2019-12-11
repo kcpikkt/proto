@@ -2,7 +2,7 @@
 cxx ?= clang++
 cxxflags =  -fPIC -std=c++17 -Wall -Wextra -Wno-unused-function
 dllflags = -shared -rdynamic
-ldflags =  #-rpath /usr/local/lib --enable-new-dtags
+ldflags = 
 
 debug ?= 1
 
@@ -99,8 +99,14 @@ ifeq ($(platform), LINUX)
 
 	proto_srcs = $(shell find $(src_dir) -name *.cc)
 	proto_objs := $(proto_srcs:$(src_dir)/%.cc=$(obj_dir)/%.o)
-	proto_ar_objs := \
-		$(addprefix $(ar_obj_dir)/,$(subst /,_,$(proto_objs:$(obj_dir)/%.o=%.o)))
+
+	proto_runtime_objs = \
+		$(filter %/entry-point.o %-runtime.o, $(proto_objs))
+	proto_lib_objs = \
+		$(filter-out $(proto_runtime_objs), $(proto_objs))
+	proto_lib_ar_objs := \
+		$(addprefix $(ar_obj_dir)/,$(subst /,_,$(proto_lib_objs:$(obj_dir)/%.o=%.o)))
+
 	proto_deps := $(proto_objs:.o=.d)
 
 	test_srcs = $(shell find $(test_src_dir)/proto -name *.cc)
@@ -109,7 +115,6 @@ ifeq ($(platform), LINUX)
 	includes := -I src/ -I vendor/ -I vendor/gl3w/include/
 	libs := -L./lib -L/usr/lib -lX11 -lGL -lGLX -lGLEW  -ldl
 endif
-
 
 ifdef client_src_dir
 	client_srcs = $(shell find $(client_src_dir) -name *.cc)
@@ -126,7 +131,7 @@ runtime: $(runtime)
 test: $(test)
 
 .PHONY: client
-client: $(client_objs) $(proto_objs)
+client: $(client_objs) $(library)
 	$(if $(client_src_dir),,\
 	$(error Client sources directory path variable 'client_src_dir' is not set. ))
 	$(if $(client_name),,\
@@ -134,37 +139,40 @@ client: $(client_objs) $(proto_objs)
 	$(if $(client_srcs),,\
 	$(error No source files in $(client_src_dir) ))
 
-#	$(eval proto_objs_filtered = $(filter-out %/entry-point.o, $(proto_objs)))
-	$(eval proto_objs_filtered = $(filter-out %-runtime.o, $(proto_objs)))
-
-	$(cxx) $(dllflags) $(ldflags) -o $(bin_dir)/$(client_name).so \
-		$(client_objs) $(proto_objs_filtered) $(libs)
+#   While hot-swapping dl there runtime records that
+#   file changed and tries to fetch it before linker has written
+#   all of it, hence outputting to part. rename should to be atomic.
+	$(cxx) -fPIC $(dllflags) $(ldflags) -o $(bin_dir)/$(client_name).so.part \
+		$(client_objs) $(library) $(libs) $(client_libs)
+	mv $(bin_dir)/$(client_name).so.part $(bin_dir)/$(client_name).so
 
 	echo $(runtime) $(bin_dir)/$(client_name).so > $(bin_dir)/run-$(client_name).sh
 	@chmod +x $(bin_dir)/run-$(client_name).sh
 
 $(client_objs): $(client_obj_dir)/%.o: $(client_src_dir)/%.cc
-	@echo $@
 	@$(call makedir, $(dir $@))
-	$(cxx) -c -fPIC $(cxxflags) -MMD -MP $< $(includes) -o $@
+	$(cxx) -c -fPIC $(cxxflags) -MMD -MP $< $(includes) $(client_includes) -o $@
 
-$(library): $(proto_objs)
-	ar rcs $(library) $(proto_ar_objs) $(ar_obj_dir)/gl3w.o
+$(library): $(proto_lib_objs)
+	ar rcs $(library) $(proto_lib_ar_objs) 
 
-$(runtime): $(LIBRARY) $(LIBRARY) Makefile
-	$(cxx) $(ldflags) -o $@ $(library) $(libs) 
+$(runtime): $(proto_runtime_objs) $(library) Makefile
+	$(cxx) $(ldflags) -o $@ $(proto_runtime_objs) $(library) $(libs) 
 
 #$(CATCH2GCH): $(VENDORDIR)/catch2/catch.hpp Makefile
 ##	Precompilation of rather hefty catch2 header
 #	$(CXX) -fPIC -D CATCH_CONFIG_MAIN $(CXXFLAGS) -c $< $(INCLUDES) -o $@
 
-$(test): $(proto_objs) $(test_objs)
+$(test): $(test_objs) $(library)
 #	Filtering out entry-point as catch2 provide its own.
 # 	Alternatively recompile all proto_objs with -DPROTO_MAIN=0
-	$(eval proto_objs_no_entrypoint = $(filter-out %/entry-point.o, $(proto_objs)))
-	$(cxx) $(ldflags) -o $@ $(proto_objs_no_entrypoint) $(test_objs) $(libs)
+	$(cxx) $(ldflags) -o $@ $(library) $(test_objs) $(libs)
 
-$(proto_objs): $(obj_dir)/%.o: $(src_dir)/%.cc
+$(proto_runtime_objs): $(obj_dir)/%.o: $(src_dir)/%.cc
+	@$(call makedir, $(dir $@))
+	$(cxx) -fPIC $(cxxflags) $(cppflags) -MMD -MP -c $< $(includes) -o $@
+
+$(proto_lib_objs): $(obj_dir)/%.o: $(src_dir)/%.cc
 	@$(call makedir, $(dir $@))
 	$(cxx) -fPIC $(cxxflags) $(cppflags) -MMD -MP -c $< $(includes) -o $@
 # 	because ar is stupid

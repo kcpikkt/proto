@@ -37,7 +37,6 @@ namespace platform {
 
     // TODO(kacper): move it to string.hh
     // case insensivite strcmp
-    int strcmp_i(const char * str1, const char * str2); 
     int strncmp_i(const char * str1, const char * str2, u32 n); 
 
     bool is_directory(StringView path);
@@ -90,6 +89,7 @@ namespace platform {
         int file_desc = -1;
     #endif
     };
+
 
 } // namespace platform
 } // namespace proto

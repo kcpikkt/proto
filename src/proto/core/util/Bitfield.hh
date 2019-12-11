@@ -15,6 +15,11 @@ namespace proto {
         Bitfield(T value) {
             _field = value;}
 
+        Bitfield<T>& operator=(T value) {
+            _field = value;
+            return *this;
+        }
+
         Bitfield(const Bitfield<T>& other) {
             _field = other._field;}
 

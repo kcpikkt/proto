@@ -7,7 +7,7 @@
 
 namespace proto {
 namespace graphics{
-namespace gl{
+    //namespace gl{
     const char * error_message();
 
     void stale_all_texture_slots();
@@ -43,6 +43,6 @@ namespace gl{
     template<> void gpu_upload<Texture2D>(Texture2D *);
 
     const char * error_message();
-} // namespace gl
+    //} // namespace gl
 } // namespace graphics
 } // namespace proto
