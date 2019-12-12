@@ -5,7 +5,7 @@
 
 namespace proto {
 void StringArena::_move(StringArena&& other) {
-    DataholderBase::dataholder_move(meta::forward<StringArena>(other));
+    StateBase::state_move(meta::forward<StringArena>(other));
     _data = other._data;
     _cursor = other._cursor;
     _capacity = other._capacity;
@@ -30,7 +30,7 @@ void StringArena::init(memory::Allocator * allocator) {
 }
 
 void StringArena::init(u64 init_capacity, memory::Allocator * allocator) {
-    DataholderBase::dataholder_init();
+    StateBase::state_init();
     assert(allocator);
     _allocator = allocator;
 

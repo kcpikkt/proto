@@ -59,11 +59,11 @@ namespace proto {
 
         ShaderProgram * current_shader = nullptr; //tmp
 
-        Array<Framebuffer> render_targets;
+        Array<Framebuffer> framebuffers;
         Framebuffer * current_read_framebuffer = nullptr;
         Framebuffer * current_draw_framebuffer = nullptr;
 
-        Framebuffer * default_frambuffer = nullptr;
+        Framebuffer * default_framebuffer = nullptr;
 
         AssetHandle default_black_texture_h;
         AssetHandle default_white_texture_h;

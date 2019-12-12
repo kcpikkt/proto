@@ -29,7 +29,14 @@ namespace proto {
     template<typename T>
     T & get_asset_ref(AssetHandle handle);
 
-
+    // just for structured bindings
+    template<typename T>
+    struct AssetHandlePair {
+        AssetHandle handle;
+        T& asset;
+        operator T& (){ return asset; }
+        operator AssetHandle (){ return handle; }
+    };
 
 
     AssetMetadata * get_metadata(AssetHandle handle);
@@ -55,10 +62,14 @@ namespace proto {
     Ret create_init_asset(StringView name);
 
     template<typename T>
-    constexpr T&(*create_asset_ref)(StringView) = create_asset<T, T&, false>; 
+    constexpr T&(*create_asset_rref)(StringView) = create_asset<T, T&, false>; 
 
     template<typename T>
-    constexpr T&(*create_init_asset_ref)(StringView) = create_asset<T, T&, true>;
+    constexpr AssetHandlePair<T>(*create_asset_rpair)(StringView) =
+        create_asset<T, AssetHandlePair<T>&, false>; 
+
+    template<typename T>
+    constexpr T&(*create_init_asset_rref)(StringView) = create_asset<T, T&, true>;
 
     template<bool init = false>
     AssetHandle create_asset(StringView name, AssetTypeIndex type);

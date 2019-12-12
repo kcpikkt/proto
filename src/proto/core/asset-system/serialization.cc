@@ -217,7 +217,7 @@ namespace serialization {
             create_init_asset((const char*)main_header.name, 
                                main_header.handle.type);
         if(handle.type == AssetType<Mesh>::index) {
-            assert(get_asset<Mesh>(handle)->Dataholder::is_initialized());
+            assert(get_asset<Mesh>(handle)->State::is_initialized());
         }
         assert(handle = main_header.handle);
 

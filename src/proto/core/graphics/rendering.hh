@@ -131,7 +131,32 @@ void init_gbuffer() {
 
 void render_gbuffer() {
     auto& ctx = *context;
-    get_asset_ref<ShaderProgram>(ctx.gbuffer_shader_h).use();
+
+    if(glIsEnabled(GL_MULTISAMPLE))
+        debug_warn(debug::category::graphics,
+                   "Rendering to gbuffer with GL_MULTISAMPLE enabled.");
+
+    auto gbuffer_shader = get_asset_ref<ShaderProgram>(ctx.gbuffer_shader_h);
+    gbuffer_shader.use();
+
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    mat4 model = mat4(1.0);
+    model = glm::scale(model, vec3(0.1));
+    model = rotate(model, (float)M_PI/2.0f, vec3(0.0, 1.0, 0.0));
+    model = translate(model, vec3(0.0, -10.0, 0.0));
+
+    mat4 projection = ctx.camera.projection_matrix();
+    mat4 view = ctx.camera.view_matrix();
+    mat4 mvp = projection * view * model;
+
+    gbuffer_shader.set_uniform<GL_FLOAT>      ("u_time", ctx.clock.elapsed_time);
+    gbuffer_shader.set_uniform<GL_FLOAT_MAT4> ("u_mvp", &mvp);
+    gbuffer_shader.set_uniform<GL_FLOAT_MAT4> ("u_model", &model);
+    gbuffer_shader.set_uniform<GL_FLOAT_MAT4> ("u_view", &view);
+    gbuffer_shader.set_uniform<GL_FLOAT_MAT4> ("u_projection", &projection);
+
+    render_mesh(&ctx.meshes[1]);
 }
 
 void render_scene() {

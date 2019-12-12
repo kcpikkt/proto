@@ -181,7 +181,6 @@ String search_for_file(StringArena& dirs, StringView filename) {
         //TOOD(kacper): use proper allocator for that
         ret.init(filename, &context->memory);
     }
-    vardump(filename);
     return ret;
 }
 

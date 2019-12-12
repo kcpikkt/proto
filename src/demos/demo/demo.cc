@@ -13,27 +13,17 @@
 
 using namespace proto;
 
-template<typename T, typename Return = T>
-meta::conditional_t<meta::is_same_v<T, int>, T, T&> function() {
-    if constexpr (meta::is_same_v<T, int>) {
-        T ok;
-        return ok;
-    } else {
-        T ok;
-        return ok;
-    }
-}
-
 PROTO_SETUP { // (RuntimeSettings * settings)
 }
 
 AssetHandle prev_shader_h;
 ShaderProgram * prev_shader;
 Entity e;
-Texture2D gbuf_position;
-Texture2D gbuf_normal;
-Texture2D gbuf_albedo;
+AssetHandle gbuf_position_h;
+AssetHandle gbuf_normal_h;
+AssetHandle gbuf_albedo_h;
 Framebuffer gbuffer;
+
 
 PROTO_INIT {
     auto& ctx = *proto::context;
@@ -44,19 +34,37 @@ PROTO_INIT {
     ctx.camera.far = 100.f;
 
     serialization::load_asset_dir("outmesh/");
-    #if 0
 
+    for(auto& t : ctx.textures) {
+        vardump(get_metadata(t.handle)->name);
+        //gfx::gpu_upload(&t);
+    }
+    
+    for(auto& m : ctx.meshes) gfx::gpu_upload(&m);
     auto& scr_size = context->window_size;
-    Framebuffer gbuffer;
-    gbuf_position.init(scr_size, GL_RGB16F, GL_RGB);
-    gbuf_normal.init(scr_size, GL_RGB16F, GL_RGB);
-    gbuf_albedo.init(scr_size, GL_RGBA, GL_RGB);
 
-    gfx::bind_framebuffer(&gbuffer);
+    auto& gbuf_position =
+        create_asset_rref<Texture2D>("gbuffer_position_texture")
+            .$_init(scr_size, GL_RGB16F, GL_RGB);
+    gbuf_position_h = gbuf_position.handle;
+
+    auto& gbuf_normal = 
+        create_asset_rref<Texture2D>("gbuffer_normal_texture")
+            .$_init(scr_size, GL_RGB16F, GL_RGB);
+    gbuf_normal_h = gbuf_normal.handle;
+
+    auto& gbuf_albedo =
+        create_asset_rref<Texture2D>("gbuffer_albedo_texture")
+            .$_init(scr_size, GL_RGBA, GL_RGBA);
+    gbuf_albedo_h = gbuf_albedo.handle;
+
     gbuffer.init(scr_size, 3);
-    gbuffer.add_color_attachment(&gbuf_position);
-    gbuffer.add_color_attachment(&gbuf_normal);
-    gbuffer.add_color_attachment(&gbuf_albedo);
+    gfx::bind_framebuffer(gbuffer);
+
+    gbuffer
+        .$_add_color_attachment(&gbuf_position)
+        .$_add_color_attachment(&gbuf_normal)
+        .$_add_color_attachment(&gbuf_albedo);
     gbuffer.finalize();
 
     u32 gbuf_depth;
@@ -67,36 +75,39 @@ PROTO_INIT {
     glFramebufferRenderbuffer
         (GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, gbuf_depth);
 
-    if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        debug_warn(debug::category::graphics,
-                   "Incomplete framebuffer");
-    }
-
-    e = create_entity();
-    add_component<TransformComp>(e);
-    add_component<RenderMeshComp>(e).mesh = ctx.meshes[1].handle;
-    #endif
+    if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        debug_warn(debug::category::graphics, "Incomplete framebuffer");
+    
+    vardump(gfx::error_message());
 }
 
 PROTO_UPDATE {
-    #if 0
+
     auto& ctx = *proto::context;
     float& time = ctx.clock.elapsed_time;
+    ctx.camera.position = vec3(0.0,0.0,0.0);
+
+    gfx::bind_framebuffer(gbuffer);
+    glViewport(0, 0, ctx.window_size.x, ctx.window_size.y);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    gfx::render_gbuffer();
+    gfx::reset_framebuffer();
+
+    get_asset_ref<ShaderProgram>(ctx.quad_shader_h).use();
+    vec2 halfscr = (vec2)ctx.window_size/2.0f;
 
     glViewport(0, 0, ctx.window_size.x, ctx.window_size.y);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    //get_asset_ref<ShaderProgram>(ctx.quad_shader_h).use();
-    vec2 halfscr = (vec2)ctx.window_size/2.0f;
-
-    gfx::render_quad(gfx::bind_texture(ctx.default_checkerboard_texture_h),
+    gfx::render_quad(gfx::bind_texture(gbuf_position_h),
                      vec2(0.0), halfscr);
-    gfx::render_quad(gfx::bind_texture(ctx.default_checkerboard_texture_h),
+    gfx::render_quad(gfx::bind_texture(gbuf_normal_h),
                      vec2(0.0, halfscr.y), halfscr);
-    gfx::render_quad(gfx::bind_texture(ctx.default_checkerboard_texture_h),
+    gfx::render_quad(gfx::bind_texture(gbuf_albedo_h),
                      halfscr, halfscr);
-    ///graphics::render_scene();
-    #endif
+    gfx::render_quad(gfx::bind_texture(ctx.default_checkerboard_texture_h),
+                     vec2(halfscr.x, 0.0), halfscr);
 }
 
 PROTO_LINK {}

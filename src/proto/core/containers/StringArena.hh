@@ -4,14 +4,14 @@
 #include "proto/core/memory/common.hh"
 #include "proto/core/containers/Array.hh"
 #include "proto/core/util/StringView.hh"
-#include "proto/core/DataholderCRTP.hh"
+#include "proto/core/StateCRTP.hh"
 #include "proto/core/util/Bitfield.hh"
 #include "proto/core/debug/markers.hh"
 
 namespace proto {
 
-struct StringArena : DataholderCRTP<StringArena>, debug::Marker{
-    using DataholderBase = DataholderCRTP<StringArena>;
+struct StringArena : StateCRTP<StringArena>, debug::Marker{
+    using StateBase = StateCRTP<StringArena>;
 
     // to allow for range-for
     struct Iterator {

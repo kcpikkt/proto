@@ -37,7 +37,9 @@ namespace graphics{
         meta::enable_if_t<meta::is_base_of_v<TextureInterface, T>,s32>;
 
     // TODO(kacper): read/write/both mode
-    u32 bind_framebuffer(Framebuffer * target);
+    u32 bind_framebuffer(Framebuffer & target);
+
+    u32 reset_framebuffer();
 
     void debug_print_texture_slots();
 

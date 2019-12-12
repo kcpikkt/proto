@@ -144,8 +144,6 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
     namespace mem = proto::memory;
 
     // just for cmdline args
-    platform::OSAllocator tmp_presetup_memory;
-
     /***************************************************************
      * RUNTIME SETUP
      */
@@ -190,7 +188,7 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
     /***************************************************************
      * OBTAINING WINDOW & OPENGL INITIALIZATION
      */
-    bool window_mode = settings.mode.check(RuntimeSettings::window_mode_bit);
+    //bool window_mode = settings.mode.check(RuntimeSettings::window_mode_bit);
     //bool opengl_mode = settings.mode.check(RuntimeSettings::opengl_mode_bit);
     //meh, 
     //assert(!(window_mode xor opengl_mode));
@@ -377,6 +375,9 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
                      "main shader_programs array");
     _context.shader_programs.init(10, &_context.memory);
 
+    set_debug_marker(_context.textures, "context.framebuffers",
+                     "main framebufffer array");
+    _context.framebuffers.init(0, &_context.memory);
 
     _context.entities.init(10, &_context.memory);
     _context.comp.transform.init(10, &_context.memory);
@@ -408,7 +409,7 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
     struct { u8 ch[4]; } default_black_texture_data[] = {{ 255, 255, 255, 255}};
 
     Texture2D & default_white_texture =
-        create_asset_ref<Texture2D>("defualt_white_texture");
+        create_asset_rref<Texture2D>("defualt_white_texture");
 
     default_white_texture.init(ivec2(1,1), GL_RGBA8, GL_RGBA);
     default_white_texture.data = (void*)default_white_texture_data;
@@ -416,7 +417,7 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
     _context.default_white_texture_h = default_white_texture.handle;
 
     Texture2D & default_black_texture =
-        create_asset_ref<Texture2D>("defualt_black_texture");
+        create_asset_rref<Texture2D>("defualt_black_texture");
 
     default_black_texture.init(ivec2(1,1), GL_RGBA8, GL_RGBA);
     default_black_texture.data = (void*)default_black_texture_data;
@@ -424,15 +425,15 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
     _context.default_black_texture_h = default_black_texture.handle;
 
     Texture2D & default_checkerboard_texture =
-        create_asset_ref<Texture2D>("defualt_checkerboard_texture");
+        create_asset_rref<Texture2D>("defualt_checkerboard_texture");
 
-    default_checkerboard_texture.init(ivec2(1,1), GL_RGBA8, GL_RGBA);
+    default_checkerboard_texture.init(ivec2(2,2), GL_RGBA8, GL_RGBA);
     default_checkerboard_texture.data = (void*)default_checkerboard_texture_data;
     graphics::gpu_upload(&default_checkerboard_texture);
     _context.default_checkerboard_texture_h = default_checkerboard_texture.handle;
 
      // DEFAULT MESHES
-    Mesh & quad = create_init_asset_ref<Mesh>("default_quad");
+    Mesh & quad = create_init_asset_rref<Mesh>("default_quad");
     quad.vertices.resize(4);
     assert(sizeof(quad_vertices) == sizeof(Vertex) * 4);
     memcpy(quad.vertices._data, quad_vertices, sizeof(Vertex) * 4);
@@ -442,24 +443,32 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
 
 #if DEFAULT_SHADERS
     auto& quad_shader =
-        create_init_asset_ref<ShaderProgram>("default_quad_shader");
+        create_init_asset_rref<ShaderProgram>("default_quad_shader");
     quad_shader.attach_shader_file(ShaderType::Vert, "quad_vert.glsl");
     quad_shader.attach_shader_file(ShaderType::Frag, "quad_frag.glsl");
     quad_shader.link();
     _context.quad_shader_h = quad_shader.handle;
 
     auto& gbuffer_shader =
-        create_init_asset_ref<ShaderProgram>("default_gbuffer_shader");
+        create_init_asset_rref<ShaderProgram>("default_gbuffer_shader");
     gbuffer_shader.attach_shader_file(ShaderType::Vert, "g-buffer_vert.glsl");
     gbuffer_shader.attach_shader_file(ShaderType::Frag, "g-buffer_frag.glsl");
     gbuffer_shader.link();
     _context.gbuffer_shader_h = gbuffer_shader.handle;
 #endif
 
+    _context.default_framebuffer = &_context.framebuffers.push_back();
+    _context.default_framebuffer->FBO = 0;
+    _context.default_framebuffer->size = _context.window_size;
+    _context.default_framebuffer->color_attachments.init(&_context.memory);
+
+    _context.current_read_framebuffer = _context.default_framebuffer;
+    _context.current_draw_framebuffer = _context.default_framebuffer;
+
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    glEnable(GL_MULTISAMPLE);  
+    glDisable(GL_MULTISAMPLE);  
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);

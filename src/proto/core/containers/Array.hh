@@ -1,6 +1,6 @@
 #pragma once
 #include "proto/core/meta.hh"
-#include "proto/core/DataholderCRTP.hh"
+#include "proto/core/StateCRTP.hh"
 #include "proto/core/debug/logging.hh"
 #include "proto/core/debug/markers.hh"
 #include "proto/core/memory/common.hh"
@@ -8,12 +8,12 @@
 namespace proto{
 
 template<typename T,
-         bool is_dataholder = meta::is_base_of_v<DataholderCRTP<T>, T> >
+         bool has_state = meta::is_base_of_v<StateCRTP<T>, T> >
 struct Array
-    : DataholderCRTP<Array<T>>, debug::Marker {
+    : StateCRTP<Array<T>>, debug::Marker {
 
     using DataType = T;
-    using DataholderBase = DataholderCRTP<Array<T>>;
+    using StateBase = StateCRTP<Array<T>>;
 
     // to allow for range-for
     struct Iterator {
@@ -49,7 +49,7 @@ struct Array
     memory::Allocator * _allocator = nullptr;
 
     void _move(Array<T>&& other) {
-        DataholderBase::dataholder_move(meta::forward<Array<T>>(other));
+        StateBase::state_move(meta::forward<Array<T>>(other));
         _data = other._data; other._data = nullptr;
         _allocator = other._allocator; other._allocator = 0;
         _size = other._size; other._size = 0;
@@ -73,7 +73,7 @@ struct Array
     Array<T>& operator=(const Array<T>& other) = delete;
 
     void init(u64 init_capacity, memory::Allocator * allocator) {
-        DataholderBase::dataholder_init();
+        StateBase::state_init();
         assert(allocator);
         _allocator = allocator;
 
@@ -173,7 +173,7 @@ struct Array
     void resize(u64 new_size) {
         if(new_size == _size) return;
         if(new_size < _size) {
-            if constexpr(is_dataholder) {
+            if constexpr(has_state) {
                 for(size_t i=new_size; i<_size; i++)
                     (_data + i)->~T();
             }
@@ -207,7 +207,7 @@ struct Array
 
     void destroy_deep() {
         assert(_allocator);
-        if constexpr(is_dataholder) {
+        if constexpr(has_state) {
             for(u64 i=0; i<_size; i++)
                 _data[i].~T();
         }

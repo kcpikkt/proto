@@ -109,6 +109,8 @@ Ret create_asset(StringView name) {
         return &metadata;
     } else if constexpr(meta::is_same_v<Ret, AssetMetadata&>) {
         return  metadata;
+    } else if constexpr(meta::is_same_v<Ret, AssetHandlePair<T>>) {
+        return AssetHandlePair<T>{ handle, _asset};
     }
 }
 
@@ -124,6 +126,10 @@ template AssetMetadata * create_asset<T, AssetMetadata *, true>  (StringView); \
 template AssetMetadata * create_asset<T, AssetMetadata *, false> (StringView); \
 template AssetMetadata & create_asset<T, AssetMetadata &, true>  (StringView); \
 template AssetMetadata & create_asset<T, AssetMetadata &, false> (StringView); \
+ template AssetHandlePair<T>                                            \
+    create_asset<T, AssetHandlePair<T>, true>  (StringView);            \
+ template AssetHandlePair<T>                                            \
+    create_asset<T, AssetHandlePair<T>, false> (StringView);    \
 
 INSTANTIATE_CREATE_ASSET_FUNCTIONS_FOR(Mesh);
 INSTANTIATE_CREATE_ASSET_FUNCTIONS_FOR(Material);

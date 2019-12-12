@@ -1,7 +1,7 @@
 #pragma once
 #include "proto/core/common.hh"
 #include "proto/core/util/StringView.hh"
-#include "proto/core/DataholderCRTP.hh"
+#include "proto/core/StateCRTP.hh"
 #include "proto/core/debug/assert.hh"
 #include "proto/core/containers/Array.hh"
 #include "proto/core/string.hh"

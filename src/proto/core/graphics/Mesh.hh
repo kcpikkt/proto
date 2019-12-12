@@ -8,7 +8,7 @@
 #include "proto/core/util/Bitfield.hh"
 #include "proto/core/asset-system/common.hh"
 #include "proto/core/graphics/Material.hh"
-#include "proto/core/DataholderCRTP.hh"
+#include "proto/core/StateCRTP.hh"
 #include "proto/core/graphics/Vertex.hh"
 #include <unistd.h>
 namespace proto {
@@ -28,7 +28,7 @@ struct serialization::AssetHeader<Mesh> {
     u64 spans_size;
 };
 
-struct Mesh : Asset, DataholderCRTP<Mesh>{
+struct Mesh : Asset, StateCRTP<Mesh>{
     struct Span {
         u32 begin_index;
         u32 index_count;
@@ -37,7 +37,7 @@ struct Mesh : Asset, DataholderCRTP<Mesh>{
         constexpr static u8 flip_uv_bit = BIT(0);
     };
 
-    using Dataholder = DataholderCRTP<Mesh>;
+    using State = StateCRTP<Mesh>;
     u32 VAO, VBO, EBO;
 
     // TODO(kacper): is on gpu
@@ -111,7 +111,7 @@ struct Mesh : Asset, DataholderCRTP<Mesh>{
 
     //FIXME(kacper);
     void init(memory::Allocator * allocator){
-        Dataholder::dataholder_init();
+        State::state_init();
         assert(allocator);
         _allocator = allocator;
         vertices.init(_allocator);

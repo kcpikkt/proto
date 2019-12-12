@@ -11,6 +11,11 @@ namespace proto {
         glGenFramebuffers(1, &FBO);
     }
 
+    Framebuffer& Framebuffer::$_add_color_attachment(Texture2D * tex) {
+        add_color_attachment(tex);
+        return *this;
+    }
+
     u32 Framebuffer::add_color_attachment(Texture2D * tex) {
         if(size != tex->size)
             debug_warn(debug::category::graphics,
@@ -25,6 +30,7 @@ namespace proto {
         glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + n,
                                 GL_TEXTURE_2D, tex->gl_id, 0);
 
+        assert(!glGetError());
         return n;
     }
     static u32 attachments[10] = 

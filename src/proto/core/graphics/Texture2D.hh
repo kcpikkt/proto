@@ -15,15 +15,17 @@ namespace serialization {
         u8 channels;
         u64 data_offset;
         u64 data_size;
+        u32 format;
+        u32 gpu_format;
     };
-} // namespace proto {
+}
 
 struct Texture2D :
-        DataholderCRTP<Texture2D>,
+        StateCRTP<Texture2D>,
         TextureInterface
 {
     memory::Allocator * _allocator;
-    void * data;
+    void * data = nullptr;
    
     u64 serialized_data_size() {
         return size.x * size.y * channels * sizeof(u8);
@@ -68,13 +70,17 @@ struct Texture2D :
         // FIXME(kacper):
         glBindTexture(GL_TEXTURE_2D, gl_id);
 
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
-                        GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
         glBindTexture(GL_TEXTURE_2D, 0);
+    }
+
+    // dollar perfix means chaining
+    inline Texture2D& $_init(ivec2 size, u32 format, u32 gpu_format){
+        init(size, format, gpu_format); return *this;
     }
 
     void init(ivec2 size, u32 format, u32 gpu_format){

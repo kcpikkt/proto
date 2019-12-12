@@ -249,11 +249,15 @@ namespace graphics{
         for(auto& s : context->texture_slots) s.flags.unset(Slot::fresh_bit);
     }
 
-    u32 bind_framebuffer(Framebuffer * target) {
-        glBindFramebuffer(GL_FRAMEBUFFER, target->FBO);
-        context->current_read_framebuffer = target;
-        context->current_draw_framebuffer = target;
-        return target->FBO;
+    u32 bind_framebuffer(Framebuffer& target) {
+        glBindFramebuffer(GL_FRAMEBUFFER, target.FBO);
+        context->current_read_framebuffer = &target;
+        context->current_draw_framebuffer = &target;
+        return target.FBO;
+    }
+
+    u32 reset_framebuffer() {
+        return bind_framebuffer(*context->default_framebuffer);
     }
 
     void debug_print_texture_slots() {
@@ -277,17 +281,20 @@ namespace graphics{
 
     template<typename T> void gpu_upload(T *);
 
-    template<> void gpu_upload<Texture2D>(Texture2D * tex) {
-        assert(tex);
+    template<> void gpu_upload<Texture2D>(Texture2D * texture) {
+        assert(texture);
+        if(texture->flags.check(TextureInterface::on_gpu_bit)) return;
 
-        bind_texture(tex);
+        bind_texture(texture);
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-        glTexImage2D(GL_TEXTURE_2D, 0, tex->format, tex->size.x, tex->size.y,
-                     0, tex->gpu_format, GL_UNSIGNED_BYTE, tex->data);
+        // Texture2D::data should be null default
+        glTexImage2D(GL_TEXTURE_2D, 0, texture->format,
+                     texture->size.x, texture->size.y,
+                     0, texture->gpu_format, GL_UNSIGNED_BYTE, texture->data);
 
-        stale_texture_slot(tex->bound_unit);
-        stale_all_texture_slots();
+        texture->flags.set(TextureInterface::on_gpu_bit);
+        stale_texture_slot(texture->bound_unit);
     }
 
     template<> void gpu_upload<Mesh>(Mesh * mesh) {
