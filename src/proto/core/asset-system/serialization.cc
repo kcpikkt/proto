@@ -214,8 +214,11 @@ namespace serialization {
         assert(main_header.signature == asset_file_signature);
 
         AssetHandle handle =
-            create_asset((const char*)main_header.name, "",
-                         main_header.handle.type);
+            create_init_asset((const char*)main_header.name, 
+                               main_header.handle.type);
+        if(handle.type == AssetType<Mesh>::index) {
+            assert(get_asset<Mesh>(handle)->Dataholder::is_initialized());
+        }
         assert(handle = main_header.handle);
 
         AssetMetadata *  metadata = get_metadata(handle);

@@ -46,25 +46,24 @@ namespace proto {
         return get_metadata(asset->handle);
     }
 
+    // TODO(kacper): add meta::decay<T>&& = T() parameter
+    // but first implement decay
+    template<typename T, typename Ret = AssetHandle, bool init = false>
+    Ret create_asset(StringView name); 
 
-
-    AssetHandle create_or_get_asset(StringView name,
-                                    StringView filepath,
-                                    AssetTypeIndex type);
-    AssetHandle create_asset(StringView name,
-                             StringView filepath,
-                             AssetTypeIndex type); 
-    AssetHandle create_asset(AssetContext * asset_context,
-                             StringView name,
-                             StringView filepath,
-                             AssetTypeIndex type); 
+    template<typename T, typename Ret = AssetHandle>
+    Ret create_init_asset(StringView name);
 
     template<typename T>
-    auto create_asset(StringView name, StringView filepath = "") ->
-        meta::enable_if_t<meta::is_base_of_v<Asset, T>, AssetHandle>
-    {
-        return create_asset(name, filepath, AssetType<T>::index);
-    }
+    constexpr T&(*create_asset_ref)(StringView) = create_asset<T, T&, false>; 
+
+    template<typename T>
+    constexpr T&(*create_init_asset_ref)(StringView) = create_asset<T, T&, true>;
+
+    template<bool init = false>
+    AssetHandle create_asset(StringView name, AssetTypeIndex type);
+
+    AssetHandle create_init_asset(StringView name, AssetTypeIndex type);
 
     void destroy_asset(AssetHandle handle); 
     void destroy_asset(AssetContext * asset_context,

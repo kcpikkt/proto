@@ -13,6 +13,17 @@
 
 using namespace proto;
 
+template<typename T, typename Return = T>
+meta::conditional_t<meta::is_same_v<T, int>, T, T&> function() {
+    if constexpr (meta::is_same_v<T, int>) {
+        T ok;
+        return ok;
+    } else {
+        T ok;
+        return ok;
+    }
+}
+
 PROTO_SETUP { // (RuntimeSettings * settings)
 }
 
@@ -25,7 +36,6 @@ Texture2D gbuf_albedo;
 Framebuffer gbuffer;
 
 PROTO_INIT {
-    vardump(1);
     auto& ctx = *proto::context;
 
     ctx.camera.fov = (float)M_PI * 2.0f / 3.0f;
@@ -34,6 +44,7 @@ PROTO_INIT {
     ctx.camera.far = 100.f;
 
     serialization::load_asset_dir("outmesh/");
+    #if 0
 
     auto& scr_size = context->window_size;
     Framebuffer gbuffer;
@@ -64,9 +75,11 @@ PROTO_INIT {
     e = create_entity();
     add_component<TransformComp>(e);
     add_component<RenderMeshComp>(e).mesh = ctx.meshes[1].handle;
+    #endif
 }
 
 PROTO_UPDATE {
+    #if 0
     auto& ctx = *proto::context;
     float& time = ctx.clock.elapsed_time;
 
@@ -83,6 +96,7 @@ PROTO_UPDATE {
     gfx::render_quad(gfx::bind_texture(ctx.default_checkerboard_texture_h),
                      halfscr, halfscr);
     ///graphics::render_scene();
+    #endif
 }
 
 PROTO_LINK {}

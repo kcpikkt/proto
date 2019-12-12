@@ -279,35 +279,12 @@ namespace graphics{
 
     template<> void gpu_upload<Texture2D>(Texture2D * tex) {
         assert(tex);
-        if(!tex->data) {
-            //vardump(get_metadata(tex->handle)->name);
-            debug_warn(debug::category::graphics,
-                       "Texture GPU upload failed because passed texture "
-                       "does not hold any image data.");
-            return;
-        }
 
         bind_texture(tex);
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-        /*  */ if(tex->channels == 1) {
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, tex->size.x, tex->size.y,
-                         0, GL_RED, GL_UNSIGNED_BYTE, tex->data);
-            glGenerateMipmap(GL_TEXTURE_2D);
-        } else if(tex->channels == 3) {
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, tex->size.x, tex->size.y,
-                         0, GL_RGB, GL_UNSIGNED_BYTE, tex->data);
-            glGenerateMipmap(GL_TEXTURE_2D);
-        } else if(tex->channels == 4) {
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, tex->size.x, tex->size.y,
-                         0, GL_RGBA, GL_UNSIGNED_BYTE, tex->data);
-            glGenerateMipmap(GL_TEXTURE_2D);
-        } else {
-            vardump((int)tex->channels);
-            debug_warn(debug::category::graphics,
-                       "No support for textures with ",
-                       (int)tex->channels, " channels");
-        }
+        glTexImage2D(GL_TEXTURE_2D, 0, tex->format, tex->size.x, tex->size.y,
+                     0, tex->gpu_format, GL_UNSIGNED_BYTE, tex->data);
 
         stale_texture_slot(tex->bound_unit);
         stale_all_texture_slots();

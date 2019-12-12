@@ -407,74 +407,53 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
     struct { u8 ch[4]; } default_white_texture_data[] = {{ 255, 255, 255, 255}};
     struct { u8 ch[4]; } default_black_texture_data[] = {{ 255, 255, 255, 255}};
 
+    Texture2D & default_white_texture =
+        create_asset_ref<Texture2D>("defualt_white_texture");
 
-    _context.default_white_texture_h =
-        create_asset<Texture2D>("defualt_white_texture");
+    default_white_texture.init(ivec2(1,1), GL_RGBA8, GL_RGBA);
+    default_white_texture.data = (void*)default_white_texture_data;
+    graphics::gpu_upload(&default_white_texture);
+    _context.default_white_texture_h = default_white_texture.handle;
 
-    _context.default_black_texture_h =
-        create_asset<Texture2D>("defualt_white_texture");
+    Texture2D & default_black_texture =
+        create_asset_ref<Texture2D>("defualt_black_texture");
 
-    _context.default_checkerboard_texture_h =
-        create_asset<Texture2D>("defualt_checkerboard_texture");
+    default_black_texture.init(ivec2(1,1), GL_RGBA8, GL_RGBA);
+    default_black_texture.data = (void*)default_black_texture_data;
+    graphics::gpu_upload(&default_black_texture);
+    _context.default_black_texture_h = default_black_texture.handle;
 
-    if(!_context.default_white_texture_h) 
-        debug_warn(debug::category::main,
-                   "Could not create default_white_texture");
+    Texture2D & default_checkerboard_texture =
+        create_asset_ref<Texture2D>("defualt_checkerboard_texture");
 
-    if(!_context.default_white_texture_h) 
-        debug_warn(debug::category::main,
-                   "Could not create default_black_texture");
+    default_checkerboard_texture.init(ivec2(1,1), GL_RGBA8, GL_RGBA);
+    default_checkerboard_texture.data = (void*)default_checkerboard_texture_data;
+    graphics::gpu_upload(&default_checkerboard_texture);
+    _context.default_checkerboard_texture_h = default_checkerboard_texture.handle;
 
-    if(!_context.default_white_texture_h) 
-        debug_warn(debug::category::main,
-                   "Could not create default_checkerboard_texture");
-
-    Texture2D * default_white_texture =
-        get_asset<Texture2D>(_context.default_white_texture_h);
-    assert(default_white_texture);
-    default_white_texture->data = (void*)default_white_texture_data;
-    default_white_texture->size = ivec2(1,1);
-    default_white_texture->channels = 4;
-    graphics::gpu_upload(default_white_texture);
-
-    Texture2D * default_black_texture =
-        get_asset<Texture2D>(_context.default_black_texture_h);
-    assert(default_black_texture);
-    default_black_texture->data = (void*)default_black_texture_data;
-    default_black_texture->size = ivec2(1,1);
-    default_black_texture->channels = 4;
-    graphics::gpu_upload(default_black_texture);
-
-    Texture2D * default_checkerboard_texture =
-        get_asset<Texture2D>(_context.default_checkerboard_texture_h);
-    assert(default_checkerboard_texture);
-    default_checkerboard_texture->data = (void*)default_checkerboard_texture_data;
-    default_checkerboard_texture->size = ivec2(2,2);
-    default_checkerboard_texture->channels = 4;
-    graphics::gpu_upload(default_checkerboard_texture);
-
-    // DEFAULT MESHES
-    _context.quad_h = create_asset<Mesh>("default_quad");
-    Mesh * quad = get_asset<Mesh>(_context.quad_h);
-    quad->vertices.resize(4);
+     // DEFAULT MESHES
+    Mesh & quad = create_init_asset_ref<Mesh>("default_quad");
+    quad.vertices.resize(4);
     assert(sizeof(quad_vertices) == sizeof(Vertex) * 4);
-    memcpy(quad->vertices._data, quad_vertices, sizeof(Vertex) * 4);
+    memcpy(quad.vertices._data, quad_vertices, sizeof(Vertex) * 4);
+    graphics::gpu_upload(&quad);
+    _context.quad_h = quad.handle;
 
-    graphics::gpu_upload(quad);
 
 #if DEFAULT_SHADERS
-    _context.quad_shader_h = create_asset<ShaderProgram>("default_quad_shader");
-    auto& quad_shader = get_asset_ref<ShaderProgram>(_context.quad_shader_h);
+    auto& quad_shader =
+        create_init_asset_ref<ShaderProgram>("default_quad_shader");
     quad_shader.attach_shader_file(ShaderType::Vert, "quad_vert.glsl");
     quad_shader.attach_shader_file(ShaderType::Frag, "quad_frag.glsl");
     quad_shader.link();
+    _context.quad_shader_h = quad_shader.handle;
 
-    _context.gbuffer_shader_h =
-        create_asset<ShaderProgram>("default_gbuffer_shader");
-    auto& gbuffer_shader = get_asset_ref<ShaderProgram>(_context.gbuffer_shader_h);
+    auto& gbuffer_shader =
+        create_init_asset_ref<ShaderProgram>("default_gbuffer_shader");
     gbuffer_shader.attach_shader_file(ShaderType::Vert, "g-buffer_vert.glsl");
     gbuffer_shader.attach_shader_file(ShaderType::Frag, "g-buffer_frag.glsl");
     gbuffer_shader.link();
+    _context.gbuffer_shader_h = gbuffer_shader.handle;
 #endif
 
     glEnable(GL_BLEND);

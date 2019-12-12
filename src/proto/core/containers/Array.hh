@@ -189,6 +189,7 @@ struct Array
 
     void reserve(u64 new_capacity) {
         assert(_allocator);
+        if(!_allocator) debug::stacktrace();
         if(new_capacity <= _capacity) return;
 
         u64 bufsz = new_capacity * sizeof(T);

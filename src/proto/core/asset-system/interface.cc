@@ -6,10 +6,16 @@
 #include "proto/core/graphics/ShaderProgram.hh"
 
 namespace proto {
+
 AssetHandle make_handle(StringView name, AssetTypeIndex type){
     // TODO(kacper): salt hash depending on type
     return AssetHandle{.hash = hash::crc32(name),
                        .type = type };
+}
+
+template<typename T>
+AssetHandle make_handle(StringView name){
+    return make_handle(name, AssetType<T>::index);
 }
 
 void add_dependency(AssetMetadata * dependant,
@@ -20,119 +26,145 @@ void add_dependency(AssetMetadata * dependant,
     dependant->deps.push_back(dependency);
 }
 
-AssetHandle create_or_get_asset(StringView name,
-                                       StringView filepath,
-                                       AssetTypeIndex type)
-{
-    AssetHandle handle = make_handle(name, type);
-    AssetMetadata * metadata = get_metadata(handle);
-    return (metadata) ? handle : create_asset(name, filepath, type);
+// specialize if necessary
+template<typename T> static void _default_asset_init(T& asset) {
+    asset.init();
 }
-AssetHandle create_asset(StringView name,
-                         StringView filepath,
-                         AssetTypeIndex type)
-{
-    return create_asset(context, name, filepath, type);
-}
-AssetHandle create_asset(AssetContext * asset_context,
-                         StringView name,
-                         StringView filepath,
-                         AssetTypeIndex type)
-{
-    AssetContext & ctx = *asset_context;
-    AssetRegistry & reg = ctx.assets;
 
-    Array<AssetMetadata> * insert_arr = nullptr;
+template<> void _default_asset_init<Mesh>(Mesh& mesh) {
+    mesh.init(&context->memory);
+}
+
+template<> void _default_asset_init<Material>(Material&) {}
+
+template<typename T>
+static Array<T>* _get_asset_array() {
+    /**/ if constexpr (meta::is_same_v<T, Mesh>)
+        return &context->meshes;
+    else if constexpr (meta::is_same_v<T, Material>)
+        return &context->materials;
+    else if constexpr (meta::is_same_v<T, Texture2D>)
+        return &context->textures;
+    else if constexpr (meta::is_same_v<T, Cubemap>)
+        return &context->cubemaps;
+    else if constexpr (meta::is_same_v<T, ShaderProgram>)
+        return &context->shader_programs;
+
+    debug_error(debug::category::data,
+                "Requested asset array of unsupported asset type");
+    assert(0); return nullptr;
+}
+
+template<typename T>
+static Array<AssetMetadata>* _get_metadata_array()
+{
+    AssetRegistry& reg = context->assets;
+    /**/ if constexpr (meta::is_same_v<T, Mesh>)
+        return &reg.meshes;
+    else if constexpr (meta::is_same_v<T, Material>)
+        return &reg.materials;
+    else if constexpr (meta::is_same_v<T, Texture2D>)
+        return &reg.textures;
+    else if constexpr (meta::is_same_v<T, Cubemap>)
+        return &reg.cubemaps;
+    else if constexpr (meta::is_same_v<T, ShaderProgram>)
+        return &reg.shader_programs;
+
+    debug_error(debug::category::data,
+                "Requested metadata array of unsupported asset type");
+    assert(0); return nullptr;
+}
+
+template<typename T, typename Ret, bool init>
+Ret create_asset(StringView name) {
+    auto & ctx = *context;
+
+    Array<AssetMetadata> * insert_arr = _get_metadata_array<T>();
+    AssetHandle handle =  make_handle<T>(name);
+
+    //if(get_metadata(handle))
+    //    debug_warn(debug::category::data,
+    //               "Asset handle collision, name: ", name);
+
+    AssetMetadata & metadata = insert_arr->push_back();
+
+    strview_copy(metadata.name, name);
+    metadata.handle = handle;
+    //TODO(kacper): default zero
+    metadata.deps.init(10, &ctx.asset_metadata_allocator);
+
+    T& _asset = _get_asset_array<T>()->push_back();
+    _asset.handle = handle;
+
+    if constexpr(init)
+        _default_asset_init<T>(_asset);
+    
+    /*  */ if constexpr(meta::is_same_v<Ret, AssetHandle>) {
+        return handle;
+    } else if constexpr(meta::is_same_v<Ret, T*>)  {
+        return &_asset;
+    } else if constexpr(meta::is_same_v<Ret, T&>)  {
+        return  _asset;
+    } else if constexpr(meta::is_same_v<Ret, AssetMetadata*>) {
+        return &metadata;
+    } else if constexpr(meta::is_same_v<Ret, AssetMetadata&>) {
+        return  metadata;
+    }
+}
+
+// silly part here, thank god for macros
+#define INSTANTIATE_CREATE_ASSET_FUNCTIONS_FOR(T) \
+template T * create_asset<T, T *, true>  (StringView);  \
+template T * create_asset<T, T *, false>  (StringView); \
+template T & create_asset<T, T &, true> (StringView);   \
+template T & create_asset<T, T &, false> (StringView);  \
+template AssetHandle create_asset<T, AssetHandle, true>  (StringView); \
+template AssetHandle create_asset<T, AssetHandle, false> (StringView); \
+template AssetMetadata * create_asset<T, AssetMetadata *, true>  (StringView); \
+template AssetMetadata * create_asset<T, AssetMetadata *, false> (StringView); \
+template AssetMetadata & create_asset<T, AssetMetadata &, true>  (StringView); \
+template AssetMetadata & create_asset<T, AssetMetadata &, false> (StringView); \
+
+INSTANTIATE_CREATE_ASSET_FUNCTIONS_FOR(Mesh);
+INSTANTIATE_CREATE_ASSET_FUNCTIONS_FOR(Material);
+INSTANTIATE_CREATE_ASSET_FUNCTIONS_FOR(Texture2D);
+INSTANTIATE_CREATE_ASSET_FUNCTIONS_FOR(Cubemap);
+INSTANTIATE_CREATE_ASSET_FUNCTIONS_FOR(ShaderProgram);
+
+template<typename T, typename Ret>
+Ret create_init_asset(StringView name) {
+    return create_asset<T, Ret, true>(name);
+}
+
+template<bool init>
+AssetHandle create_asset(StringView name, AssetTypeIndex type) {
     switch(type) {
-    case AssetType<Mesh>::index:     { insert_arr = &reg.meshes;   } break;
-    case AssetType<Material>::index: { insert_arr = &reg.materials;} break;
-    case AssetType<Texture2D>::index:{ insert_arr = &reg.textures; } break;
-    case AssetType<Cubemap>::index:  { insert_arr = &reg.cubemaps; } break;
+    case AssetType<Mesh>::index:
+        return create_asset <Mesh, AssetHandle, init>(name);
+
+    case AssetType<Material>::index:
+        return create_asset <Material, AssetHandle, init>(name);
+
+    case AssetType<Texture2D>::index:
+        return create_asset <Texture2D, AssetHandle, init>(name);
+
+    case AssetType<Cubemap>::index:
+        return create_asset <Cubemap, AssetHandle, init>(name);
+
     case AssetType<ShaderProgram>::index:
-        { insert_arr = &reg.shader_programs; } break;
-    default:
-        debug_warn(1, "requested asset of unsupported type");
+        return create_asset <ShaderProgram, AssetHandle, init>(name);
     }
 
-    if(insert_arr) {
-
-        AssetHandle handle =  make_handle(name, type);
-
-        if(get_metadata(handle))
-            debug_warn(debug::category::data,
-                       "Asset handle collision, name: ", name);
-
-        insert_arr->push_back();
-        AssetMetadata * metadata = &insert_arr->back(); 
-
-        strview_copy(metadata->name, name);
-
-        if(filepath)
-            strview_copy(metadata->filepath, filepath);
-
-        metadata->handle = handle;
-
-        metadata->deps.init(10, &ctx.asset_metadata_allocator);
-        
-        switch(type) {
-        case AssetType<Mesh>::index:     {
-            ctx.meshes.push_back();
-
-            Mesh * mesh = &ctx.meshes.back();
-            assert(mesh);
-
-            //// TODO(kacper): designated asset_memory
-            mesh->init(&context->memory);
-
-            mesh->handle = metadata->handle;
-        } break;
-        case AssetType<Material>::index: {
-            ctx.materials.push_back();
-            //// TODO(kacper): designated asset_memory
-            //_asset_context->materials.back().init(&context->memory);
-
-            Material * material = &ctx.materials.back();
-            assert(material);
-
-            material->handle = metadata->handle;
-        } break;
-        case AssetType<Texture2D>::index:  {
-            ctx.textures.push_back();
-
-            Texture2D * texture = &ctx.textures.back();
-            assert(texture);
-
-            texture->init(&context->memory);
-
-            texture->handle = metadata->handle;
-        } break;
-        case AssetType<Cubemap>::index:  {
-            ctx.cubemaps.push_back();
-
-            Cubemap * cubemap = &ctx.cubemaps.back();
-            assert(cubemap);
-
-            cubemap->init();
-
-            cubemap->handle = metadata->handle;
-        } break;
-        case AssetType<ShaderProgram>::index:  {
-            ctx.shader_programs.push_back();
-
-            ShaderProgram * shader_program = &ctx.shader_programs.back();
-            assert(shader_program);
-
-            shader_program->init();
-            shader_program->handle = metadata->handle;
-        } break;
-        default:
-            debug_warn(1, "requested asset of unsupported type: ",
-                       AssetType(type).name);
-
-        }
-        return metadata->handle;
-    }
+    debug_error(debug::category::data,
+                "Cannot create asset of type ", AssetType(type).name);
     return invalid_asset_handle;
+}
+
+template AssetHandle create_asset<true> (StringView, AssetTypeIndex);
+template AssetHandle create_asset<false>(StringView, AssetTypeIndex);
+
+AssetHandle create_init_asset(StringView name, AssetTypeIndex type) {
+    return create_asset<true>(name, type);
 }
 
 void destroy_asset(AssetContext * asset_context,
@@ -156,8 +188,6 @@ void destroy_asset(AssetContext * asset_context,
                 break;
             }
         }
-     
-
      
     } break;
     case AssetType<Material>::index: {

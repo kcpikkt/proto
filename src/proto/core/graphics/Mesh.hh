@@ -37,6 +37,7 @@ struct Mesh : Asset, DataholderCRTP<Mesh>{
         constexpr static u8 flip_uv_bit = BIT(0);
     };
 
+    using Dataholder = DataholderCRTP<Mesh>;
     u32 VAO, VBO, EBO;
 
     // TODO(kacper): is on gpu
@@ -110,6 +111,7 @@ struct Mesh : Asset, DataholderCRTP<Mesh>{
 
     //FIXME(kacper);
     void init(memory::Allocator * allocator){
+        Dataholder::dataholder_init();
         assert(allocator);
         _allocator = allocator;
         vertices.init(_allocator);
@@ -119,7 +121,6 @@ struct Mesh : Asset, DataholderCRTP<Mesh>{
         glGenVertexArrays(1, &VAO);
         glGenBuffers     (1, &VBO);
         glGenBuffers     (1, &EBO);
-        dataholder_init();
     }
 
     void destroy_shallow() {
