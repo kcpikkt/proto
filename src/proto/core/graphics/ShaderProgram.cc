@@ -255,17 +255,16 @@ void ShaderProgram::set_material(Material * material) {
     auto& ctx = *proto::context;
 
     set_uniform <GL_FLOAT_VEC3> ("u_material.ambient",
-                &material->ambient_color);
+                                 &material->ambient_color);
 
     set_uniform <GL_FLOAT_VEC3> ("u_material.diffuse",
-                &material->diffuse_color);
+                                 &material->diffuse_color);
 
     set_uniform <GL_FLOAT_VEC3> ("u_material.specular",
-                &material->specular_color);
+                                 &material->specular_color);
 
     set_uniform <GL_FLOAT> ("u_material.shininess",
-                material->shininess);
-
+                            material->shininess);
 
     Texture2D * map;
 

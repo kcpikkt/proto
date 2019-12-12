@@ -1,5 +1,8 @@
 #include "proto/proto.hh"
 #include "proto/core/platform/common.hh" 
+#include "proto/core/graphics/gl.hh" 
+#include "proto/core/graphics/rendering.hh" 
+#include "proto/core/util/namespace-shorthands.hh" 
 #include "proto/core/asset-system/interface.hh" 
 #include "proto/core/asset-system/serialization.hh" 
 
@@ -32,8 +35,9 @@ AssetHandle fetch_texture(StringView rel_path) {
     int x,y,n;
 
     StringView name = sys::basename_view(rel_path);
-
-    AssetHandle handle = create_asset<Texture2D>(name);
+    // INIT if you want to preview it
+    AssetHandle handle =
+        create_init_asset<Texture2D>(name);
 
     if(!handle) {
         debug_warn(debug::category::data,
@@ -51,6 +55,24 @@ AssetHandle fetch_texture(StringView rel_path) {
     texture->data = stbi_load(_texpath, &x, &y, &n, 0);
 
     assert(x); assert(y); assert(n); assert(texture->data);
+
+    switch(n) {
+    case 1:
+        texture->format = GL_R8;
+        texture->gpu_format = GL_RED;
+        break;
+    case 3:
+        texture->format = GL_RGB8;
+        texture->gpu_format = GL_RGB;
+        break;
+    case 4:
+        texture->format = GL_RGBA8;
+        texture->gpu_format = GL_RGBA;
+        break;
+    default:
+        debug_warn(debug::category::graphics,
+                   "No support for textures with ", n, " channels");
+    }
 
     texture->channels = (u8)n;
     texture->size = ivec2(x,y);
@@ -82,7 +104,10 @@ PROTO_INIT {
 
     auto& scene = *scene_ptr;
     AssetHandle outmesh_h =
-        create_asset<Mesh>(platform::basename_view(filepath));
+        create_init_asset<Mesh>(platform::basename_view(filepath));
+
+    Array<Material> ready_materials;
+    ready_materials.init_resize(scene.mNumMaterials, &context->memory);
 
     // LOAD MATERIALS AND TEXNAMES
     for(u32 m = 0; m < scene.mNumMaterials; m++) {
@@ -91,8 +116,6 @@ PROTO_INIT {
         AssetHandle material_h = create_asset<Material>(mat_name);
         Material * material = get_asset<Material>(material_h);
 
-        //AssetHandle material_h = create_asset<Material>()
-        // C++ api doesnt seem to work...
 
         auto fetch_fail =
             [&](StringView prop_name) {
@@ -194,6 +217,7 @@ PROTO_INIT {
                 add_dependency(get_metadata(outmesh_h), material->bump_map);
             }
         }
+        ready_materials[m] = *material;
     }
 
     // LOAD MESH GEOMETRY
@@ -212,12 +236,11 @@ PROTO_INIT {
     outmesh.indices.resize(index_count);
     outmesh.spans.resize(scene.mNumMeshes);
 
-    u32 outvertex = 0; // index of vertex
+    u32 vertices_emited = 0; // index of vertex
     u32 outindex = 0; // index of index basically
     for(u32 m=0; m<scene.mNumMeshes; m++) {
         auto& mesh = (*scene.mMeshes[m]);
         assert(mesh.mNumFaces * 3 > mesh.mNumVertices);
-
         
         vec3 span_bounds = vec3(0.0, 0.0, 0.0);
         outmesh.spans[m].begin_index = outindex;
@@ -227,34 +250,34 @@ PROTO_INIT {
             assert(face.mNumIndices == 3);
 
             for(u32 i=0; i<3; i++) {
-                outmesh.indices[outindex + i] = outvertex + face.mIndices[i];
+                outmesh.indices[outindex + i] = vertices_emited + face.mIndices[i];
 
-                auto& outpos =
-                    outmesh.vertices[outmesh.indices[outindex + i]].position;
+                auto& outvertex = outmesh.vertices[outmesh.indices[outindex + i]];
 
-                outpos = to_vec3( mesh.mVertices[face.mIndices[i]] );
+                outvertex.position = to_vec3( mesh.mVertices[face.mIndices[i]] );
 
                 if(mesh.HasNormals())
-                    outmesh.vertices[outmesh.indices[outindex + i]].normal =
+                    outvertex.normal =
                         to_vec3( mesh.mNormals[face.mIndices[i]] );
 
-                //if(mesh.HasTextureCoords())
-                //    outmesh.vertices[outmesh.indices[outindex + i]].uv =
-                //        to_vec3( mesh.mTextureCoords[face.mIndices[i]] ).xy;
+                if(mesh.HasTextureCoords(0))
+                    outvertex.uv =
+                        to_vec3( mesh.mTextureCoords[0][face.mIndices[i]]).xy;
+                else
+                    outvertex.uv = vec2(0.0);
 
-                span_bounds = vec3(max(span_bounds.x, outpos.x),
-                                   max(span_bounds.y, outpos.y),
-                                   max(span_bounds.z, outpos.z));
+                span_bounds = vec3(max(span_bounds.x, outvertex.position.x),
+                                   max(span_bounds.y, outvertex.position.y),
+                                   max(span_bounds.z, outvertex.position.z));
             } outindex += 3;
         }
-        outvertex += mesh.mNumVertices;
+        vertices_emited += mesh.mNumVertices;
         outmesh.spans[m].index_count = outindex - outmesh.spans[m].begin_index;
+        outmesh.spans[m].material = ready_materials[mesh.mMaterialIndex];
 
         // RENDER PREVIEW OF GIVEN SPAN
         // HMM, but first you need separate thread...
+        // or render per load non realtime
     }
     serialization::save_asset_tree_rec(outmesh_h, "outmesh/");
-    
 }
-
-//PROTO_UPDATE {}

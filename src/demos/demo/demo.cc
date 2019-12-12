@@ -35,26 +35,30 @@ PROTO_INIT {
 
     serialization::load_asset_dir("outmesh/");
 
-    for(auto& t : ctx.textures) {
-        vardump(get_metadata(t.handle)->name);
-        //gfx::gpu_upload(&t);
-    }
+    #if 1
+    for(auto& t : ctx.textures) gfx::gpu_upload(&t);
     
     for(auto& m : ctx.meshes) gfx::gpu_upload(&m);
     auto& scr_size = context->window_size;
 
+    auto no_mipmap =
+        [](Texture2D& tex){ tex.flags.unset(Texture2D::mipmap_bit); };
+
     auto& gbuf_position =
         create_asset_rref<Texture2D>("gbuffer_position_texture")
+            .$_configure(no_mipmap)
             .$_init(scr_size, GL_RGB16F, GL_RGB);
     gbuf_position_h = gbuf_position.handle;
 
     auto& gbuf_normal = 
         create_asset_rref<Texture2D>("gbuffer_normal_texture")
+            .$_configure(no_mipmap)
             .$_init(scr_size, GL_RGB16F, GL_RGB);
     gbuf_normal_h = gbuf_normal.handle;
 
     auto& gbuf_albedo =
         create_asset_rref<Texture2D>("gbuffer_albedo_texture")
+            .$_configure(no_mipmap)
             .$_init(scr_size, GL_RGBA, GL_RGBA);
     gbuf_albedo_h = gbuf_albedo.handle;
 
@@ -77,14 +81,28 @@ PROTO_INIT {
 
     if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         debug_warn(debug::category::graphics, "Incomplete framebuffer");
+    gfx::reset_framebuffer();
+    gfx::stale_all_texture_slots();
     
+    #endif
     vardump(gfx::error_message());
 }
 
 PROTO_UPDATE {
-
     auto& ctx = *proto::context;
     float& time = ctx.clock.elapsed_time;
+    //u32 unit = (u32)(time * 3.0) % 32;
+
+    //if(ctx.texture_slots[unit].texture){
+    //    io::print(get_metadata(ctx.texture_slots[unit].texture)->name, '\r');
+    //} else {
+    //    io::print("invalid", '\r');
+    //}
+    //io::flush();
+
+    #if 1
+   //gfx::unbind_all_texture_slots();
+    //gfx::debug_print_texture_slots();
     ctx.camera.position = vec3(0.0,0.0,0.0);
 
     gfx::bind_framebuffer(gbuffer);
@@ -105,9 +123,11 @@ PROTO_UPDATE {
     gfx::render_quad(gfx::bind_texture(gbuf_normal_h),
                      vec2(0.0, halfscr.y), halfscr);
     gfx::render_quad(gfx::bind_texture(gbuf_albedo_h),
-                     halfscr, halfscr);
+                     vec2(halfscr.x, 0.0), halfscr);
     gfx::render_quad(gfx::bind_texture(ctx.default_checkerboard_texture_h),
                      vec2(halfscr.x, 0.0), halfscr);
+    gfx::stale_all_texture_slots();
+    #endif
 }
 
 PROTO_LINK {}

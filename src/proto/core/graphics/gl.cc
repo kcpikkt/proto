@@ -237,6 +237,10 @@ namespace graphics{
         }
     }
 
+    void unbind_all_texture_slots() {
+        for(u32 i=0; i<context->texture_slots.size(); i++) unbind_texture_slot(i);
+    }
+
     void stale_texture_slot(u32 index) {
         assert(proto::context);
         using Slot = proto::RenderContext::TextureSlot;
@@ -292,6 +296,9 @@ namespace graphics{
         glTexImage2D(GL_TEXTURE_2D, 0, texture->format,
                      texture->size.x, texture->size.y,
                      0, texture->gpu_format, GL_UNSIGNED_BYTE, texture->data);
+
+        if(texture->flags.check(TextureInterface::mipmap_bit))
+            glGenerateMipmap(GL_TEXTURE_2D);
 
         texture->flags.set(TextureInterface::on_gpu_bit);
         stale_texture_slot(texture->bound_unit);

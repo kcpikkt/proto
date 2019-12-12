@@ -28,6 +28,10 @@ namespace graphics{
 
     s32 unbind_texture(AssetHandle texture_handle);
 
+    void unbind_texture_slot();
+
+    void unbind_all_texture_slots();
+
     template<typename T>
     auto unbind_texture(T * texture) ->
         meta::enable_if_t<meta::is_base_of_v<TextureInterface, T>,s32>;

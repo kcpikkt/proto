@@ -13,6 +13,11 @@ namespace proto {
 
     AssetHandle make_handle(StringView name, AssetTypeIndex type);
 
+    template<typename T>
+    AssetHandle make_handle(StringView name){
+        return make_handle(name, AssetType<T>::index);
+    }
+
     // NOTE(kacper): no need for header definition,
     //               all specializations are explicitly instantiated
     template<typename T>
@@ -29,7 +34,7 @@ namespace proto {
     template<typename T>
     T & get_asset_ref(AssetHandle handle);
 
-    // just for structured bindings
+    // just for structured bindings but idk yet
     template<typename T>
     struct AssetHandlePair {
         AssetHandle handle;

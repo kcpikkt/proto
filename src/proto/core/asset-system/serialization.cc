@@ -8,6 +8,8 @@
 #include "proto/core/platform/api.hh"
 #include "proto/core/math/hash.hh"
 
+#include "proto/core/graphics/gl.hh"
+
 namespace proto {
 namespace serialization {
 
@@ -151,12 +153,19 @@ namespace serialization {
         texture->data = data;
         texture->_allocator = allocator;
         texture->channels = texture_header.channels;
+        texture->format = texture_header.format;
+        texture->gpu_format = texture_header.gpu_format;
         texture->size = texture_header.size;
 
         assert(texture_header.data_size = texture->serialized_data_size());
 
         memcpy(texture->data, tex_data_ptr, texture_header.data_size);
-        allocator->free(data);
+        // NOTE(kacper): here memory is not freed, it should be freed after
+        //               gfx::gpu_upload(). Allocator is known since it is pointed
+        //               by Texture2D::_allocator but idk if it is good idea.
+        //               Perhaps there will be just one texture staging allocator
+        //               for that known globally.
+        // allocator->free(data);
     }
  
     template<>
@@ -216,6 +225,7 @@ namespace serialization {
         AssetHandle handle =
             create_init_asset((const char*)main_header.name, 
                                main_header.handle.type);
+
         if(handle.type == AssetType<Mesh>::index) {
             assert(get_asset<Mesh>(handle)->State::is_initialized());
         }

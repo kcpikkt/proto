@@ -17,9 +17,10 @@ struct TextureInterface : Asset {
     u32 gl_id;
     s32 bound_unit = -1;
     ivec2 size;
-    Bitfield<u8> flags = 0;
     constexpr static u8 on_gpu_bit = BIT(0);
     constexpr static u8 bound_bit  = BIT(1);
+    constexpr static u8 mipmap_bit  = BIT(2);
+    Bitfield<u8> flags = mipmap_bit;
 
     // actually cpy
     void _move(TextureInterface&& other) {

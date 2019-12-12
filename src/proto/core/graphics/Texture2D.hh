@@ -41,6 +41,8 @@ struct Texture2D :
         serialization::AssetHeader<Texture2D> ret;
         ret.size = size;
         ret.channels = channels;
+        ret.format = format;
+        ret.gpu_format = gpu_format;
         ret.data_offset = sizeof(serialization::AssetHeader<Texture2D>);
         ret.data_size = serialized_data_size();
         return ret;
@@ -70,8 +72,14 @@ struct Texture2D :
         // FIXME(kacper):
         glBindTexture(GL_TEXTURE_2D, gl_id);
 
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        if(flags.check(TextureInterface::mipmap_bit))
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                            GL_LINEAR_MIPMAP_LINEAR);
+        else
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
@@ -79,6 +87,10 @@ struct Texture2D :
     }
 
     // dollar perfix means chaining
+    inline Texture2D& $_configure( void(*proc)(Texture2D&) ){
+        proc(*this); return *this;
+    }
+
     inline Texture2D& $_init(ivec2 size, u32 format, u32 gpu_format){
         init(size, format, gpu_format); return *this;
     }

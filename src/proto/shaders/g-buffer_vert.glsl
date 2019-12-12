@@ -21,7 +21,7 @@ void main() {
     mat3 normal_matrix = transpose(inverse(mat3(u_model)));
     frag_in.normal = normal_matrix * a_normal;
 
-    frag_in.uv = a_uv * vec2(1.0,-1.0);
+    frag_in.uv = a_uv + vec2(0.0, 1.0);
 
     gl_Position = u_mvp * vec4(a_position, 1.0);
 }

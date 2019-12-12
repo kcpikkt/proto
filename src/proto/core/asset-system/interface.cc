@@ -13,11 +13,6 @@ AssetHandle make_handle(StringView name, AssetTypeIndex type){
                        .type = type };
 }
 
-template<typename T>
-AssetHandle make_handle(StringView name){
-    return make_handle(name, AssetType<T>::index);
-}
-
 void add_dependency(AssetMetadata * dependant,
                     AssetHandle dependency)
 {
@@ -82,9 +77,9 @@ Ret create_asset(StringView name) {
     Array<AssetMetadata> * insert_arr = _get_metadata_array<T>();
     AssetHandle handle =  make_handle<T>(name);
 
-    //if(get_metadata(handle))
-    //    debug_warn(debug::category::data,
-    //               "Asset handle collision, name: ", name);
+    if(get_metadata(handle))
+        debug_warn(debug::category::data,
+                   "Asset handle collision: ", name, ", ", AssetType<T>::name);
 
     AssetMetadata & metadata = insert_arr->push_back();
 
@@ -116,20 +111,20 @@ Ret create_asset(StringView name) {
 
 // silly part here, thank god for macros
 #define INSTANTIATE_CREATE_ASSET_FUNCTIONS_FOR(T) \
-template T * create_asset<T, T *, true>  (StringView);  \
-template T * create_asset<T, T *, false>  (StringView); \
-template T & create_asset<T, T &, true> (StringView);   \
-template T & create_asset<T, T &, false> (StringView);  \
-template AssetHandle create_asset<T, AssetHandle, true>  (StringView); \
+template T * create_init_asset<T, T *>   (StringView); \
+template T * create_asset<T, T *, false> (StringView); \
+template T & create_init_asset<T, T &>   (StringView); \
+template T & create_asset<T, T &, false> (StringView); \
+template AssetHandle create_init_asset<T, AssetHandle>   (StringView); \
 template AssetHandle create_asset<T, AssetHandle, false> (StringView); \
-template AssetMetadata * create_asset<T, AssetMetadata *, true>  (StringView); \
+template AssetMetadata * create_init_asset<T, AssetMetadata *>   (StringView); \
 template AssetMetadata * create_asset<T, AssetMetadata *, false> (StringView); \
-template AssetMetadata & create_asset<T, AssetMetadata &, true>  (StringView); \
+template AssetMetadata & create_init_asset<T, AssetMetadata &>   (StringView); \
 template AssetMetadata & create_asset<T, AssetMetadata &, false> (StringView); \
- template AssetHandlePair<T>                                            \
-    create_asset<T, AssetHandlePair<T>, true>  (StringView);            \
- template AssetHandlePair<T>                                            \
-    create_asset<T, AssetHandlePair<T>, false> (StringView);    \
+template AssetHandlePair<T>                                            \
+   create_init_asset<T, AssetHandlePair<T>>  (StringView);            \
+template AssetHandlePair<T>                                            \
+   create_asset<T, AssetHandlePair<T>, false> (StringView);    \
 
 INSTANTIATE_CREATE_ASSET_FUNCTIONS_FOR(Mesh);
 INSTANTIATE_CREATE_ASSET_FUNCTIONS_FOR(Material);
