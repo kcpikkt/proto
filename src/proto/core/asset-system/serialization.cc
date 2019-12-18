@@ -149,7 +149,7 @@ namespace serialization {
         u8 * cubemap_header_ptr = buffer.data8;
         u8 * cubemap_data_ptr = cubemap_header_ptr + cubemap_header.data_offset;
 
-       memcpy(cubemap_header_ptr, &cubemap_header, sizeof(AssetHeader<Cubemap>));
+        memcpy(cubemap_header_ptr, &cubemap_header, sizeof(AssetHeader<Cubemap>));
 
         u64 one_side_size = cubemap_header.data_size / 6;
         u8 * rt_data_ptr = cubemap_data_ptr;

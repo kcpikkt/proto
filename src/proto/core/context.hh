@@ -98,6 +98,7 @@ namespace proto {
         struct {
             Array<RenderMeshComp> render_mesh;
             Array<TransformComp> transform;
+            Array<PointlightComp> pointlights;
         } comp;
     };
 

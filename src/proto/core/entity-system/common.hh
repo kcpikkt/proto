@@ -27,6 +27,7 @@ struct EntityMetadata {
 struct InvalidComp;
 struct TransformComp;
 struct RenderMeshComp;
+struct PointlightComp;
     
 using ComponentTypeIndex = u8;
 
@@ -48,6 +49,7 @@ template<typename = RuntimeComponentType> struct ComponentType;
 PROTO_COMPONENT_TYPE(InvalidComp, 0);
 PROTO_COMPONENT_TYPE(TransformComp, 1);
 PROTO_COMPONENT_TYPE(RenderMeshComp, 2);
+PROTO_COMPONENT_TYPE(PointlightComp, 3);
 
 // default for runtime typeinfo
 template<typename T>
@@ -74,6 +76,10 @@ public:
 
 struct Component {
     Entity entity;
+};
+
+struct PointlightComp : Component {
+    vec3 color = vec3(1.0);
 };
 
 struct TransformComp : Component {

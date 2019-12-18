@@ -19,8 +19,8 @@ using namespace proto;
 PROTO_SETUP { // (RuntimeSettings * settings)
 }
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image/stb_image.h"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image/stb_image_write.h"
 
 u8 client_data_begin; //////////////////////////////
 
@@ -69,6 +69,7 @@ AssetHandle postbuf_pong_h;
 AssetHandle deffered_shader_h;
 AssetHandle ssao_gaussian_shader_h;
 AssetHandle skybox_shader_h;
+AssetHandle gaussian_shader_h;
 AssetHandle hdr_shader_h;
 
 AssetHandle skybox_h;
@@ -95,9 +96,36 @@ void mouse_move_callback(MouseMoveEvent& ev) {
 } MouseMoveInputSink mouse_move_input_sink;
 
 
+void* capture_buffer ;
+s32 capture_frame = 0;
+char capture_name[256];
+
+void capture() {
+    capture_frame++;
+    stbi_flip_vertically_on_write(1);
+
+    GLint viewport[4];
+    glGetIntegerv(GL_VIEWPORT, viewport);
+
+    int x = viewport[0];
+    int y = viewport[1];
+    int width = viewport[2];
+    int height = viewport[3];
+
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadPixels(x, y, width, height, GL_RGB, GL_UNSIGNED_BYTE, capture_buffer);
+
+    sprint(capture_name, 128, "rec/1/capture", capture_frame, ".png");
+    stbi_write_png(capture_name, width, height, 3, capture_buffer, 0);
+}
+
+
 PROTO_INIT {
     auto& ctx = *proto::context;
 
+    capture_buffer =
+        ctx.memory.alloc(ctx.window_size.x * ctx.window_size.y * 3);
+    assert(capture_buffer);
     mouse_move_input_sink.init(ctx.mouse_move_input_channel, mouse_move_callback);
 
     ctx.camera.position = vec3(0.0,1.65,10.0);
@@ -127,24 +155,31 @@ PROTO_INIT {
 
 
     teapot_0 = create_entity();
-    //teapot_1 = create_entity();
-    //teapot_2 = create_entity();
+    teapot_1 = create_entity();
 
     {
+    add_component<PointlightComp>(teapot_0);
     auto& transform = add_component<TransformComp>(teapot_0);
-    transform.position = vec3(0.0, 1.0, 0.0);
+    transform.position = vec3(0.0, -1000.0, 0.0);
     transform.scale = vec3(0.085);
 
     if(Mesh * teapot_mesh = get_asset<Mesh>( make_handle<Mesh>("teapot") )) {
         add_component<RenderMeshComp>(teapot_0).mesh = make_handle<Mesh>("teapot");
-        teapot_mesh->spans[0].material.specular_color = vec3(8.0);
-
     } else
         debug_info(debug::category::main, "Failed to assign mesh to entity.");
     }
 
+    {
+    add_component<PointlightComp>(teapot_1);
+    auto& transform = add_component<TransformComp>(teapot_1);
+    transform.position = vec3(0.0, -100.0, 0.0);
+    transform.scale = vec3(0.085);
 
-
+    if(Mesh * teapot_mesh = get_asset<Mesh>( make_handle<Mesh>("teapot") )) {
+        add_component<RenderMeshComp>(teapot_1).mesh = make_handle<Mesh>("teapot");
+    } else
+        debug_info(debug::category::main, "Failed to assign mesh to entity.");
+    }
 
     for(auto& t : ctx.textures) gfx::gpu_upload(&t);
     for(auto& m : ctx.meshes) gfx::gpu_upload(&m);
@@ -291,19 +326,19 @@ PROTO_INIT {
     auto& defbuf_ping =
         create_asset_rref<Texture2D>("defbuffer_ping_texture")
             .$_configure(no_mipmap)
-            .$_init(scr_size, GL_RGBA, GL_RGBA);
+            .$_init(scr_size, GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE);
     defbuf_ping_h = defbuf_ping.handle;
 
     auto& defbuf_bloom =
         create_asset_rref<Texture2D>("defbuffer_bloom_texture")
             .$_configure(no_mipmap)
-            .$_init(scr_size, GL_RGB, GL_RGB);
+            .$_init(scr_size, GL_RGB, GL_RGB, GL_UNSIGNED_BYTE);
     defbuf_bloom_h = defbuf_bloom.handle;
 
     auto& defbuf_pong =
         create_asset_rref<Texture2D>("defbuffer_pong_texture")
             .$_configure(no_mipmap)
-            .$_init(scr_size, GL_RGBA, GL_RGBA);
+            .$_init(scr_size, GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE);
     defbuf_pong_h = defbuf_pong.handle;
 
     defbuffer
@@ -339,6 +374,11 @@ PROTO_INIT {
         .$_add_color_attachment(postbuf_pong)
         .finalize();
 
+    gaussian_shader_h = 
+        create_init_asset_rref<ShaderProgram>("gaussian_shader")
+            .$_attach_shader_file(ShaderType::Vert, "pass_vert.glsl")
+            .$_attach_shader_file(ShaderType::Frag, "twopass_gaussian_frag.glsl")
+            .$_link().handle;
 
     hdr_shader_h =
         create_init_asset_rref<ShaderProgram>("hdr_shader")
@@ -353,7 +393,7 @@ PROTO_INIT {
 
 ////////////////////////////////////////////////////////////////////////////
 
-#define TAKE 0
+#define TAKE 1
 
 PROTO_UPDATE {
     auto& ctx = *proto::context;
@@ -361,11 +401,12 @@ PROTO_UPDATE {
     glDisable(GL_BLEND);
 
     #if TAKE == 0
-    ctx.camera.position = vec3(0.0, 1.25, 2.0);
+    ctx.camera.position = vec3(0.0, 1.25, 10.0);
     #elif TAKE == 1
     ctx.camera.rotation =
         angle_axis(sin(time/25.0), glm::normalize(vec3(1.0,-1.0,0.0)));
     ctx.camera.position = vec3(1.0 * cos(time/10.0),0.65, 0.0);
+
     #elif TAKE == 2
     float stime = time/10.0;
     ctx.camera.position = vec3(3.0 + cos(stime)*stime * 1.2,
@@ -375,10 +416,30 @@ PROTO_UPDATE {
         angle_axis(sin(time/10.0) + 1.4, vec3(0.0,1.0,0.0));
     #elif TAKE == 3
     float stime = time/10.0;
-    ctx.camera.position = vec3(3.2, 1.65 + cos(stime*2.0)/3.0
-                               ,5.0 + sin(stime) * 7.0);
-    #endif 
+    ctx.camera.position = vec3(3.1 - sin(stime)/2.0,
+                               0.85 + cos(stime*2.0)/1.5 ,
+                               5.0 + sin(stime) * 7.0);
+ 
+    {
+    auto& transform = *get_component<TransformComp>(teapot_0);
+    transform.position = vec3(3.0 + sin(7.0 * stime)/5.0f,
+                              (sin(10.0 *stime) + sqrt(stime))/2.0f + 0.6 ,
+                              2.0 + sin(stime) * 7.0);
+    transform.rotation = angle_axis(tan(time / 4.0),
+                                    glm::normalize(vec3(1.0,1.0,0.0)));
+    }
 
+    {
+    auto& transform = *get_component<TransformComp>(teapot_1);
+    transform.position = vec3(3.9 + cos(20.0 * stime)/3.0f,
+                              (sin(10.0 *stime + 0.8) + sqrt(stime))/2.0f + 0.6 ,
+                              1.0 + sin(stime) * 8.5);
+    transform.rotation = angle_axis(stime*10.0,
+                                    glm::normalize(vec3(0.0,1.0,-0.2)));
+    }
+ 
+ 
+    #endif 
     gfx::reset_framebuffer();
 
     glClearColor(0.1f,0.1f,0.1f,1.0f);
@@ -496,7 +557,9 @@ PROTO_UPDATE {
 
     gfx::bind_framebuffer(defbuffer);
 
-    glDrawBuffer(GL_COLOR_ATTACHMENT0);
+    u32 draw_attchs[] =
+        {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT2};
+    glDrawBuffers(2, draw_attchs);
 
     auto deffered_shader =
         get_asset_ref<ShaderProgram>(deffered_shader_h)
@@ -519,8 +582,45 @@ PROTO_UPDATE {
             .$_set_float ("u_dirlight[0].far",       dirlight_far)
             .$_set_vec3  ("u_dirlight[0].direction", &sun_dir)
             .$_set_vec3  ("u_dirlight[0].color",     &sun_color)
-            .$_set_float ("u_dirlight[0].intensity", 0.8f);
+            .$_set_float ("u_dirlight[0].intensity", 0.3f);
 
+    for(s32 i=0; i<ctx.comp.pointlights.size(); i++) {
+        sprint(uniform_name, 128, "u_pointlight[", i, "].");
+        sprint(uniform_name + 16, 128 - 16, "on\0");
+        deffered_shader.set_int(uniform_name, 1);
+        auto& transform =
+            *get_component<TransformComp>(ctx.comp.pointlights[i].entity);
+        sprint(uniform_name + 16, 128 - 16, "position\0");
+        deffered_shader.set_vec3(uniform_name, &transform.position);
+        sprint(uniform_name + 16, 128 - 16, "color\0");
+        deffered_shader.set_vec3(uniform_name, &ctx.comp.pointlights[i].color);
+        sprint(uniform_name + 16, 128 - 16, "intensity\0");
+        deffered_shader.set_float(uniform_name, 2.0);
+    }
+
+    gfx::render_quad();
+
+    // BLOOM BLUR
+    glDrawBuffer(GL_COLOR_ATTACHMENT2);
+
+    s32 bloom_blur = 6; 
+    auto& gaussian_shader =
+        get_asset_ref<ShaderProgram>(gaussian_shader_h);
+
+    gaussian_shader
+        .$_use()
+        .$_set_int   ("u_mode",       0)
+        .$_set_float ("u_spread",     2.0)
+        .$_set_int   ("u_size",       bloom_blur)
+        .$_set_vec2  ("u_resolution", &scr_size)
+        .$_set_tex2D ("u_tex",        gfx::bind_texture(defbuf_bloom_h));
+    gfx::render_quad();
+
+    glDrawBuffer(GL_COLOR_ATTACHMENT1);
+    gaussian_shader
+        .$_use()
+        .$_set_int   ("u_mode",1)
+        .$_set_tex2D ("u_tex", gfx::bind_texture(defbuf_pong_h));
 
     gfx::render_quad();
 
@@ -532,7 +632,8 @@ PROTO_UPDATE {
         .$_set_float ("u_time",           time)
         .$_set_vec2  ("u_resolution",     &scr_size)
         .$_set_tex2D ("gbuf.normal",      gbuf_normal_h)
-        .$_set_tex2D ("u_tex",            gfx::bind_texture(defbuf_ping_h));
+        .$_set_tex2D ("u_tex",            gfx::bind_texture(defbuf_ping_h))
+        .$_set_tex2D ("u_bloom",          gfx::bind_texture(defbuf_bloom_h));
 
     gfx::render_quad();
 
@@ -544,13 +645,13 @@ PROTO_UPDATE {
     glViewport(0, 0, ctx.window_size.x, ctx.window_size.y);
 
     #if 0
-    gfx::render_texture_quad(gfx::bind_texture(gbuf_normal_h),
+    gfx::render_texture_quad(gfx::bind_texture(defbuf_ping_h),
                              vec2(0.0), halfscr);
 
-    gfx::render_texture_quad(gfx::bind_texture(gbuf_normal_h),
+    gfx::render_texture_quad(gfx::bind_texture(defbuf_pong_h),
                              vec2(0.0, halfscr.y), halfscr);
 
-    gfx::render_texture_quad(gfx::bind_texture(gbuf_normal_h),
+    gfx::render_texture_quad(gfx::bind_texture(defbuf_bloom_h),
                              vec2(halfscr.x, 0.0), halfscr);
 
     gfx::render_texture_quad(gfx::bind_texture(gbuf_position_h),
@@ -560,8 +661,10 @@ PROTO_UPDATE {
     glEnable(GL_BLEND);
     gfx::render_texture_quad(gfx::bind_texture(postbuf_ping_h),
                              vec2(0.0), 2.0f*halfscr);
+
+    capture();
     #endif
-    gfx::render_std_basis();
+    //gfx::render_std_basis();
 
     glEnable(GL_DEPTH_TEST);
 

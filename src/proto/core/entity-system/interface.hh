@@ -21,6 +21,9 @@ namespace proto {
         else if constexpr
             (ComponentType<T>::index == ComponentType<RenderMeshComp>::index)
                 return &context->comp.render_mesh;
+        else if constexpr
+            (ComponentType<T>::index == ComponentType<PointlightComp>::index)
+                return &context->comp.pointlights;
         else {
                 return nullptr;
                 assert(0);

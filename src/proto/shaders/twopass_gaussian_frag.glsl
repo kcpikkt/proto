@@ -10,6 +10,7 @@ uniform vec2 u_resolution;
 uniform sampler2D u_tex;
 uniform int u_mode;
 uniform int u_size;
+uniform float u_spread;
 
 out vec4 frag_color;
 
@@ -19,7 +20,7 @@ float kernel[7] =
 
 void main() {
     vec4 acc = vec4(0.0);
-    vec2 pix = vec2(1.0) / u_resolution;
+    vec2 pix = vec2(u_spread) / u_resolution;
  
     if(u_mode == 0) {
         for(int i=(-u_size); i<u_size; i++) {

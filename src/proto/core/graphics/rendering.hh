@@ -137,10 +137,12 @@ void render_scene(bool simple = false) {
 
         mat4 projection = ctx.camera.projection();
         mat4 view = ctx.camera.view();
-
         mat4 mvp = projection * view * model;
 
         (*ctx.current_shader)
+            //tmp
+            .$_set_int   ("u_is_light",
+                          (s32)(0 != get_component<PointlightComp>(comp.entity)))
             .$_set_float ("u_time",       time)
             .$_set_mat4  ("u_mvp",        &mvp)
             .$_set_mat4  ("u_model",      &model);

@@ -4,6 +4,7 @@ bin/*
 lib/*
 src/tools/gl3w/*
 vendor/*
+rec/*
 outmesh/*
 include/*
 proto.config

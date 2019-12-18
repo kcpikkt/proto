@@ -225,7 +225,7 @@ int proto::platform::runtime(int argc, char ** argv){
     // So every linux window manager is actually just a root X window?
     Window root = DefaultRootWindow(_context.display);
 
-    _context.window_size = proto::ivec2(960,1024);
+    _context.window_size = proto::ivec2(1920,1024);
     mouse_lock_pos = _context.window_size/2;
 
     _context.window =
@@ -390,6 +390,7 @@ int proto::platform::runtime(int argc, char ** argv){
     _context.entities.init(10, &_context.memory);
     _context.comp.transform.init(10, &_context.memory);
     _context.comp.render_mesh.init(10, &_context.memory);
+    _context.comp.pointlights.init(10, &_context.memory);
 
 
     // Context
@@ -593,7 +594,8 @@ int proto::platform::runtime(int argc, char ** argv){
 
     _context.clock.init(2.0f);
     while(!_context.exit_sig) {
-        _context.clock.tick();
+        //_context.clock.tick();
+         _context.clock.elapsed_time += 0.016666f;
 
         stat(_context.clientlib_path, &clientlib_statbuf);
         if(clientlib_mtime != clientlib_statbuf.st_mtime) {

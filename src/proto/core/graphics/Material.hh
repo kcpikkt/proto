@@ -57,7 +57,6 @@ struct Material : Asset {
     //tmp, use bitfield
     bool transparency = false;
 
-    proto::vec3 emission_color  = proto::vec3(0.0);
     proto::vec3 ambient_color  = proto::vec3(0.2);
     proto::vec3 diffuse_color  = proto::vec3(0.8);
     proto::vec3 specular_color = proto::vec3(1.0);

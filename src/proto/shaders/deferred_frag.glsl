@@ -1,5 +1,6 @@
 #version 450
 layout(location = 0) out vec4 frag_color;
+layout(location = 1) out vec4 frag_bloom;
 
 in struct VertOut {
     vec3 position;
@@ -138,11 +139,15 @@ void main() {
     vec3 g_normal        = g_normal_shin.rgb;
     float g_shininess    = g_normal_shin.a;
 
-    
+   
     vec4 g_albedo_spec   = texture(gbuf.albedo_spec, frag_in.uv);
     vec3 g_albedo        = g_albedo_spec.rgb;
     float g_specular     = g_albedo_spec.a;
 
+    if(g_shininess > 1000.0) {
+        g_albedo *= 40.0;
+    }
+    
     float g_depth        = texture(gbuf.depth, frag_in.uv).r;
 
     float linear_depth =
@@ -287,50 +292,35 @@ float dirlight_vol = 0.0;
 
     frag_ambient += dirlight_vol * u_dirlight[0].color;
 
-    frag_color = vec4(frag_diffuse + frag_specular + frag_ambient, 1.0);
-
-    #if 0
-    int index = (gl_FragCoord.x / u_resolution.x)
-    vec3 frag2cam = normalize(u_cam_pos - g_frag_pos);
-    frag_ambient = g_albedo * 0.14;
-    // DIRECTIONAL LIGHT
-    dirlight_space_frag_pos = (u_dirlight[0].matrix * vec4(g_frag_pos,1.0));
-    dirlight_proj_coords = dirlight_space_frag_pos.xyz / dirlight_space_frag_pos.w;
-    dirlight_proj_coords = dirlight_proj_coords * 0.5 + 0.5;
-    frag_depth = dirlight_proj_coords.z;
-
-    shadowmap_depth = texture(u_dirlight[0].shadow_map,
-                              dirlight_proj_coords.xy).r;
-
-    if(frag_depth - bias < shadowmap_depth) {
-        angle_falloff = clamp(dot(g_normal, -u_dirlight[0].direction), 0.0, 1.0);
-
-        light = u_dirlight[0].color * u_dirlight[0].intensity;
-
-        diffuse = light * angle_falloff * g_albedo ;
-
-        angle_falloff = clamp(dot(g_normal, -u_dirlight[0].direction), 0.0, 1.0);
-
-        angle_falloff = dot(reflect(normalize(-u_dirlight[0].direction),
-                                g_normal), -frag2cam);
-        angle_falloff = clamp(angle_falloff, 0.0, 1.0);
-        angle_falloff = pow(angle_falloff, max(1.0,u_material.shininess));
-
-        diffuse *= (1.0 - angle_falloff);
-
-        specular = light * angle_falloff * g_specular;
-
-        frag_diffuse += diffuse;
-        frag_specular += specular;
-    }
-
+    vec3 frag2light;
+    vec3 frag2light_norm;
     // POINT LIGHTS
     for(int i=0; i<pointlight_count-2; i++) {
         if(u_pointlight[i].on != 0) {
-            frag2light = u_pointlight[i].position -
-                          (g_frag_pos + g_normal * normal_offset);
 
-            shadowmap_depth = texture(u_pointlight[i].shadow_map,
+            light =
+                u_pointlight[i].color *
+                u_pointlight[i].intensity * g_ssao;
+
+            frag2light = u_pointlight[i].position - g_frag_pos;
+            frag2light_norm = normalize(frag2light);
+
+            angle_falloff =
+                clamp(dot(g_normal, frag2light_norm), 0.0, 1.0);
+
+            diffuse = light * angle_falloff * g_albedo / pow(length(frag2light),2.0);
+
+            angle_falloff = dot(reflect(frag2light_norm, g_normal), -frag2cam_norm);
+            angle_falloff = clamp(angle_falloff, 0.0, 1.0);
+            angle_falloff = pow(angle_falloff, max(1.0, g_shininess));
+
+            diffuse *= (1.0 - angle_falloff);
+
+            frag_diffuse += diffuse;
+            frag_specular += light * angle_falloff * g_specular + ssr/2.0;
+
+#if 0
+           shadowmap_depth = texture(u_pointlight[i].shadow_map,
                                       -frag2light).r * u_pointlight[i].far;
 
             
@@ -344,9 +334,10 @@ float dirlight_vol = 0.0;
             diffuse = light * angle_falloff * g_albedo;
             // specular angle factor
             
-            angle_falloff = dot(reflect(normalize(frag2light), g_normal), -frag2cam);
+            angle_falloff = dot(reflect(normalize(frag2light), g_normal),
+                                -frag2cam_norm);
             angle_falloff = clamp(angle_falloff, 0.0, 1.0);
-            angle_falloff = pow(angle_falloff, max(1.0,u_material.shininess));
+            angle_falloff = pow(angle_falloff, max(1.0,g_shininess));
 
             diffuse *= (1.0 - angle_falloff);
 
@@ -354,11 +345,10 @@ float dirlight_vol = 0.0;
 
             frag_diffuse += diffuse;
             frag_specular += specular;
+    #endif
         }
     }
 
-    frag2light = u_pointlight[0].position - g_frag_pos;
-
     frag_color = vec4(frag_diffuse + frag_specular + frag_ambient , 1.0);
-    #endif
+    frag_bloom = length(frag_color.xyz) > 4.2 ? frag_color : vec4(0.0);
 }

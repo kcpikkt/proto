@@ -21,13 +21,20 @@ uniform struct Material {
     sampler2D opacity_map;
 } u_material;
 
+uniform int u_is_light;
+
 void main() {
     float opacity = texture(u_material.opacity_map, frag_in.uv).r;
     if(opacity < 0.9) discard;
 
     g_position = vec4(frag_in.position, 1.0);
     g_normal_shin.rgb = vec4(normalize(frag_in.normal), 1.0).rgb;
-    g_normal_shin.a = u_material.shininess;
+    if(u_is_light != 0)
+        // well, this temporarily encodes "I am light, dont shade"
+        g_normal_shin.a = 1001.0; 
+    else
+        g_normal_shin.a = u_material.shininess;
+
     g_albedo_spec.rgb = texture(u_material.diffuse_map, frag_in.uv).rgb;
     g_albedo_spec.a = texture(u_material.specular_map, frag_in.uv).r;
     

@@ -13,6 +13,7 @@ uniform struct GBuffer {
 
 
 uniform sampler2D u_tex;
+uniform sampler2D u_bloom;
 uniform vec2 u_resolution;
 uniform float u_time;
 
@@ -27,9 +28,11 @@ void main() {
     if(length(g_normal) < 0.9) {
         frag_color = vec4(0.0); return;}
 
-    const float gamma = 1.7;
-    const float exposure = 1.2;
+    const float gamma = 1.6;
+    const float exposure = 1.6;
     vec3 hdr_color = texture(u_tex, frag_in.uv).rgb;
+    vec3 bloom = texture(u_bloom, frag_in.uv).rgb;
+    hdr_color += bloom;
   
     vec3 mapped = vec3(1.0) - exp(-hdr_color * exposure);
     mapped = pow(mapped, vec3(1.0 / gamma));
