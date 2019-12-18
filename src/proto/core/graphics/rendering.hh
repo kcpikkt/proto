@@ -41,14 +41,11 @@ void render_span(Mesh * mesh, u32 index, bool simple = false) {
         stale_all_texture_slots();
 }
 
-void render_mesh(Mesh * mesh, bool simple = false, bool transparent = false) {
+void render_mesh(Mesh * mesh, bool simple = false) {
     assert(mesh);
     mesh->bind();
     for(u32 i=0; i< mesh->spans.size() ; i++) {
-        if(mesh->spans[i].material.flags.check(Material::transparent_bit) ==
-           transparent) {
-            render_span(mesh, i, simple);
-        }
+        render_span(mesh, i, simple);
     }
 }
 
@@ -120,7 +117,7 @@ void render_skybox(s32 texture_unit) {
     glEnable(GL_CULL_FACE);
 }
 
-void render_scene(bool simple = false, bool transparent = false) {
+void render_scene(bool simple = false) {
     auto& ctx = *context;
     auto& time = ctx.clock.elapsed_time;
     assert(context->current_shader);
@@ -129,10 +126,7 @@ void render_scene(bool simple = false, bool transparent = false) {
         TransformComp * transform = get_component<TransformComp>(comp.entity);
         assert(transform);
 
-        mat4 model = mat4(1.0);
-        model = glm::scale(model, transform->scale);
-        model = glm::toMat4(transform->rotation) * model;
-        model = translate(model, transform->position);
+        mat4 model = transform->model();
 
         Mesh * mesh = get_asset<Mesh>(comp.mesh);
 
@@ -151,7 +145,7 @@ void render_scene(bool simple = false, bool transparent = false) {
             .$_set_mat4  ("u_mvp",        &mvp)
             .$_set_mat4  ("u_model",      &model);
 
-        render_mesh(mesh, simple, transparent);
+        render_mesh(mesh, simple);
     }
 }
 
@@ -177,7 +171,7 @@ void render_gbuffer() {
         .$_use()
         .$_set_float ("u_time",       ctx.clock.elapsed_time);
 
-    render_scene(false, false);
+    render_scene();
 }
 
 

@@ -30,8 +30,10 @@ ShaderProgram * prev_shader;
 Framebuffer dirlight_shadowmap_buf;
 AssetHandle dirlight_shadowmap_shader_h;
 AssetHandle dirlight_shadowmap_h;
-ivec2 dirlight_shadowmap_size = vec2(1024);
-float dirlight_near = 1.1f, dirlight_far = 600.0f;
+
+
+ivec2 dirlight_shadowmap_size = vec2(4096);
+float dirlight_near = 1.1f, dirlight_far = 100.0f;
 
 vec3 sun_dir   = vec3( 0.3,-1.0,  -0.5);
 vec3 sun_pos   = vec3( 0.0, 400.0, 0.0);
@@ -59,15 +61,23 @@ AssetHandle defbuf_ping_h;
 AssetHandle defbuf_bloom_h;
 AssetHandle defbuf_pong_h;
 
+Framebuffer postbuffer;
+AssetHandle postbuf_ping_h;
+AssetHandle postbuf_pong_h;
+
 //shaders
 AssetHandle deffered_shader_h;
 AssetHandle ssao_gaussian_shader_h;
 AssetHandle skybox_shader_h;
+AssetHandle hdr_shader_h;
 
 AssetHandle skybox_h;
 AssetHandle skyboxa_h;
 
 Entity sponza;
+Entity teapot_0;
+Entity teapot_1;
+Entity teapot_2;
 
 u8 client_data_end; 
 
@@ -103,6 +113,7 @@ PROTO_INIT {
     gfx::gpu_upload(get_asset<Cubemap>(skybox_h));
 
     sponza = create_entity();
+
     auto& transform = add_component<TransformComp>(sponza);
     transform.position = vec3(0.0, 0.0, 0.0);
     transform.rotation = angle_axis(M_PI/2.0f, vec3(0.0, 1.0, 0.0));
@@ -111,18 +122,28 @@ PROTO_INIT {
     if(Mesh * sponza_mesh = get_asset<Mesh>( make_handle<Mesh>("sponza") )) {
         add_component<RenderMeshComp>(sponza).mesh = make_handle<Mesh>("sponza");
 
-        // this is really ad hoc, FIXME
-        for(auto& s : sponza_mesh->spans) {
-            auto& diff = s.material.diffuse_map;
-            if(diff == make_handle<Texture2D>("sponza_thorn_diff") ||
-               diff == make_handle<Texture2D>("vase_plant"))
-            {
-                s.material.flags.set(Material::transparency_bit);
-            }
-            
-        }
     } else
         debug_info(debug::category::main, "Failed to assign mesh to entity.");
+
+
+    teapot_0 = create_entity();
+    //teapot_1 = create_entity();
+    //teapot_2 = create_entity();
+
+    {
+    auto& transform = add_component<TransformComp>(teapot_0);
+    transform.position = vec3(0.0, 1.0, 0.0);
+    transform.scale = vec3(0.085);
+
+    if(Mesh * teapot_mesh = get_asset<Mesh>( make_handle<Mesh>("teapot") )) {
+        add_component<RenderMeshComp>(teapot_0).mesh = make_handle<Mesh>("teapot");
+        teapot_mesh->spans[0].material.specular_color = vec3(8.0);
+
+    } else
+        debug_info(debug::category::main, "Failed to assign mesh to entity.");
+    }
+
+
 
 
     for(auto& t : ctx.textures) gfx::gpu_upload(&t);
@@ -134,7 +155,7 @@ PROTO_INIT {
         [](Texture2D& tex){ tex.flags.unset(Texture2D::mipmap_bit); };
 
     auto& dirlight_shadowmap =
-        create_asset_rref<Texture2D>("gbuffer_shadowmap_texture")
+        create_asset_rref<Texture2D>("dirlight_shadowmap_texture")
             .$_configure(no_mipmap)
             .$_init(dirlight_shadowmap_size, GL_DEPTH_COMPONENT24,
                     GL_DEPTH_COMPONENT, GL_FLOAT);
@@ -270,7 +291,7 @@ PROTO_INIT {
     auto& defbuf_ping =
         create_asset_rref<Texture2D>("defbuffer_ping_texture")
             .$_configure(no_mipmap)
-            .$_init(scr_size, GL_RGB, GL_RGB);
+            .$_init(scr_size, GL_RGBA, GL_RGBA);
     defbuf_ping_h = defbuf_ping.handle;
 
     auto& defbuf_bloom =
@@ -288,7 +309,7 @@ PROTO_INIT {
     defbuffer
         .$_init(scr_size, 3)
         .$_bind()
-        .$_add_color_attachment(defbuf_pong)
+        .$_add_color_attachment(defbuf_ping)
         .$_add_color_attachment(defbuf_pong)
         .$_add_color_attachment(defbuf_bloom)
         .finalize();
@@ -299,19 +320,64 @@ PROTO_INIT {
             .$_attach_shader_file(ShaderType::Frag, "deferred_frag.glsl")
             .$_link().handle;
 
+    auto& postbuf_ping =
+        create_asset_rref<Texture2D>("postbuffer_ping_texture")
+            .$_configure(no_mipmap)
+            .$_init(scr_size, GL_RGBA, GL_RGBA);
+    postbuf_ping_h = postbuf_ping.handle;
+
+    auto& postbuf_pong =
+        create_asset_rref<Texture2D>("postbuffer_pong_texture")
+            .$_configure(no_mipmap)
+            .$_init(scr_size, GL_RGBA, GL_RGBA);
+    postbuf_pong_h = postbuf_pong.handle;
+
+    postbuffer
+        .$_init(scr_size, 2)
+        .$_bind()
+        .$_add_color_attachment(postbuf_ping)
+        .$_add_color_attachment(postbuf_pong)
+        .finalize();
+
+
+    hdr_shader_h =
+        create_init_asset_rref<ShaderProgram>("hdr_shader")
+            .$_attach_shader_file(ShaderType::Vert, "pass_vert.glsl")
+            .$_attach_shader_file(ShaderType::Frag, "hdr_frag.glsl")
+            .$_link().handle;
+
+
     gfx::stale_all_texture_slots();
     vardump(gfx::error_message());
 }
 
 ////////////////////////////////////////////////////////////////////////////
 
+#define TAKE 0
 
 PROTO_UPDATE {
-
     auto& ctx = *proto::context;
     float& time = ctx.clock.elapsed_time;
     glDisable(GL_BLEND);
-    ctx.camera.position = vec3(1.0 * cos(time/40.0),1.65,7.0);
+
+    #if TAKE == 0
+    ctx.camera.position = vec3(0.0, 1.25, 2.0);
+    #elif TAKE == 1
+    ctx.camera.rotation =
+        angle_axis(sin(time/25.0), glm::normalize(vec3(1.0,-1.0,0.0)));
+    ctx.camera.position = vec3(1.0 * cos(time/10.0),0.65, 0.0);
+    #elif TAKE == 2
+    float stime = time/10.0;
+    ctx.camera.position = vec3(3.0 + cos(stime)*stime * 1.2,
+                               4.65,
+                               -3.5 - sin(time/10.0) * 7.0);
+    ctx.camera.rotation =
+        angle_axis(sin(time/10.0) + 1.4, vec3(0.0,1.0,0.0));
+    #elif TAKE == 3
+    float stime = time/10.0;
+    ctx.camera.position = vec3(3.2, 1.65 + cos(stime*2.0)/3.0
+                               ,5.0 + sin(stime) * 7.0);
+    #endif 
 
     gfx::reset_framebuffer();
 
@@ -328,29 +394,36 @@ PROTO_UPDATE {
                      dirlight_shadowmap_buf.size.y);
     glClear(GL_DEPTH_BUFFER_BIT);
 
-    float tmp = 160.0;
-    mat4 model = mat4(1.0);
-    model = glm::scale(model, vec3(0.1));
-    model = glm::translate(model, vec3(0.0,-10.0,0.0));
-
+    float tmp = 17.0;
     mat4 dirlight_proj =
         glm::ortho(-tmp, tmp, -tmp, tmp,
                    dirlight_near, dirlight_far);  
 
-    sun_pos = -sun_dir  * 300.0f;
+    sun_pos = -sun_dir * 40.0f;
     mat4 dirlight_view =
         glm::lookAt(sun_pos, sun_pos + sun_dir, 
                     vec3( 0.0f, 1.0f, 0.0f)); 
 
-    mat4 dirlight_mvp = dirlight_proj * dirlight_view * model;
-    mat4 dirlight_vp = dirlight_proj * dirlight_view ;
+    mat4 dirlight_vp = dirlight_proj * dirlight_view;
+    for(auto& comp : context->comp.render_mesh) {
+        TransformComp * transform = get_component<TransformComp>(comp.entity);
+        assert(transform);
+        mat4 model = transform->model();
 
-    get_asset_ref<ShaderProgram>(dirlight_shadowmap_shader_h)
+        Mesh * mesh = get_asset<Mesh>(comp.mesh);
+
+        if(!mesh) {
+            debug_error(1, "abandoned component :/"); continue;
+        }
+
+        mat4 dirlight_mvp = dirlight_vp * model;
+
+        get_asset_ref<ShaderProgram>(dirlight_shadowmap_shader_h)
             .$_use()
-            .$_set_mat4 ("u_mvp", &dirlight_mvp);
+            .$_set_mat4  ("u_mvp", &dirlight_mvp);
 
-    //gfx::render_scene(true);
-    gfx::render_mesh(&ctx.meshes[2]);
+        gfx::render_mesh(mesh, true);
+    }
 
     #endif
     // gbuf
@@ -377,10 +450,10 @@ PROTO_UPDATE {
             .$_use()
             .$_set_mat4  ("u_mvp",            &ssao_mvp)
             .$_set_float ("u_time",           time)
-            .$_set_float ("u_radius",         2.5f)
+            .$_set_vec2  ("u_resolution",     &scr_size)
+            .$_set_float ("u_radius",         1.0f)
             .$_set_mat4  ("u_projection",     &projection)
             .$_set_mat4  ("u_view",           &view)
-            .$_set_vec2  ("u_resolution",     &scr_size)
             .$_set_tex2D ("gbuf.position",    gbuf_position_h)
             .$_set_tex2D ("gbuf.normal",      gbuf_normal_h)
             .$_set_tex2D ("gbuf.depth",       gbuf_depth_h)
@@ -428,10 +501,13 @@ PROTO_UPDATE {
     auto deffered_shader =
         get_asset_ref<ShaderProgram>(deffered_shader_h)
             .$_use()
+            .$_set_float ("u_time",           time)
             .$_set_int   ("u_size",           blur)
             .$_set_float ("u_cam_far",        ctx.camera.far)
             .$_set_float ("u_cam_near",       ctx.camera.near)
+            .$_set_vec3  ("u_cam_pos",        &ctx.camera.position)
             .$_set_mat4  ("u_projection",     &projection)
+            .$_set_mat4  ("u_view",           &view)
             .$_set_vec2  ("u_resolution",     &scr_size)
             .$_set_tex2D ("gbuf.position",    gbuf_position_h)
             .$_set_tex2D ("gbuf.normal",      gbuf_normal_h)
@@ -448,6 +524,18 @@ PROTO_UPDATE {
 
     gfx::render_quad();
 
+    // POSTPROCESS
+    gfx::bind_framebuffer(postbuffer);
+    glDrawBuffer(GL_COLOR_ATTACHMENT0);
+    get_asset_ref<ShaderProgram>(hdr_shader_h)
+        .$_use()
+        .$_set_float ("u_time",           time)
+        .$_set_vec2  ("u_resolution",     &scr_size)
+        .$_set_tex2D ("gbuf.normal",      gbuf_normal_h)
+        .$_set_tex2D ("u_tex",            gfx::bind_texture(defbuf_ping_h));
+
+    gfx::render_quad();
+
     gfx::reset_framebuffer();
 
     get_asset_ref<ShaderProgram>(ctx.quad_shader_h).use();
@@ -456,10 +544,10 @@ PROTO_UPDATE {
     glViewport(0, 0, ctx.window_size.x, ctx.window_size.y);
 
     #if 0
-    gfx::render_texture_quad(gfx::bind_texture(gbuf_depth_h),
+    gfx::render_texture_quad(gfx::bind_texture(gbuf_normal_h),
                              vec2(0.0), halfscr);
 
-    gfx::render_texture_quad(gfx::bind_texture(gbuf_albedo_spec_h),
+    gfx::render_texture_quad(gfx::bind_texture(gbuf_normal_h),
                              vec2(0.0, halfscr.y), halfscr);
 
     gfx::render_texture_quad(gfx::bind_texture(gbuf_normal_h),
@@ -469,11 +557,8 @@ PROTO_UPDATE {
                              halfscr, halfscr);
 
     #else 
-    //gfx::render_texture_quad(gfx::bind_texture(dirlight_shadowmap_h),
-    //                         vec2(0.0), 2.0f*halfscr);
-
     glEnable(GL_BLEND);
-    gfx::render_texture_quad(gfx::bind_texture(defbuf_pong_h),
+    gfx::render_texture_quad(gfx::bind_texture(postbuf_ping_h),
                              vec2(0.0), 2.0f*halfscr);
     #endif
     gfx::render_std_basis();

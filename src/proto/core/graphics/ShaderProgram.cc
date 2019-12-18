@@ -339,7 +339,7 @@ void ShaderProgram::set_material(Material * material) {
     else
         set_uniform<GL_SAMPLER_2D>
             ("u_material.diffuse_map",
-             gfx::bind_texture(ctx.default_black_texture_h));
+             gfx::bind_texture(ctx.default_white_texture_h));
 
     if( (map = get_asset<Texture2D>(material->specular_map)) )
         set_uniform<GL_SAMPLER_2D>
@@ -356,6 +356,15 @@ void ShaderProgram::set_material(Material * material) {
         set_uniform<GL_SAMPLER_2D>
             ("u_material.bump_map",
              gfx::bind_texture(ctx.default_black_texture_h));
+
+    if( (map = get_asset<Texture2D>(material->opacity_map)) )
+        set_uniform<GL_SAMPLER_2D>
+            ("u_material.opacity_map", gfx::bind_texture(map));
+    else
+        set_uniform<GL_SAMPLER_2D>
+            ("u_material.opacity_map",
+             gfx::bind_texture(ctx.default_white_texture_h));
+
 }
 
 

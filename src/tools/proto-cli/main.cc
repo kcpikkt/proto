@@ -175,6 +175,7 @@ void parse_mesh(StringView filepath, StringView outdir) {
     const aiScene * scene_ptr =
         importer.ReadFile(filepath.str(),
                           aiProcess_CalcTangentSpace      |
+                          aiProcess_GenNormals            |
                           aiProcess_Triangulate           |
                           aiProcess_JoinIdenticalVertices |
                           aiProcess_SortByPType);
