@@ -96,6 +96,7 @@ ifeq ($(platform), LINUX)
 	library_name = libproto.a
 	runtime      = $(bin_dir)/$(runtime_name)
 	library      = $(lib_dir)/$(library_name)
+	standalone   = $(bin_dir)/$(client_name)$($(client_name),-,proto-)standalone
 
 	proto_srcs = $(shell find $(src_dir) -name *.cc)
 	proto_objs := $(proto_srcs:$(src_dir)/%.cc=$(obj_dir)/%.o)
@@ -131,8 +132,15 @@ runtime: $(runtime)
 .PHONY: test
 test: $(test)
 
+.PHONY: standalone_setup
+standalone_setup:
+	$(eval cppflags += "-DPROTO_STANDALONE")
+
+.PHONY: standalone
+standalone: standalone_setup runtime $(standalone)
+
 .PHONY: client
-client: $(client_objs) $(library)
+client: runtime $(client_objs) $(library)
 	$(if $(client_src_dir),,\
 	$(error Client sources directory path variable 'client_src_dir' is not set. ))
 	$(if $(client_name),,\
@@ -147,8 +155,25 @@ client: $(client_objs) $(library)
 		$(client_objs) $(library) $(libs) $(client_libs)
 	mv $(bin_dir)/$(client_name).so.part $(bin_dir)/$(client_name).so
 
-	echo $(runtime) $(bin_dir)/$(client_name).so > $(bin_dir)/run-$(client_name).sh
+	$(eval outfile = $(bin_dir)/run-$(client_name).sh)
+
+#   NOTE(kacper): bit of a headache to write $@ to file in make... 
+#                 let me know if you have better idea how to do it.
+	@echo "#!/bin/bash" > $(outfile)
+	@echo "$(runtime) $(bin_dir)/$(client_name).so \"__dollar__at\"" >> $(outfile)
+	@sed -i '$ s/__dollar/$$/' $(outfile)
+	@sed -i '$ s/__at/@/' $(outfile)
 	@chmod +x $(bin_dir)/run-$(client_name).sh
+
+$(standalone): $(proto_runtime_objs) $(client_objs) $(library)
+	$(if $(client_src_dir),,\
+	$(error Client sources directory path variable 'client_src_dir' is not set. ))
+	$(if $(client_name),,\
+	$(error Client dynamic library name 'client_name' is not set. ))
+	$(if $(client_srcs),,\
+	$(error No source files in $(client_src_dir) ))
+
+	$(cxx) $(ldflags) -o $@ $(proto_runtime_objs) $(client_objs) $(library) $(libs) 
 
 $(client_objs): $(client_obj_dir)/%.o: $(client_src_dir)/%.cc
 	@$(call makedir, $(dir $@))
@@ -200,7 +225,9 @@ $(test_objs): $(obj_dir)/test/%.o: $(test_src_dir)/proto/%.cc
 
 .PHONY: clean
 clean:
-	$(call remove, $(runtime) $(proto_objs) $(proto_ar_objs) $(proto_deps) $(TESTOBJS) $(CATCH2GCH) $(OBJDIR)/glfw3.o)
+	$(call remove, $(runtime) $(proto_objs) \
+		$(proto_ar_objs) $(proto_deps) $(TESTOBJS) \
+		$(client_objs) $(client_deps) $(CATCH2GCH) $(OBJDIR)/glfw3.o)
 
 -include $(proto_deps)
 -include $(client_deps)

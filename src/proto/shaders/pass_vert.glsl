@@ -9,19 +9,12 @@ out struct VertOut {
     vec2 uv;
 } frag_in;
 
-uniform struct GBuffer {
-    sampler2D position;
-    sampler2D normal;
-    sampler2D albedo_spec;
-} gbuf;
-
-uniform float u_time;
-uniform mat4 u_mvp;
-uniform mat4 u_model;
-uniform mat4 u_view;
-uniform mat4 u_projection;
-
 void main() {
+    frag_in.position = a_position;
+    frag_in.normal = a_normal; 
+    frag_in.uv = a_uv;
+
+    gl_Position = vec4(a_position, 1.0);
 }
  
 

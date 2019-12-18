@@ -560,8 +560,6 @@ PROTO_INIT {
                  cubemap_bk_texture.size.x, cubemap_bk_texture.size.y,
                  0, GL_RGB, GL_UNSIGNED_BYTE, cubemap_bk_texture.data);
 
-
-
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);

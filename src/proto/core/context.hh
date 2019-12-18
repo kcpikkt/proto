@@ -46,7 +46,7 @@ namespace proto {
         struct TextureSlot {
             AssetHandle texture = invalid_asset_handle;
             s32 gl_tex_unit;
-            s32 gl_id_bound;
+            s32 bound_gl_id;
             Bitfield<u8> flags;
             AssetTypeIndex type;
             constexpr static u8 bound_bit = BIT(0);
@@ -70,7 +70,12 @@ namespace proto {
         AssetHandle default_checkerboard_texture_h;
 
         AssetHandle quad_h;
+        AssetHandle cube_h;
+
         AssetHandle quad_shader_h;
+        AssetHandle skybox_shader_h;
+        AssetHandle std_basis_h;
+        AssetHandle std_basis_shader_h;
 
         AssetHandle gbuffer_shader_h;
         //tmp
@@ -128,6 +133,12 @@ namespace proto {
         memory::LinkedListAllocator gp_string_allocator;
         memory::LinkedListAllocator gp_debug_strings_allocator;
         Array<StringView> cmdline;
+        char ** argv;
+        s32 argc;
+
+        // preservation of client data when hot-swapping
+        void ** client_preserved; 
+        u64 client_preserved_size; 
 
         proto::ivec2 window_size;
 
@@ -138,6 +149,8 @@ namespace proto {
         Channel<KeyEvent> key_input_channel;
         Channel<MouseMoveEvent> mouse_move_input_channel;
         Channel<MouseButtonEvent> mouse_button_input_channel;
+
+        char key_state[32];
 
         Bitfield<debug::Category> stdout_log_categories = debug::category::all;
         debug::Level stdout_log_level = debug::level::all;

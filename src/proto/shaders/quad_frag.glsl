@@ -16,4 +16,5 @@ void main() {
     vec2 uv = floor(frag_in.uv * segs) / segs;
 
     frag_color = texture(u_tex, frag_in.uv);
+//    frag_color.w = 1.0;
 }

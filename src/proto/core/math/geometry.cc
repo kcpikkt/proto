@@ -1,7 +1,10 @@
 #include "proto/core/math/geometry.hh"
+#include <tgmath.h>
 
 namespace proto {
     mat4 perspective(float fov, float aspect, float near, float far) {
+    // FIXME(kacper): non-linearity of depth mate, this function does not work
+        assert(0);
         float theta = tan(fov/2.0);
         // row here is column in matrix btw
         return {{1.0/theta, 0.0,         0.0,                          0.0},
@@ -17,6 +20,9 @@ namespace proto {
                                                  mat[3][3]));
     }
 
+    quat angle_axis(float angle,vec3 axis) {
+        return quat(float(cos(angle/2.0f)), float(sin(angle/2.0f)) * axis);
+    }
 
 
 } // namespace proto

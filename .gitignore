@@ -12,3 +12,4 @@ proto.files
 proto.includes
 .vs/
 *.so
+parse*

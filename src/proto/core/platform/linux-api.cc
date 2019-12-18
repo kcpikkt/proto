@@ -52,7 +52,7 @@ const char * basename_substr(const char * path, u32 * no_ext_len) {
 
 StringView basename_view(StringView path) {
     u32 index = 0;
-    const char * basename;
+    const char * basename = path.str();
     char c;
     while(index < path.length()) {
         c = path[index];
@@ -86,6 +86,8 @@ const char * dirname_substr(const char * path, u32 * len) {
     if(len) *len = dirname_len(path);
     return path;
 }
+//FIXME(kacper): empty string crash
+//NOTE(kacper):  btw, write tests for them for gods sake
 
 StringView dirname_view(const char * path) {
     return StringView(path, dirname_len(path));
@@ -156,6 +158,12 @@ bool is_directory(StringView path) {
     struct stat statbuf;
     if (stat(path, &statbuf) != 0) return false;
     return S_ISDIR(statbuf.st_mode);
+}
+
+bool is_file(StringView path) {
+    struct stat statbuf;
+    if (stat(path, &statbuf) != 0) return false;
+    return S_ISREG(statbuf.st_mode);
 }
 
 String search_for_file(StringArena& dirs, StringView filename) {

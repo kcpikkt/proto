@@ -331,7 +331,8 @@ AssetMetadata * get_metadata(AssetContext * asset_context,
     case AssetType<ShaderProgram>::index:
         { lookup_arr = &reg.shader_programs;  } break;
     default:
-        debug_warn(1, "requested metadata of asset of unsupported type");
+        debug_warn(1, "requested metadata of asset of unsupported type ",
+                   AssetType(handle.type).name);
     }
     if(lookup_arr) {
         for(u32 i = 0; i<(*lookup_arr).size(); i++) {

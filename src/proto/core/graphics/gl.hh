@@ -1,6 +1,7 @@
 #pragma once
 #include "proto/core/graphics/common.hh"
 #include "proto/core/context.hh"
+#include "proto/core/graphics/Framebuffer.hh"
 #include "proto/core/graphics/Texture2D.hh"
 #include "proto/core/debug/logging.hh"
 #include "proto/core/meta.hh"

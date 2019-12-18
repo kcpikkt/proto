@@ -13,7 +13,6 @@ namespace graphics{
     //namespace gl{
 
     s32 bind_texture(AssetHandle texture_handle) {
-        assert(!glGetError());
         auto fail =
             [](){
                 debug_warn(debug::category::graphics,
@@ -36,7 +35,6 @@ namespace graphics{
     auto bind_texture(T * texture) ->
         meta::enable_if_t<meta::is_base_of_v<TextureInterface, T>,s32>
     {
-        assert(!glGetError());
         if(!texture) {
             debug_warn(debug::category::graphics,
                        "Pointer to texture passed to ", __PRETTY_FUNCTION__,
@@ -62,6 +60,7 @@ namespace graphics{
             if(!slot.flags.check(Slot::reserved_bit)) {
                 assert(slot.flags.check(Slot::bound_bit));
                 assert(slot.texture == texture.handle);
+                assert(slot.bound_gl_id == texture.gl_id);
                 slot.flags.set(Slot::fresh_bit);
                 return texture.bound_unit;
             }
@@ -88,7 +87,6 @@ namespace graphics{
                 vardump((u8)modindex);
                 vardump(get_metadata(prev_texture->handle)->name);
             }
-
             //assert(prev_texture->bound_unit == (s32)modindex);
 
             prev_texture->bound_unit = -1;
@@ -97,22 +95,19 @@ namespace graphics{
 
         assert(texture.gl_id >= 0);
         glActiveTexture(GL_TEXTURE0 + modindex);
-        assert(!glGetError());
 
         /*  */ if constexpr(meta::is_same_v<T, Texture2D>) {
             slot.type = AssetType<Texture2D>::index;
             glBindTexture(GL_TEXTURE_2D, texture.gl_id);
-            assert(!glGetError());
         } else if constexpr(meta::is_same_v<T, Cubemap>) {
             slot.type = AssetType<Cubemap>::index;
             glBindTexture(GL_TEXTURE_CUBE_MAP, texture.gl_id);
-            assert(!glGetError());
         }
-        assert(!glGetError());
 
         slot.texture = texture.handle;
 
         texture.bound_unit = (s32)modindex;
+        slot.bound_gl_id = texture.gl_id;
 
         texture.flags.set(TextureInterface::bound_bit);
         slot.flags.set(Slot::bound_bit | Slot::fresh_bit);
@@ -283,7 +278,40 @@ namespace graphics{
         }
     }
 
+    // take refs, nofail here, handle taking function can fail
     template<typename T> void gpu_upload(T *);
+
+    template<> void gpu_upload<Renderbuffer>(Renderbuffer * renderbuffer) {
+        assert(renderbuffer);
+        if(renderbuffer->flags.check(Renderbuffer::on_gpu_bit)) return;
+
+        glBindRenderbuffer(GL_RENDERBUFFER, renderbuffer->gl_id);
+        glRenderbufferStorage(GL_RENDERBUFFER, renderbuffer->gpu_format,
+                              renderbuffer->size.x, renderbuffer->size.y);
+        renderbuffer->flags.set(Renderbuffer::on_gpu_bit);
+    }
+
+    template<> void gpu_upload<Cubemap>(Cubemap * cubemap) {
+        assert(cubemap);
+        if(cubemap->flags.check(TextureInterface::on_gpu_bit)) return;
+
+        bind_texture(cubemap);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+        for(s32 i=0; i<6; i++) {
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0,
+                     cubemap->format,
+                     cubemap->size.x, cubemap->size.y, 0,
+                     cubemap->gpu_format,
+                     GL_UNSIGNED_BYTE, //cubemap->datatype,
+                     cubemap->data[i]);
+        }
+        //if(texture->flags.check(TextureInterface::mipmap_bit))
+        //    glGenerateMipmap(GL_TEXTURE_2D);
+
+        cubemap->flags.set(TextureInterface::on_gpu_bit);
+        stale_texture_slot(cubemap->bound_unit);
+    }
 
     template<> void gpu_upload<Texture2D>(Texture2D * texture) {
         assert(texture);
@@ -293,9 +321,17 @@ namespace graphics{
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
         // Texture2D::data should be null default
-        glTexImage2D(GL_TEXTURE_2D, 0, texture->format,
-                     texture->size.x, texture->size.y,
-                     0, texture->gpu_format, GL_UNSIGNED_BYTE, texture->data);
+
+        if(texture->datatype == GL_FLOAT) {
+            vardump(get_metadata(texture->handle)->name);
+        }
+
+        glTexImage2D(GL_TEXTURE_2D, 0,
+                     texture->format,
+                     texture->size.x, texture->size.y, 0,
+                     texture->gpu_format,
+                     texture->datatype,
+                     texture->data);
 
         if(texture->flags.check(TextureInterface::mipmap_bit))
             glGenerateMipmap(GL_TEXTURE_2D);
@@ -303,6 +339,7 @@ namespace graphics{
         texture->flags.set(TextureInterface::on_gpu_bit);
         stale_texture_slot(texture->bound_unit);
     }
+
 
     template<> void gpu_upload<Mesh>(Mesh * mesh) {
         assert(mesh);

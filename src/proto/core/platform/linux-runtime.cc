@@ -13,6 +13,7 @@
 #include "proto/core/asset-system/interface.hh"
 #include "proto/core/util/namespace-shorthands.hh"
 #include "proto/core/meta.hh"
+#include "proto/core/math/random.hh"
 #include "proto/core/context.hh"
 #include "proto/core/io.hh"
 
@@ -35,10 +36,10 @@
 #include <X11/Xlib.h>
 #include <X11/XKBlib.h>
 
-
 // switches
 #define DEFAULT_TEXTURES 1
 #define DEFAULT_SHADERS 1
+#define DEFAULT_MESHES 1
 
 void breakpoint() {};
 
@@ -73,8 +74,10 @@ namespace platform {
 proto::ivec2 mouse_lock_pos = proto::ivec2(200,200);
 static void X_event_callback(XEvent& X_event) {
     static MouseMoveEvent prev_mouse_move_event{};
+
     if(X_event.type == KeyPress || X_event.type == KeyRelease) {
         KeyEvent event;
+
         event.code =
             XkbKeycodeToKeysym(_context.display,
                                X_event.xkey.keycode, 0,
@@ -114,6 +117,8 @@ static void X_event_callback(XEvent& X_event) {
 }
 
 static void X_handle_events() {
+    XQueryKeymap(_context.display, _context.key_state);
+
     XEvent ev;
     while(XPending(_context.display)) {
         XNextEvent(_context.display, &ev);
@@ -136,11 +141,12 @@ typedef GLXFBConfig (*glXChooseFBConfigProc)
 RuntimeSettings settings;
 void * clientlib_h;
 
-int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** argv){
+int proto::platform::runtime(int argc, char ** argv){
 
     proto::context = &_context;
     auto& ctx = _context;
 
+    ctx.argc = argc; ctx.argv = argv;
     namespace mem = proto::memory;
 
     // just for cmdline args
@@ -235,6 +241,7 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
                 PointerMotionMask |
                 ExposureMask |
                 KeyPressMask |
+                KeyReleaseMask |
                 ButtonPressMask);
 
     static int visual_attribs[] =
@@ -286,7 +293,9 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
                 "Could not match any framebuffer configuration");
 
 
-    XMapWindow(_context.display, _context.window);
+    if(settings.mode.check(RuntimeSettings::window_mode_bit))
+        XMapWindow(_context.display, _context.window);
+
     XStoreName(_context.display, _context.window, "proto!");
     glXMakeCurrent(_context.display, _context.window, gl_context);
 
@@ -308,7 +317,6 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
     log_info(proto::debug::category::main, indent,
             "OpenGL " ,glGetString(GL_VERSION),
             ", GLSL " ,glGetString(GL_SHADING_LANGUAGE_VERSION));
-    log_info(proto::debug::category::main, indent, "terminal mode");
 
     log_info(proto::debug::category::main, indent);
 
@@ -406,12 +414,12 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
          { 255, 255, 255, 255}, { 255,   0, 255, 255}};
 
     struct { u8 ch[4]; } default_white_texture_data[] = {{ 255, 255, 255, 255}};
-    struct { u8 ch[4]; } default_black_texture_data[] = {{ 255, 255, 255, 255}};
+    struct { u8 ch[4]; } default_black_texture_data[] = {{   0,   0,   0, 255}};
 
     Texture2D & default_white_texture =
         create_asset_rref<Texture2D>("defualt_white_texture");
 
-    default_white_texture.init(ivec2(1,1), GL_RGBA8, GL_RGBA);
+    default_white_texture.init(ivec2(1,1), GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
     default_white_texture.data = (void*)default_white_texture_data;
     graphics::gpu_upload(&default_white_texture);
     _context.default_white_texture_h = default_white_texture.handle;
@@ -419,7 +427,7 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
     Texture2D & default_black_texture =
         create_asset_rref<Texture2D>("defualt_black_texture");
 
-    default_black_texture.init(ivec2(1,1), GL_RGBA8, GL_RGBA);
+    default_black_texture.init(ivec2(1,1), GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
     default_black_texture.data = (void*)default_black_texture_data;
     graphics::gpu_upload(&default_black_texture);
     _context.default_black_texture_h = default_black_texture.handle;
@@ -432,7 +440,15 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
     graphics::gpu_upload(&default_checkerboard_texture);
     _context.default_checkerboard_texture_h = default_checkerboard_texture.handle;
 
-     // DEFAULT MESHES
+
+#if DEFAULT_MESHES
+    Mesh & cube = create_init_asset_rref<Mesh>("default_cube");
+    cube.vertices.resize(36);
+    assert(sizeof(cube_vertices) == sizeof(Vertex) * 36);
+    memcpy(cube.vertices._data, cube_vertices, sizeof(Vertex) * 36);
+    graphics::gpu_upload(&cube);
+    _context.cube_h = cube.handle;
+
     Mesh & quad = create_init_asset_rref<Mesh>("default_quad");
     quad.vertices.resize(4);
     assert(sizeof(quad_vertices) == sizeof(Vertex) * 4);
@@ -440,8 +456,17 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
     graphics::gpu_upload(&quad);
     _context.quad_h = quad.handle;
 
+    Mesh & std_basis = create_init_asset_rref<Mesh>("default_std_basis");
+    std_basis.vertices.resize(6);
+    assert(sizeof(std_basis_vertices) == sizeof(Vertex) * 6);
+    memcpy(std_basis.vertices._data, std_basis_vertices, sizeof(Vertex) * 6);
+    graphics::gpu_upload(&std_basis);
+    _context.std_basis_h = std_basis.handle;
+#endif
+
 
 #if DEFAULT_SHADERS
+
     auto& quad_shader =
         create_init_asset_rref<ShaderProgram>("default_quad_shader");
     quad_shader.attach_shader_file(ShaderType::Vert, "quad_vert.glsl");
@@ -449,12 +474,26 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
     quad_shader.link();
     _context.quad_shader_h = quad_shader.handle;
 
+    auto& std_basis_shader =
+        create_init_asset_rref<ShaderProgram>("default_std_basis_shader");
+    std_basis_shader.attach_shader_file(ShaderType::Vert, "pass_mvp_vert.glsl");
+    std_basis_shader.attach_shader_file(ShaderType::Frag, "std_basis_frag.glsl");
+    std_basis_shader.link();
+    _context.std_basis_shader_h = std_basis_shader.handle;
+
     auto& gbuffer_shader =
         create_init_asset_rref<ShaderProgram>("default_gbuffer_shader");
     gbuffer_shader.attach_shader_file(ShaderType::Vert, "g-buffer_vert.glsl");
     gbuffer_shader.attach_shader_file(ShaderType::Frag, "g-buffer_frag.glsl");
     gbuffer_shader.link();
     _context.gbuffer_shader_h = gbuffer_shader.handle;
+
+    
+    _context.skybox_shader_h =
+        create_init_asset_rref<ShaderProgram>("default_skybox_shader")
+            .$_attach_shader_file(ShaderType::Vert, "pass_mvp_vert.glsl")
+            .$_attach_shader_file(ShaderType::Frag, "skybox_frag.glsl")
+            .$_link().handle;
 #endif
 
     _context.default_framebuffer = &_context.framebuffers.push_back();
@@ -464,6 +503,8 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
 
     _context.current_read_framebuffer = _context.default_framebuffer;
     _context.current_draw_framebuffer = _context.default_framebuffer;
+
+    random::seed_mt64(settings.mt64_seed);
 
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -550,7 +591,7 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
     client_init();
     assert(!glGetError());
 
-    _context.clock.init(60.0f);
+    _context.clock.init(2.0f);
     while(!_context.exit_sig) {
         _context.clock.tick();
 
@@ -563,6 +604,7 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
 
             assert(clientlib_h);
 
+            void * client_preserve = nullptr;
             client_unlink();
             dlclose(clientlib_h);
 

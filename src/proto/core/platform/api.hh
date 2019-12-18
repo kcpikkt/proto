@@ -40,6 +40,7 @@ namespace platform {
     int strncmp_i(const char * str1, const char * str2, u32 n); 
 
     bool is_directory(StringView path);
+    bool is_file(StringView path);
 
     String search_for_file(StringArena& dirs, StringView filename);
 

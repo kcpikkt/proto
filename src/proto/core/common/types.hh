@@ -1,12 +1,11 @@
 #pragma once
 
-#include <cstdint>
-#include <cstddef>
-#define GLM_SWIZZLE 
+#include <stdint.h>
+#include <stddef.h>
+#define GLM_FORCE_SWIZZLE 
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
-
-//TEMP
-#include <memory>
+#include <glm/gtc/quaternion.hpp>
 
 namespace proto {
     using u8  = uint8_t;
@@ -20,9 +19,8 @@ namespace proto {
     using s64 = int64_t;
 
     // NOTE(kacper):
-    // this is for forward compatibility when I am going implement
-    // math library. glm is used for now since I never used SIMD intrinsics
-    // before and i dont feel like writing it now now
+    // never used SIMD, dont feel like writing my
+    // own math lib now but perhaps in future?
 
     using ivec2 = glm::ivec2;
     using ivec3 = glm::ivec3;
@@ -43,4 +41,5 @@ namespace proto {
     using mat3x3 = glm::mat3x3;
     using mat4x4 = glm::mat4x4;
 
+    using quat = glm::quat;
 }

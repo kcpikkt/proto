@@ -54,6 +54,9 @@ struct Material : Asset {
     //    return sizeof();
     //}
 
+    //tmp, use bitfield
+    bool transparency = false;
+
     proto::vec3 ambient_color  = proto::vec3(0.2);
     proto::vec3 diffuse_color  = proto::vec3(0.8);
     proto::vec3 specular_color = proto::vec3(1.0);
@@ -64,5 +67,6 @@ struct Material : Asset {
     AssetHandle diffuse_map;
     AssetHandle ambient_map;
     AssetHandle bump_map;
+    AssetHandle opacity_map;
 };
 } //namespace proto 

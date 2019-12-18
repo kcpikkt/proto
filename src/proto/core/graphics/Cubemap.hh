@@ -3,42 +3,41 @@
 #include "proto/core/graphics/TextureInterface.hh"
 
 namespace proto {
+    struct Cubemap;
+namespace serialization {
+
+    template<>
+    struct AssetHeader<Cubemap> {
+        ivec2 size;
+        u8 channels;
+        u32 format;
+        u32 gpu_format;
+        u64 data_size;
+        u64 data_offset;
+    };
+}
 
 struct Cubemap : TextureInterface {
-    void * data[6];
+    void * data[6] = {};
 
-    void _move(Cubemap&& other) {
-        TextureInterface::_move(meta::move(other));
-        for(u8 i=0; i<6; i++) {
-            data[i] = other.data[i];
-        }
-    }
+    serialization::AssetHeader<Cubemap> serialization_header_map();
+
+    u64 serialized_data_size();
+
+    u64 serialized_size();
+
+    void _move(Cubemap&& other);
 
     Cubemap() {}
 
-    Cubemap(Cubemap&& other) {
-        _move(meta::forward<Cubemap>(other));
-    }
+    Cubemap(Cubemap&& other);
 
-    Cubemap& operator=(Cubemap&& other) {
-        _move(meta::forward<Cubemap>(other));
-        return *this;
-    }
+    Cubemap& operator=(Cubemap&& other);
 
+    void init();
 
-    void init() {
-        glGenTextures(1, &gl_id);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, gl_id);
+    void init(ivec2 size, u32 format, u32 gpu_format, u32 datatype);
 
-        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-
-        glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
-    }
 };
 
 } // namespace proto

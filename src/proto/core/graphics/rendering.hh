@@ -1,10 +1,12 @@
 #pragma once
+#include "proto/core/math/common.hh"
 #include "proto/core/graphics/Mesh.hh"
 #include "proto/core/graphics/Material.hh"
 #include "proto/core/graphics/gl.hh"
 #include "proto/core/math/geometry.hh"
 #include "proto/core/asset-system/interface.hh"
 #include "proto/core/entity-system/common.hh"
+#include "proto/core/entity-system/interface.hh"
 
 namespace proto {
 namespace graphics {
@@ -33,21 +35,36 @@ void render_span(Mesh * mesh, u32 index, bool simple = false) {
     glDrawElements (GL_TRIANGLES, index_count,
                     GL_UNSIGNED_INT, (void*)(sizeof(u32) * begin_index));
 
-    //TODO(kacper): no need to stale all of them? perhaps stale only ones that
+    //TODO(kacper): no need to stale all of them? perhaps stale only ones those
     //              you used?
     if(!simple)
         stale_all_texture_slots();
 }
 
-void render_mesh(Mesh * mesh, bool simple = false) {
+void render_mesh(Mesh * mesh, bool simple = false, bool transparent = false) {
     assert(mesh);
     mesh->bind();
-    for(u32 i=0; i< mesh->spans.size() ; i++) render_span(mesh, i, simple);
+    for(u32 i=0; i< mesh->spans.size() ; i++) {
+        if(mesh->spans[i].material.flags.check(Material::transparent_bit) ==
+           transparent) {
+            render_span(mesh, i, simple);
+        }
+    }
 }
 
-void render_quad(s32 texture_unit,
-                 vec2 pos = vec2(0.0),
-                 vec2 size = context->window_size) {
+void render_quad() {
+    get_asset_ref<Mesh>(proto::context->quad_h).bind();
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+}
+
+void render_cube() {
+    get_asset_ref<Mesh>(proto::context->cube_h).bind();
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+}
+
+void render_texture_quad(s32 texture_unit,
+                         vec2 pos = vec2(0.0),
+                         vec2 size = context->window_size) {
     auto& quad_shader = get_asset_ref<ShaderProgram>(context->quad_shader_h);
     quad_shader.use();
 
@@ -62,12 +79,81 @@ void render_quad(s32 texture_unit,
 
     quad_shader.set_uniform<GL_FLOAT_MAT3>("u_matrix", &matrix);
     quad_shader.set_uniform<GL_SAMPLER_2D>("u_tex", texture_unit);
-    get_asset_ref<Mesh>(proto::context->quad_h).bind();
-   
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+    render_quad();
 }
 
-void render_shadowmaps() {}
+void render_std_basis() {
+    auto& ctx = *context;
+    auto std_basis_shader = get_asset_ref<ShaderProgram>(ctx.std_basis_shader_h);
+
+    mat4 model = mat4(1.0);
+    model = glm::scale(model, vec3(1.0));
+    mat4 projection = ctx.camera.projection();
+    mat4 view = ctx.camera.view();
+    mat4 mvp = projection * view * model;
+
+    std_basis_shader
+        .$_use()
+        .$_set_mat4("u_mvp", &mvp);
+
+    get_asset_ref<Mesh>(ctx.std_basis_h).bind();
+    glDrawArrays(GL_LINES, 0, 6);
+}
+
+void render_skybox(s32 texture_unit) {
+    auto& ctx = *context;
+    glDepthMask(GL_FALSE);
+    glDisable(GL_CULL_FACE);
+
+    mat4 skybox_mvp =
+        ctx.camera.projection() * mat4(mat3(ctx.camera.view()));
+
+    get_asset_ref<ShaderProgram>(ctx.skybox_shader_h)
+        .$_use()
+        .$_set_mat4  ("u_mvp",    &skybox_mvp)
+        .$_set_tex2D ("u_skybox", texture_unit);
+
+    render_cube();
+
+    glDepthMask(GL_TRUE);
+    glEnable(GL_CULL_FACE);
+}
+
+void render_scene(bool simple = false, bool transparent = false) {
+    auto& ctx = *context;
+    auto& time = ctx.clock.elapsed_time;
+    assert(context->current_shader);
+
+    for(auto& comp : context->comp.render_mesh) {
+        TransformComp * transform = get_component<TransformComp>(comp.entity);
+        assert(transform);
+
+        mat4 model = mat4(1.0);
+        model = glm::scale(model, transform->scale);
+        model = glm::toMat4(transform->rotation) * model;
+        model = translate(model, transform->position);
+
+        Mesh * mesh = get_asset<Mesh>(comp.mesh);
+
+        if(!mesh) {
+            debug_error(1, "not good, fixme, too late for error message");
+            continue;
+        }
+
+        mat4 projection = ctx.camera.projection();
+        mat4 view = ctx.camera.view();
+
+        mat4 mvp = projection * view * model;
+
+        (*ctx.current_shader)
+            .$_set_float ("u_time",       time)
+            .$_set_mat4  ("u_mvp",        &mvp)
+            .$_set_mat4  ("u_model",      &model);
+
+        render_mesh(mesh, simple, transparent);
+    }
+}
 
 void render_gbuffer() {
     auto& ctx = *context;
@@ -76,9 +162,6 @@ void render_gbuffer() {
         debug_warn(debug::category::graphics,
                    "Rendering to gbuffer with GL_MULTISAMPLE enabled.");
 
-    auto gbuffer_shader = get_asset_ref<ShaderProgram>(ctx.gbuffer_shader_h);
-    gbuffer_shader.use();
-
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     mat4 model = mat4(1.0);
@@ -86,48 +169,17 @@ void render_gbuffer() {
     model = rotate(model, (float)M_PI/2.0f, vec3(0.0, 1.0, 0.0));
     model = translate(model, vec3(0.0, -10.0, 0.0));
 
-    mat4 projection = ctx.camera.projection_matrix();
-    mat4 view = ctx.camera.view_matrix();
+    mat4 projection = ctx.camera.projection();
+    mat4 view = ctx.camera.view();
     mat4 mvp = projection * view * model;
 
-    gbuffer_shader.set_uniform<GL_FLOAT>      ("u_time", ctx.clock.elapsed_time);
-    gbuffer_shader.set_uniform<GL_FLOAT_MAT4> ("u_mvp", &mvp);
-    gbuffer_shader.set_uniform<GL_FLOAT_MAT4> ("u_model", &model);
-    gbuffer_shader.set_uniform<GL_FLOAT_MAT4> ("u_view", &view);
-    gbuffer_shader.set_uniform<GL_FLOAT_MAT4> ("u_projection", &projection);
+    get_asset_ref<ShaderProgram>(ctx.gbuffer_shader_h)
+        .$_use()
+        .$_set_float ("u_time",       ctx.clock.elapsed_time);
 
-    render_mesh(&ctx.meshes[1]);
+    render_scene(false, false);
 }
 
-void render_scene() {
-    auto& ctx = *context;
-    auto& time = ctx.clock.elapsed_time;
-    assert(context->current_shader);
-
-    assert(0 && "commented out");
-    #if 0
-    for(auto& comp : context->comp.render_mesh) {
-        TransformComp * transform = get_component<TransformComp>(comp.entity);
-        assert(transform);
-
-        //mat4 model = translate(mat4(1.0), transform->position);
-        Mesh * mesh = get_asset<Mesh>(comp.mesh);
-
-        ctx.camera.position = vec3(0.0,0.0,00.0);
-        mat4 model = mat4(1.0);
-        model = scale(model, vec3(0.01));
-        model = glm::rotate(model, (float)M_PI/2.0f, vec3(0.0,1.0,0.0));
-        model = translate(model, vec3(0.0, -1.0, cos(time) * 1.0));
-        mat4 mvp = ctx.camera.projection_matrix() * model;
-
-        ctx.current_shader->set_uniform<GL_FLOAT>("u_time", time);
-        ctx.current_shader->set_uniform<GL_FLOAT_MAT4>("u_mvp", &mvp);
-        ctx.current_shader->set_uniform<GL_FLOAT_MAT4>("u_model", &model);
-
-        render_mesh(mesh, true);
-    }
-    #endif
-}
 
 } // namespace graphics
 } // namespace proto

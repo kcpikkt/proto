@@ -4,13 +4,16 @@
 
 #pragma once
 #include "proto/core/common/types.hh"
+#include "proto/core/graphics/common.hh"
 #include "proto/core/util/Bitfield.hh"
+#include "proto/core/asset-system/common.hh"
 
 namespace proto {
 
 struct TextureInterface : Asset {
-    u8 channels; // deprecate, use format instead
+    u8 channels; // deprecate, use format instead, well maybe have it anyway, idk
     
+    u32 datatype = GL_UNSIGNED_BYTE;
     u32 format;
     u32 gpu_format;
 

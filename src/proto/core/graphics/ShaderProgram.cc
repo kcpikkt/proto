@@ -6,10 +6,10 @@
 #include "proto/core/memory/common.hh"
 #include "proto/core/asset-system/interface.hh"
 #include "proto/core/graphics/gl.hh"
+#include "proto/core/util/namespace-shorthands.hh"
 #include "proto/core/util/String.hh"
 
-using namespace proto;
-using namespace proto::graphics;
+namespace proto {
 
 constexpr GLenum gl_shader_type(ShaderType type) {
     switch(type) {
@@ -137,10 +137,19 @@ void ShaderProgram::use() {
     proto::context->current_shader = this;
 }
 
+
 template<>
 void ShaderProgram::set_uniform<GL_SAMPLER_2D, s32>
 (const char * name, s32 value ) {
     glUniform1i ( glGetUniformLocation(_program, name), (s32)value);
+}
+
+template<>
+void ShaderProgram::set_uniform<GL_SAMPLER_2D, AssetHandle>
+(const char * name, AssetHandle handle ) {
+    // TODO(kacper): error msg bind_tex ret val
+    glUniform1i ( glGetUniformLocation(_program, name),
+                (s32)gfx::bind_texture(handle));
 }
 
 // -----------
@@ -172,8 +181,8 @@ void ShaderProgram::set_uniform<GL_FLOAT_VEC2, float *>
 }
 
 template<>
-void ShaderProgram::set_uniform<GL_FLOAT_VEC2, proto::vec2 *>
-(const char * name, proto::vec2 * value ) {
+void ShaderProgram::set_uniform<GL_FLOAT_VEC2, vec2 *>
+(const char * name, vec2 * value ) {
     glUniform2fv ( glGetUniformLocation(_program, name), 1, (float * )value);
 
 }
@@ -186,8 +195,8 @@ void ShaderProgram::set_uniform<GL_FLOAT_VEC3, float *>
 }
 
 template<>
-void ShaderProgram::set_uniform<GL_FLOAT_VEC3, proto::vec3 *>
-(const char * name, proto::vec3 * value ) {
+void ShaderProgram::set_uniform<GL_FLOAT_VEC3, vec3 *>
+(const char * name, vec3 * value ) {
     glUniform3fv ( glGetUniformLocation(_program, name), 1, (float * )value);
 }
 
@@ -199,8 +208,8 @@ void ShaderProgram::set_uniform<GL_FLOAT_VEC4, float *>
 }
 
 template<>
-void ShaderProgram::set_uniform<GL_FLOAT_VEC4, proto::vec4 *>
-(const char * name, proto::vec4 * value ) {
+void ShaderProgram::set_uniform<GL_FLOAT_VEC4, vec4 *>
+(const char * name, vec4 * value ) {
     glUniform4fv ( glGetUniformLocation(_program, name), 1, (float * )value);
 }
 
@@ -209,14 +218,14 @@ template<>
 void ShaderProgram::set_uniform<GL_FLOAT_MAT2, float *>
 (const char * name, float * value ) {
     glUniformMatrix3fv ( glGetUniformLocation(_program, name), 1, GL_FALSE,
-                         (float * )value);
+                        (float * )value);
 }
 
 template<>
-void ShaderProgram::set_uniform<GL_FLOAT_MAT2, proto::mat2 *>
-(const char * name, proto::mat2 * value ) {
+void ShaderProgram::set_uniform<GL_FLOAT_MAT2, mat2 *>
+(const char * name, mat2 * value ) {
     glUniformMatrix3fv ( glGetUniformLocation(_program, name), 1, GL_FALSE,
-                         (float * )value);
+                        (float * )value);
 }
 
 // ------------
@@ -224,14 +233,14 @@ template<>
 void ShaderProgram::set_uniform<GL_FLOAT_MAT3, float *>
 (const char * name, float * value ) {
     glUniformMatrix3fv ( glGetUniformLocation(_program, name), 1, GL_FALSE,
-                         (float * )value);
+                        (float * )value);
 }
 
 template<>
-void ShaderProgram::set_uniform<GL_FLOAT_MAT3, proto::mat3 *>
-(const char * name, proto::mat3 * value ) {
+void ShaderProgram::set_uniform<GL_FLOAT_MAT3, mat3 *>
+(const char * name, mat3 * value ) {
     glUniformMatrix3fv ( glGetUniformLocation(_program, name), 1, GL_FALSE,
-                         (float * )value);
+                        (float * )value);
 }
 
 // ------------
@@ -239,14 +248,62 @@ template<>
 void ShaderProgram::set_uniform<GL_FLOAT_MAT4, float *>
 (const char * name, float * value ) {
     glUniformMatrix4fv ( glGetUniformLocation(_program, name), 1, GL_FALSE,
-                         (float * )value);
+                        (float * )value);
 }
 template<>
-void ShaderProgram::set_uniform<GL_FLOAT_MAT4, proto::mat4 *>
-(const char * name, proto::mat4 * value ) {
+void ShaderProgram::set_uniform<GL_FLOAT_MAT4, mat4 *>
+(const char * name, mat4 * value ) {
     glUniformMatrix4fv ( glGetUniformLocation(_program, name), 1, GL_FALSE,
-                         (float * )value);
+                        (float * )value);
 }
+
+ void ShaderProgram::set_int  (const char* name, s32 v) {
+    set_uniform<GL_INT, s32>(name,v); }
+
+ void ShaderProgram::set_float(const char* name, float v) {
+    set_uniform<GL_FLOAT, float>(name,v); }
+
+ void ShaderProgram::set_vec2(const char* name, vec2* v) {
+    set_uniform<GL_FLOAT_VEC2, vec2*>(name,v); }
+
+ void ShaderProgram::set_vec3(const char* name, vec3* v) {
+    set_uniform<GL_FLOAT_VEC3, vec3*>(name,v); }
+
+ void ShaderProgram::set_mat3(const char* name, mat3* v) {
+    set_uniform<GL_FLOAT_MAT3, mat3*>(name,v); }
+
+ void ShaderProgram::set_mat4(const char* name, mat4* v) {
+    set_uniform<GL_FLOAT_MAT4, mat4*>(name,v); }
+
+ void ShaderProgram::set_tex2D(const char* name, s32 v) {
+    set_uniform<GL_SAMPLER_2D, s32>(name,v); }
+
+ void ShaderProgram::set_tex2D(const char* name, AssetHandle v) {
+    set_uniform<GL_SAMPLER_2D, AssetHandle>(name,v); }
+
+ ShaderProgram& ShaderProgram::$_set_int(const char* name, s32 v) {
+    set_uniform<GL_INT, s32>(name,v); return *this; }
+
+ ShaderProgram& ShaderProgram::$_set_float(const char* name, float v) {
+    set_uniform<GL_FLOAT, float>(name,v); return *this; }
+
+ ShaderProgram& ShaderProgram::$_set_vec2(const char* name, vec2* v) {
+    set_uniform<GL_FLOAT_VEC2, vec2*>(name,v); return *this; }
+
+ ShaderProgram& ShaderProgram::$_set_vec3(const char* name, vec3* v) {
+    set_uniform<GL_FLOAT_VEC3, vec3*>(name,v); return *this; }
+
+ ShaderProgram& ShaderProgram::$_set_mat3(const char* name, mat3* v) {
+    set_uniform<GL_FLOAT_MAT3, mat3*>(name,v); return *this; }
+
+ ShaderProgram& ShaderProgram::$_set_mat4(const char* name, mat4* v) {
+    set_uniform<GL_FLOAT_MAT4, mat4*>(name,v); return *this; }
+
+ ShaderProgram& ShaderProgram::$_set_tex2D(const char* name, s32 v) {
+    set_uniform<GL_SAMPLER_2D, s32>(name,v); return *this; }
+
+ ShaderProgram& ShaderProgram::$_set_tex2D(const char* name, AssetHandle v) {
+    set_uniform<GL_SAMPLER_2D, AssetHandle>(name,v); return *this; }
 
 
 void ShaderProgram::set_material(Material * material) {
@@ -270,34 +327,37 @@ void ShaderProgram::set_material(Material * material) {
 
     if( (map = get_asset<Texture2D>(material->ambient_map)) )
         set_uniform<GL_SAMPLER_2D>
-            ("u_material.ambient_map", bind_texture(map));
+            ("u_material.ambient_map", gfx::bind_texture(map));
     else
         set_uniform<GL_SAMPLER_2D>
             ("u_material.ambient_map",
-             bind_texture(ctx.default_black_texture_h));
+             gfx::bind_texture(ctx.default_black_texture_h));
 
     if( (map = get_asset<Texture2D>(material->diffuse_map)) )
         set_uniform<GL_SAMPLER_2D>
-            ("u_material.diffuse_map", bind_texture(map));
+            ("u_material.diffuse_map", gfx::bind_texture(map));
     else
         set_uniform<GL_SAMPLER_2D>
             ("u_material.diffuse_map",
-             bind_texture(ctx.default_black_texture_h));
+             gfx::bind_texture(ctx.default_black_texture_h));
 
     if( (map = get_asset<Texture2D>(material->specular_map)) )
         set_uniform<GL_SAMPLER_2D>
-            ("u_material.specular_map", bind_texture(map));
+            ("u_material.specular_map", gfx::bind_texture(map));
     else
         set_uniform<GL_SAMPLER_2D>
             ("u_material.specular_map",
-             bind_texture(ctx.default_black_texture_h));
+             gfx::bind_texture(ctx.default_black_texture_h));
 
     if( (map = get_asset<Texture2D>(material->bump_map)) )
         set_uniform<GL_SAMPLER_2D>
-            ("u_material.bump_map", bind_texture(map));
+            ("u_material.bump_map", gfx::bind_texture(map));
     else
         set_uniform<GL_SAMPLER_2D>
             ("u_material.bump_map",
-             bind_texture(ctx.default_black_texture_h));
+             gfx::bind_texture(ctx.default_black_texture_h));
 }
 
+
+
+} // namespace proto

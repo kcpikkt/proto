@@ -6,11 +6,17 @@
 
 
 #include "proto/core/common/types.hh"
+#include "proto/core/util/Bitfield.hh"
 #include "proto/core/event-system.hh"
 namespace proto {
 
 const static char * ascii =
     " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
+
+
+struct KeyState : Bitfield<u8> {
+    constexpr static u8 pressed_bit = BIT(0);
+};
 
 struct KeyEvent {
     //    u32 device;

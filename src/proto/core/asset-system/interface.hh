@@ -22,6 +22,7 @@ namespace proto {
     //               all specializations are explicitly instantiated
     template<typename T>
     T * get_asset(AssetHandle handle);
+
     template<typename T>
     T * get_asset(AssetContext * asset_context,
                   AssetHandle handle);

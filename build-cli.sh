@@ -1,5 +1,4 @@
 #!/bin/bash
-make runtime
 make client \
      client_src_dir=src/tools/proto-cli \
      client_name=cli \

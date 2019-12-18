@@ -8,130 +8,512 @@
 #include "proto/core/graphics/rendering.hh"
 #include "proto/core/graphics/Camera.hh"
 #include "proto/core/graphics/Framebuffer.hh"
+#include "proto/core/graphics/Renderbuffer.hh"
 #include "proto/core/util/namespace-shorthands.hh"
 #include "proto/core/meta.hh"
+#include "proto/core/math/random.hh"
+#include "proto/core/math/common.hh"
 
 using namespace proto;
 
 PROTO_SETUP { // (RuntimeSettings * settings)
 }
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image/stb_image.h"
+
+u8 client_data_begin; //////////////////////////////
+
 AssetHandle prev_shader_h;
 ShaderProgram * prev_shader;
-Entity e;
+
+Framebuffer dirlight_shadowmap_buf;
+AssetHandle dirlight_shadowmap_shader_h;
+AssetHandle dirlight_shadowmap_h;
+ivec2 dirlight_shadowmap_size = vec2(1024);
+float dirlight_near = 1.1f, dirlight_far = 600.0f;
+
+vec3 sun_dir   = vec3( 0.3,-1.0,  -0.5);
+vec3 sun_pos   = vec3( 0.0, 400.0, 0.0);
+vec3 sun_color = vec3( 1.0, 1.0,   1.0);
+
+// gbuffer
+Framebuffer gbuffer;
 AssetHandle gbuf_position_h;
 AssetHandle gbuf_normal_h;
-AssetHandle gbuf_albedo_h;
-Framebuffer gbuffer;
+AssetHandle gbuf_albedo_spec_h;
+AssetHandle gbuf_depth_h;
+//Renderbuffer gbuf_depth;
+
+Framebuffer prebuffer;
+AssetHandle prebuf_ssao_h;
+AssetHandle prebuf_pingpong_h;
+
+AssetHandle ssao_shader_h;
+AssetHandle ssao_noise_h;
+Array<vec3> ssao_kernel;
+ivec2 ssao_noise_size = ivec2(64,64);
+
+Framebuffer defbuffer;
+AssetHandle defbuf_ping_h;
+AssetHandle defbuf_bloom_h;
+AssetHandle defbuf_pong_h;
+
+//shaders
+AssetHandle deffered_shader_h;
+AssetHandle ssao_gaussian_shader_h;
+AssetHandle skybox_shader_h;
+
+AssetHandle skybox_h;
+AssetHandle skyboxa_h;
+
+Entity sponza;
+
+u8 client_data_end; 
+
+u32 skybox_cubemap_gl_id;
+
+char randomdata[1024];
+
+void mouse_move_callback(MouseMoveEvent& ev) {
+    float factor = 0.01 * context->clock.delta_time;
+
+    context->camera.rotation = 
+        glm::rotate(context->camera.rotation,
+                    factor * ev.delta.x, vec3(0.0, 1.0, 0.0));
+
+} MouseMoveInputSink mouse_move_input_sink;
 
 
 PROTO_INIT {
     auto& ctx = *proto::context;
 
-    ctx.camera.fov = (float)M_PI * 2.0f / 3.0f;
+    mouse_move_input_sink.init(ctx.mouse_move_input_channel, mouse_move_callback);
+
+    ctx.camera.position = vec3(0.0,1.65,10.0);
+    ctx.camera.rotation = angle_axis(0.0, vec3(0.0,1.0,0.0));
+    ctx.camera.fov = (float)M_PI * 1.4f / 3.0f;
     ctx.camera.aspect = (float)ctx.window_size.x/ctx.window_size.y;
     ctx.camera.near = 0.01f;
-    ctx.camera.far = 100.f;
+    ctx.camera.far = 300.0f;
 
     serialization::load_asset_dir("outmesh/");
+    skybox_h = serialization::load_asset("res/cubemap.past");
 
-    #if 1
+    gfx::gpu_upload(get_asset<Cubemap>(skybox_h));
+
+    sponza = create_entity();
+    auto& transform = add_component<TransformComp>(sponza);
+    transform.position = vec3(0.0, 0.0, 0.0);
+    transform.rotation = angle_axis(M_PI/2.0f, vec3(0.0, 1.0, 0.0));
+    transform.scale = vec3(0.0085); // sponza has around 11.65 meters
+
+    if(Mesh * sponza_mesh = get_asset<Mesh>( make_handle<Mesh>("sponza") )) {
+        add_component<RenderMeshComp>(sponza).mesh = make_handle<Mesh>("sponza");
+
+        // this is really ad hoc, FIXME
+        for(auto& s : sponza_mesh->spans) {
+            auto& diff = s.material.diffuse_map;
+            if(diff == make_handle<Texture2D>("sponza_thorn_diff") ||
+               diff == make_handle<Texture2D>("vase_plant"))
+            {
+                s.material.flags.set(Material::transparency_bit);
+            }
+            
+        }
+    } else
+        debug_info(debug::category::main, "Failed to assign mesh to entity.");
+
+
     for(auto& t : ctx.textures) gfx::gpu_upload(&t);
-    
     for(auto& m : ctx.meshes) gfx::gpu_upload(&m);
     auto& scr_size = context->window_size;
-
+    
+// render to texture config, we obviously don't want mipmaps on them
     auto no_mipmap =
         [](Texture2D& tex){ tex.flags.unset(Texture2D::mipmap_bit); };
 
+    auto& dirlight_shadowmap =
+        create_asset_rref<Texture2D>("gbuffer_shadowmap_texture")
+            .$_configure(no_mipmap)
+            .$_init(dirlight_shadowmap_size, GL_DEPTH_COMPONENT24,
+                    GL_DEPTH_COMPONENT, GL_FLOAT);
+    dirlight_shadowmap_h = dirlight_shadowmap.handle;
+
+    dirlight_shadowmap_buf
+        .$_init(dirlight_shadowmap_size, 0)
+        .$_bind()
+        .$_add_depth_attachment(dirlight_shadowmap)
+        .finalize();
+
+    dirlight_shadowmap_shader_h = 
+        create_init_asset_rref<ShaderProgram>("dirlight_shadowmap_shader")
+            .$_attach_shader_file(ShaderType::Vert, "pass_mvp_vert.glsl")
+            .$_attach_shader_file(ShaderType::Frag, "noop_frag.glsl")
+            .$_link().handle;
+
+// g-buffer setup
     auto& gbuf_position =
         create_asset_rref<Texture2D>("gbuffer_position_texture")
             .$_configure(no_mipmap)
-            .$_init(scr_size, GL_RGB16F, GL_RGB);
+            .$_init(scr_size, GL_RGBA16F, GL_RGBA, GL_FLOAT);
     gbuf_position_h = gbuf_position.handle;
 
     auto& gbuf_normal = 
         create_asset_rref<Texture2D>("gbuffer_normal_texture")
             .$_configure(no_mipmap)
-            .$_init(scr_size, GL_RGB16F, GL_RGB);
+            .$_init(scr_size, GL_RGBA16F, GL_RGBA, GL_FLOAT);
     gbuf_normal_h = gbuf_normal.handle;
 
-    auto& gbuf_albedo =
-        create_asset_rref<Texture2D>("gbuffer_albedo_texture")
+    auto& gbuf_albedo_spec =
+        create_asset_rref<Texture2D>("gbuffer_albedo_spec_texture")
             .$_configure(no_mipmap)
-            .$_init(scr_size, GL_RGBA, GL_RGBA);
-    gbuf_albedo_h = gbuf_albedo.handle;
+            .$_init(scr_size, GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE);
+    gbuf_albedo_spec_h = gbuf_albedo_spec.handle;
 
-    gbuffer.init(scr_size, 3);
-    gfx::bind_framebuffer(gbuffer);
+    auto& gbuf_depth =
+        create_asset_rref<Texture2D>("gbuffer_depth_texture")
+            .$_configure(no_mipmap)
+            .$_init(scr_size, GL_DEPTH_COMPONENT24,
+                    GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE);
+    gbuf_depth_h = gbuf_depth.handle;
 
     gbuffer
-        .$_add_color_attachment(&gbuf_position)
-        .$_add_color_attachment(&gbuf_normal)
-        .$_add_color_attachment(&gbuf_albedo);
-    gbuffer.finalize();
+        .$_init(scr_size, 3)
+        .$_bind()
+        .$_add_color_attachment(gbuf_position)
+        .$_add_color_attachment(gbuf_normal)
+        .$_add_color_attachment(gbuf_albedo_spec)
+        .$_add_depth_attachment(gbuf_depth)
+        .finalize();
 
-    u32 gbuf_depth;
-    glGenRenderbuffers(1, &gbuf_depth);
-    glBindRenderbuffer(GL_RENDERBUFFER, gbuf_depth);
-    glRenderbufferStorage
-        (GL_RENDERBUFFER, GL_DEPTH_COMPONENT, scr_size.x, scr_size.y);
-    glFramebufferRenderbuffer
-        (GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, gbuf_depth);
+// ssao prebuffer setup
+    ssao_kernel.init_resize(64, &ctx.memory);
+    float distrib_bias = 1.5;
 
-    if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        debug_warn(debug::category::graphics, "Incomplete framebuffer");
+    for(u32 i=0; i<ssao_kernel.size(); i++)
+        ssao_kernel[i] =
+            glm::normalize(vec3(random::randf01() * 2.0f - 1.0f,
+                                random::randf01() * 2.0f - 1.0f,
+                                random::randf01() )) *
+            lerp(0.11f, 1.0f, pow(random::randf01(), distrib_bias));
+
+    Array<vec3> ssao_noise_data;
+    ssao_noise_data.init_resize(ssao_noise_size.x * ssao_noise_size.y, &ctx.memory);
+
+    for(auto& pix : ssao_noise_data)
+        pix = vec3(random::randf01() * 2.0f - 1.0f,
+                   random::randf01() * 2.0f - 1.0f,
+                   0.0);
+
+    ssao_noise_h =
+        create_asset_rref<Texture2D>("ssao_noise_texture")
+            .$_configure(no_mipmap)
+            .$_init(ssao_noise_data.raw(), ssao_noise_size,
+                    GL_RGB32F, GL_RGB, GL_FLOAT)
+            .$_upload()
+            .$_configure([](Texture2D& tex){ tex.data = nullptr; })
+            .handle;
+
+
+    auto ssao_tex_data_config =
+        [](Texture2D& tex) {
+            tex.format = GL_RED;
+            tex.gpu_format = GL_RED;
+            tex.size = context->window_size;
+        };
+
+    auto ssao_tex_param_config =
+        []() {
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        };
+
+    auto& prebuf_ssao =
+        create_asset_rref<Texture2D>("prebuffer_ssao_texture")
+            .$_configure(no_mipmap)
+            .$_init(ssao_tex_param_config)
+            .$_configure(ssao_tex_data_config);
+    prebuf_ssao_h = prebuf_ssao.handle;
+
+    auto& prebuf_pingpong =
+        create_asset_rref<Texture2D>("prebuffer_pingpong_texture")
+            .$_configure(no_mipmap)
+            .$_init(ssao_tex_param_config)
+            .$_configure(ssao_tex_data_config);
+    prebuf_pingpong_h = prebuf_pingpong.handle;
+
+    prebuffer
+        .$_init(scr_size, 2)
+        .$_bind()
+        .$_add_color_attachment(prebuf_ssao)
+        .$_add_color_attachment(prebuf_pingpong)
+        .finalize();
+
     gfx::reset_framebuffer();
+
+    ssao_shader_h = 
+        create_init_asset_rref<ShaderProgram>("ssao_shader")
+            .$_attach_shader_file(ShaderType::Vert, "pass_vert.glsl")
+            .$_attach_shader_file(ShaderType::Frag, "ssao_frag.glsl")
+            .$_link().handle;
+
+    ssao_gaussian_shader_h = 
+        create_init_asset_rref<ShaderProgram>("ssao_gaussian_shader")
+            .$_attach_shader_file(ShaderType::Vert, "pass_vert.glsl")
+            .$_attach_shader_file(ShaderType::Frag,
+                                  "twopass_ssao_gaussian_frag.glsl")
+            .$_link().handle;
+
+    auto& defbuf_ping =
+        create_asset_rref<Texture2D>("defbuffer_ping_texture")
+            .$_configure(no_mipmap)
+            .$_init(scr_size, GL_RGB, GL_RGB);
+    defbuf_ping_h = defbuf_ping.handle;
+
+    auto& defbuf_bloom =
+        create_asset_rref<Texture2D>("defbuffer_bloom_texture")
+            .$_configure(no_mipmap)
+            .$_init(scr_size, GL_RGB, GL_RGB);
+    defbuf_bloom_h = defbuf_bloom.handle;
+
+    auto& defbuf_pong =
+        create_asset_rref<Texture2D>("defbuffer_pong_texture")
+            .$_configure(no_mipmap)
+            .$_init(scr_size, GL_RGBA, GL_RGBA);
+    defbuf_pong_h = defbuf_pong.handle;
+
+    defbuffer
+        .$_init(scr_size, 3)
+        .$_bind()
+        .$_add_color_attachment(defbuf_pong)
+        .$_add_color_attachment(defbuf_pong)
+        .$_add_color_attachment(defbuf_bloom)
+        .finalize();
+
+    deffered_shader_h = 
+        create_init_asset_rref<ShaderProgram>("deferred_shader")
+            .$_attach_shader_file(ShaderType::Vert, "pass_vert.glsl")
+            .$_attach_shader_file(ShaderType::Frag, "deferred_frag.glsl")
+            .$_link().handle;
+
     gfx::stale_all_texture_slots();
-    
-    #endif
     vardump(gfx::error_message());
 }
 
+////////////////////////////////////////////////////////////////////////////
+
+
 PROTO_UPDATE {
+
     auto& ctx = *proto::context;
     float& time = ctx.clock.elapsed_time;
-    //u32 unit = (u32)(time * 3.0) % 32;
+    glDisable(GL_BLEND);
+    ctx.camera.position = vec3(1.0 * cos(time/40.0),1.65,7.0);
 
-    //if(ctx.texture_slots[unit].texture){
-    //    io::print(get_metadata(ctx.texture_slots[unit].texture)->name, '\r');
-    //} else {
-    //    io::print("invalid", '\r');
-    //}
-    //io::flush();
+    gfx::reset_framebuffer();
 
+    glClearColor(0.1f,0.1f,0.1f,1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glViewport(0, 0, ctx.window_size.x, ctx.window_size.y);
+
+    gfx::render_skybox(gfx::bind_texture(skybox_h));
+
+    // shadows
     #if 1
-   //gfx::unbind_all_texture_slots();
-    //gfx::debug_print_texture_slots();
-    ctx.camera.position = vec3(0.0,0.0,0.0);
+    gfx::bind_framebuffer(dirlight_shadowmap_buf);
+    glViewport(0, 0, dirlight_shadowmap_buf.size.x,
+                     dirlight_shadowmap_buf.size.y);
+    glClear(GL_DEPTH_BUFFER_BIT);
 
+    float tmp = 160.0;
+    mat4 model = mat4(1.0);
+    model = glm::scale(model, vec3(0.1));
+    model = glm::translate(model, vec3(0.0,-10.0,0.0));
+
+    mat4 dirlight_proj =
+        glm::ortho(-tmp, tmp, -tmp, tmp,
+                   dirlight_near, dirlight_far);  
+
+    sun_pos = -sun_dir  * 300.0f;
+    mat4 dirlight_view =
+        glm::lookAt(sun_pos, sun_pos + sun_dir, 
+                    vec3( 0.0f, 1.0f, 0.0f)); 
+
+    mat4 dirlight_mvp = dirlight_proj * dirlight_view * model;
+    mat4 dirlight_vp = dirlight_proj * dirlight_view ;
+
+    get_asset_ref<ShaderProgram>(dirlight_shadowmap_shader_h)
+            .$_use()
+            .$_set_mat4 ("u_mvp", &dirlight_mvp);
+
+    //gfx::render_scene(true);
+    gfx::render_mesh(&ctx.meshes[2]);
+
+    #endif
+    // gbuf
     gfx::bind_framebuffer(gbuffer);
     glViewport(0, 0, ctx.window_size.x, ctx.window_size.y);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     gfx::render_gbuffer();
+
+    gfx::bind_framebuffer(prebuffer);
+    glViewport(0, 0, ctx.window_size.x, ctx.window_size.y);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glDrawBuffer(GL_COLOR_ATTACHMENT0);
+
+    glDisable(GL_DEPTH_TEST);
+
+    mat4 projection = ctx.camera.projection();
+    mat4 view = ctx.camera.view();
+    mat4 ssao_mvp = projection * view;
+
+    vec2 scr_size = (vec2)ctx.window_size;
+    auto ssao_shader =
+        get_asset_ref<ShaderProgram>(ssao_shader_h)
+            .$_use()
+            .$_set_mat4  ("u_mvp",            &ssao_mvp)
+            .$_set_float ("u_time",           time)
+            .$_set_float ("u_radius",         2.5f)
+            .$_set_mat4  ("u_projection",     &projection)
+            .$_set_mat4  ("u_view",           &view)
+            .$_set_vec2  ("u_resolution",     &scr_size)
+            .$_set_tex2D ("gbuf.position",    gbuf_position_h)
+            .$_set_tex2D ("gbuf.normal",      gbuf_normal_h)
+            .$_set_tex2D ("gbuf.depth",       gbuf_depth_h)
+            .$_set_tex2D ("u_noise",          ssao_noise_h);
+
+    char uniform_name[128];
+    for(u32 i=0; i<ssao_kernel.size(); i++) {
+        sprint(uniform_name, 128, "kernel[", i, ']');
+        ssao_shader.set_vec3(uniform_name, &ssao_kernel[i]);
+    }
+    gfx::render_quad();
+
+    s32 blur = 3;
+    #if 1
+
+    auto& ssao_gaussian_shader = 
+        get_asset_ref<ShaderProgram>(ssao_gaussian_shader_h);
+    
+    glDrawBuffer(GL_COLOR_ATTACHMENT1);
+    ssao_gaussian_shader
+        .$_use()
+        .$_set_int   ("u_mode",           0)
+        .$_set_float ("u_time",           time)
+        .$_set_int   ("u_size",           blur)
+        .$_set_float ("u_cam_far",        ctx.camera.far)
+        .$_set_float ("u_cam_near",       ctx.camera.near)
+        .$_set_mat4  ("u_projection",     &projection)
+        .$_set_vec2  ("u_resolution",     &scr_size)
+        .$_set_tex2D ("u_depth",          gbuf_depth_h)
+        .$_set_tex2D ("u_tex",            prebuf_ssao_h);
+    gfx::render_quad();
+
+    glDrawBuffer(GL_COLOR_ATTACHMENT0);
+    ssao_gaussian_shader
+        .$_use()
+        .$_set_int   ("u_mode",           1)
+        .$_set_tex2D ("u_tex",            prebuf_pingpong_h);
+    gfx::render_quad();
+    #endif
+
+    gfx::bind_framebuffer(defbuffer);
+
+    glDrawBuffer(GL_COLOR_ATTACHMENT0);
+
+    auto deffered_shader =
+        get_asset_ref<ShaderProgram>(deffered_shader_h)
+            .$_use()
+            .$_set_int   ("u_size",           blur)
+            .$_set_float ("u_cam_far",        ctx.camera.far)
+            .$_set_float ("u_cam_near",       ctx.camera.near)
+            .$_set_mat4  ("u_projection",     &projection)
+            .$_set_vec2  ("u_resolution",     &scr_size)
+            .$_set_tex2D ("gbuf.position",    gbuf_position_h)
+            .$_set_tex2D ("gbuf.normal",      gbuf_normal_h)
+            .$_set_tex2D ("gbuf.albedo_spec", gbuf_albedo_spec_h)
+            .$_set_tex2D ("gbuf.depth",       gbuf_depth_h)
+            .$_set_tex2D ("gbuf.ssao",        prebuf_ssao_h)
+            .$_set_tex2D ("u_dirlight[0].shadow_map", dirlight_shadowmap_h)
+            .$_set_mat4  ("u_dirlight[0].matrix",    &dirlight_vp)
+            .$_set_float ("u_dirlight[0].far",       dirlight_far)
+            .$_set_vec3  ("u_dirlight[0].direction", &sun_dir)
+            .$_set_vec3  ("u_dirlight[0].color",     &sun_color)
+            .$_set_float ("u_dirlight[0].intensity", 0.8f);
+
+
+    gfx::render_quad();
+
     gfx::reset_framebuffer();
 
     get_asset_ref<ShaderProgram>(ctx.quad_shader_h).use();
     vec2 halfscr = (vec2)ctx.window_size/2.0f;
 
     glViewport(0, 0, ctx.window_size.x, ctx.window_size.y);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    gfx::render_quad(gfx::bind_texture(gbuf_position_h),
-                     vec2(0.0), halfscr);
-    gfx::render_quad(gfx::bind_texture(gbuf_normal_h),
-                     vec2(0.0, halfscr.y), halfscr);
-    gfx::render_quad(gfx::bind_texture(gbuf_albedo_h),
-                     vec2(halfscr.x, 0.0), halfscr);
-    gfx::render_quad(gfx::bind_texture(ctx.default_checkerboard_texture_h),
-                     vec2(halfscr.x, 0.0), halfscr);
-    gfx::stale_all_texture_slots();
+    #if 0
+    gfx::render_texture_quad(gfx::bind_texture(gbuf_depth_h),
+                             vec2(0.0), halfscr);
+
+    gfx::render_texture_quad(gfx::bind_texture(gbuf_albedo_spec_h),
+                             vec2(0.0, halfscr.y), halfscr);
+
+    gfx::render_texture_quad(gfx::bind_texture(gbuf_normal_h),
+                             vec2(halfscr.x, 0.0), halfscr);
+
+    gfx::render_texture_quad(gfx::bind_texture(gbuf_position_h),
+                             halfscr, halfscr);
+
+    #else 
+    //gfx::render_texture_quad(gfx::bind_texture(dirlight_shadowmap_h),
+    //                         vec2(0.0), 2.0f*halfscr);
+
+    glEnable(GL_BLEND);
+    gfx::render_texture_quad(gfx::bind_texture(defbuf_pong_h),
+                             vec2(0.0), 2.0f*halfscr);
     #endif
+    gfx::render_std_basis();
+
+    glEnable(GL_DEPTH_TEST);
+
+    gfx::stale_all_texture_slots();
 }
 
-PROTO_LINK {}
+#if 0 // framebuffers as handles
+PROTO_UNLINK {
+    // yeah, thats hacky
+    u64 preserved_data_size = &client_data_end - &client_data_begin;
+    void * preserved = context->memory.alloc(preserved_data_size);
 
-PROTO_UNLINK {}
+    memcpy(preserved, &client_data_begin, preserved_data_size);
+
+    (*context->client_preserved) = preserved;
+    context->client_preserved_size = preserved_data_size;
+}
+
+PROTO_LINK {
+    if(*context->client_preserved) {
+        u64 preserved_data_size = &client_data_end - &client_data_begin;
+    
+        if(preserved_data_size != context->client_preserved_size) {
+            debug_warn(debug::category::main,
+                       "Client data size changed between links, "
+                       "cannot retrieve preservedd data.");
+            return;
+        }
+
+        memcpy(&client_data_begin,
+               (*context->client_preserved),
+               preserved_data_size);
+
+        (*context->client_preserved) = nullptr;
+        context->client_preserved_size = 0;
+    }
+}
+#endif
 
 PROTO_CLOSE {}

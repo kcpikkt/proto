@@ -1,5 +1,6 @@
 #include "proto/core/string.hh"
 #include "proto/core/util/algo.hh"
+#include "proto/core/io.hh"
 
 namespace proto {
 
@@ -167,7 +168,7 @@ u32 strview_count(StringView str, char c) {
 
 bool strview_cmp(StringView fst, StringView snd) {
     if(fst.length() != snd.length()) return false;
-    u32 index = 0, len = fst.length();;
+    u32 index = 0, len = fst.length();
     while( *(fst.str() + index) == *(snd.str() + index) && index < len) index++;
     return (index == len);
 }

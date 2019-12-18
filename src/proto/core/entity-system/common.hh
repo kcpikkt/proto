@@ -76,7 +76,10 @@ struct Component {
 };
 
 struct TransformComp : Component {
-    vec3 position;
+    vec3 position = vec3(0.0f);
+    quat rotation;
+    // do not use nonuniform scale, I don't handle it yet (why whould you even)
+    vec3 scale = vec3(1.0f);
 };
 
 struct RenderMeshComp : Component {
