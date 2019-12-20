@@ -7,7 +7,7 @@ In this early stage it doesn't do all of that well yet but I was capable to pull
 ![70MB+ preview gif, may take a bit to load...](/prev0.gif)
 
 It uses IdTech-like architecture where game/demo is a dynamic library that can be hot-swapped at any time.
-It has its own asset file format - .past (.p(roto)a(s)sset?) which is basically just memory dump for faster loads
+It has its own asset file format - .past (.p(roto)as(sse)t?) which is basically just memory dump for faster loads
 and cli under src/tools, that currently serves just as an parser from external formats to pasts.
  
 # Dependencies
