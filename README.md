@@ -1,6 +1,6 @@
 # proto [![Build Status](https://travis-ci.org/kcpikkt/proto.svg?branch=master)](https://travis-ci.org/kcpikkt/proto)
 proto is my bottom-up apprach to building game/demo framework.
-It is supposed to handle everything from interfacing with the platform, input, timekeeping, memory managment, 
+It is supposed to handle everything from interfacing with the platform, input, timekeeping, memory managment
 to sound, rendering, entity-component system, asset managment and more.
 In this early stage it doesn't do all of that well yet but I was capable to pull off a small demo: [link](https://youtu.be/WClkKQ8i9xY)
 
