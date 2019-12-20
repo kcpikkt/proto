@@ -21,7 +21,7 @@ though is written with being multiplatform in mind.
 
 Scarce dependencies allow proto to be built with just simple makefile.
 
-make runtime - builds proto-runtime which takes path to client dynamic library it is supposed to run as its
+make runtime - builds proto-runtime which takes path to client dynamic library, it is supposed to run, as its
 first command line argument.
 ```sh
 $ make runtime
