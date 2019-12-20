@@ -11,21 +11,63 @@ namespace meta {
      */
 
     template <size_t ...Ns> struct Sequence{};
-    template <size_t ...Ns> struct SequenceGenerator;
+    template <size_t ...Ns> struct sequence_generator;
 
     template<size_t B, size_t N, size_t ...Ns>
-    struct SequenceGenerator<B, N, Ns...> {
-        using type = typename SequenceGenerator<B, N-1, N-1, Ns...>::type;
+    struct sequence_generator<B, N, Ns...> {
+        using type = typename sequence_generator<B, N-1, N-1, Ns...>::type;
     };
     template<size_t B, size_t ...Ns>
-    struct SequenceGenerator<B, B, Ns...> {
+    struct sequence_generator<B, B, Ns...> {
         using type = Sequence<Ns...>;
     };
 
-
     template <size_t B, size_t E>
-    using MakeSequence = typename SequenceGenerator<B,E>::type;
+    using make_sequence = typename sequence_generator<B,E>::type;
 
+    //constant
+    template<typename T,T Val>
+    struct constant {
+        constexpr static T value = Val;
+    };
+
+    using true_t = constant<bool, true>;
+    using false_t = constant<bool, false>;
+
+    // is_same (add variadic?)
+    template<typename A, typename B>
+    struct is_same : false_t {};
+
+    template<typename A>
+    struct is_same<A, A> : true_t {};
+
+    template<typename A, typename B>
+    inline constexpr auto is_same_v = is_same<A,B>::value;
+
+    // identity
+    template<typename T>
+    struct identity { using type = T; };
+
+    // conditional
+    template<bool, typename T, typename>
+    struct conditional : identity<T> {};
+
+    template<typename T, typename F>
+    struct conditional<false, T, F> : identity<F> {};
+
+    template<bool C, typename T, typename F>
+    using conditional_t = typename conditional<C,T,F>::type;
+
+    // conditional_value
+    template<typename T, bool, T true_val, T>
+    struct conditional_value : constant<T, true_val> {};
+
+    template<typename T, T true_val, T false_val>
+    struct conditional_value<T, false, true_val, false_val>
+        : constant<T, false_val> {};
+
+
+    // typelist
     struct typelist_void;
 
     template<typename...> struct _typelist;
@@ -38,13 +80,22 @@ namespace meta {
 
         constexpr static size_t size = sizeof...(Ts);
 
-        template<size_t I>
-        struct at {
-            using type =
-                typename std::tuple_element<I, std::tuple<Ts...>>::type;
+        template<size_t I, typename T, typename...Sub_Ts> 
+        struct at_helper {
+            using type = typename at_helper<I-1, Sub_Ts...>::type;
         };
-        // template<size_t I>
-        // using at_t = typename at<I>::type;
+
+        template<typename T, typename...Sub_Ts> 
+        struct at_helper<0, T, Sub_Ts...> {
+            using type = T;
+        };
+
+        template<size_t I>
+        using at = at_helper<I, Ts...>;
+       
+        template<size_t I>
+        using at_t = typename at<I>::type;
+
 
         template<typename...> struct sub;
 
@@ -56,18 +107,17 @@ namespace meta {
         template <size_t N>
         struct prefix {
             static_assert(size >= N);
-            using type = typename sub<MakeSequence<0, N>
+            using type = typename sub<make_sequence<0, N>
                                       >::type;
         };
 
-        // template <size_t N>
-        // using prefix = typename prefix<N>::type;
-
-
         template <size_t N>
+        using prefix_t = typename prefix<N>::type;
+
+               template <size_t N>
         struct suffix {
             static_assert(size >= N);
-            using type = typename sub<MakeSequence<size - N, size>
+            using type = typename sub<make_sequence<size - N, size>
                                       >::type;
         };
 
@@ -75,13 +125,13 @@ namespace meta {
             static_assert(size > 0);
             using type = typename at<0>::type;
         };
-        // using first_t = typename first::type;
+        using first_t = typename first::type;
 
         struct last {
             static_assert(size > 0);
             using type = typename at<size - 1>::type;
         };
-        // using last_t = typename last::type;
+        using last_t = typename last::type;
 
         template <typename...>
         struct append;
@@ -118,63 +168,34 @@ namespace meta {
         // template <typename... Ts>
         // using prepend_t = typename append<Ts...>::type;
 
-        template <typename...> struct index_of;
 
-        //basecase
-        template <typename T,
-                  typename ...Recursive_Ts,
-                  template <typename...> typename List>
-        struct index_of<T, T, List<Recursive_Ts...>>
-        {
-            constexpr static size_t value = List<Recursive_Ts...>::size;
+        template<typename...> struct index_of;
+
+        template<typename L, typename...Sub_Ts>
+        struct index_of<L, L, Sub_Ts...> {
+            constexpr static auto value = (size - sizeof...(Sub_Ts) - 1);
         };
 
-        template <typename T1,
-                  typename T2,
-                  typename ...Recursive_Ts,
-                  template <typename...> typename List>
-        struct index_of<T1, T2, List<Recursive_Ts...>>
-        {
-            using helper = typelist<Ts...>::prefix<List<Recursive_Ts...>::size - 1>;
-            using prefix_typelist = typename helper::type;
+        template<typename L, typename T, typename...Sub_Ts>
+        struct index_of<L, T, Sub_Ts...> {
+            constexpr static size_t value = index_of<L, Sub_Ts...>::value;
+        };
 
-            constexpr static size_t value =
-                index_of<T1,
-                        typename typelist<Recursive_Ts...>::last::type,
-                        prefix_typelist>::value;
+        template<typename T>
+        struct index_of<T> {
+            constexpr static auto value = index_of<T, Ts...>::value;
         };
 
         template <typename T>
-        struct index_of<T>
-        {
-            using helper = typelist<Ts...>::prefix<size - 1>;
-            using prefix_typelist = typename helper::type;
+        constexpr static auto index_of_v = index_of<T>::value;
 
-            constexpr static size_t value =
-                index_of<T,
-                        typename typelist<Ts...>::last::type,
-                        prefix_typelist>::value;
-        };
 
-        // template <typename ...Ts>
-        // using index_of_v = typename index_of<Ts...>::value;
     };
-
-    template<typename T,T Val>
-    struct constant {
-        constexpr static T value = Val;
-    };
-
-    using true_t = constant<bool, true>;
-    using false_t = constant<bool, false>;
 
     // what a shame that and is a keyword
 
     template<typename...> using void_t = void;
 
-    // identity
-    template<typename T>
-    struct identity { using type = T; };
 
     // negation
     template<typename T>
@@ -195,16 +216,6 @@ namespace meta {
 
     template<typename ...Ts>
     inline static constexpr auto conjunction_v = conjunction<Ts...>::value;
-
-    // is_same (add variadic?)
-    template<typename A, typename B>
-    struct is_same : false_t {};
-
-    template<typename A>
-    struct is_same<A, A> : true_t {};
-
-    template<typename A, typename B>
-    inline constexpr auto is_same_v = is_same<A,B>::value;
 
     // is_floating_point
     namespace internal {
@@ -288,11 +299,6 @@ namespace meta {
     template<typename T>
     inline static constexpr auto is_integer_v = is_integer<T>::value;
 
-    template<bool, typename T, typename>
-    struct conditional : identity<T> {};
-
-    template<typename T, typename F>
-    struct conditional<false, T, F> : identity<F> {};
     namespace internal {
         template<bool, typename T = void>
         struct enable_if {};
@@ -400,6 +406,25 @@ namespace meta {
 
     template<typename Base, typename Derived>
     inline static constexpr auto is_base_of_v = is_base_of<Base, Derived>::value;
+
+    // is_convertible
+    namespace internal {
+        template<typename To>
+        true_t is_convertible_test(To);
+
+        template<typename>
+        false_t is_convertible_test(...);
+
+        template<typename From, typename To>
+        using is_convertible = decltype(is_convertible_test<To>(declval<From>()));
+    }
+
+    template<typename A, typename B>
+    using is_convertible = internal::is_convertible<A, B>;
+
+    template<typename A, typename B>
+    inline static constexpr auto is_convertible_v = is_convertible<A, B>::value;
+
 
     // has_operator_*
 

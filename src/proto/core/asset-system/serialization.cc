@@ -7,6 +7,9 @@
 #include "proto/core/util/Buffer.hh"
 #include "proto/core/platform/api.hh"
 #include "proto/core/math/hash.hh"
+#include "proto/core/graphics/Cubemap.hh"
+
+#include "proto/core/graphics/gl.hh"
 
 namespace proto {
 namespace serialization {
@@ -32,7 +35,7 @@ namespace serialization {
             next_multiple(16, main_header_size) + 
             next_multiple(16, deps_size) + 
             next_multiple(16, asset->serialized_size());
-        
+
         buffer.data8 = (u8*)allocator->alloc(buf_size);
         assert(buffer.data8);
         assert((size_t)buffer.data % 16 == 0);
@@ -92,7 +95,6 @@ namespace serialization {
 
         serialize_specific_asset_to_buffer (asset, asset_buffer); 
 
-        vardump(main_header.data_offset);
         return buffer;
     }
 
@@ -116,7 +118,7 @@ namespace serialization {
     }
  
     template<>
-    void serialize_specific_asset_to_buffer<Texture>(Texture* texture,
+    void serialize_specific_asset_to_buffer<Texture2D>(Texture2D* texture,
                                                      MemBuffer buffer)
     {
         assert(buffer.size >= texture->serialized_size());
@@ -124,19 +126,127 @@ namespace serialization {
 
         u8 * texture_header_ptr = buffer.data8;
 
-        AssetHeader<Texture> texture_header = texture->serialization_header_map();
+        AssetHeader<Texture2D> texture_header = texture->serialization_header_map();
 
         u8 * texture_data_ptr = texture_header_ptr + texture_header.data_offset;
 
-        memcpy(texture_header_ptr, &texture_header, sizeof(AssetHeader<Texture>));
+        memcpy(texture_header_ptr, &texture_header, sizeof(AssetHeader<Texture2D>));
         memcpy(texture_data_ptr, texture->data, texture_header.data_size);
     }
+
+    template<>
+    void serialize_specific_asset_to_buffer<Cubemap>(Cubemap* cubemap,
+                                                     MemBuffer buffer)
+    {
+        assert(buffer.size >= cubemap->serialized_size());
+
+        assert(cubemap->data[0]); assert(cubemap->data[1]);
+        assert(cubemap->data[2]); assert(cubemap->data[3]);
+        assert(cubemap->data[4]); assert(cubemap->data[5]);
+
+        AssetHeader<Cubemap> cubemap_header = cubemap->serialization_header_map();
+
+        u8 * cubemap_header_ptr = buffer.data8;
+        u8 * cubemap_data_ptr = cubemap_header_ptr + cubemap_header.data_offset;
+
+        memcpy(cubemap_header_ptr, &cubemap_header, sizeof(AssetHeader<Cubemap>));
+
+        u64 one_side_size = cubemap_header.data_size / 6;
+        u8 * rt_data_ptr = cubemap_data_ptr;
+        u8 * lf_data_ptr = rt_data_ptr + one_side_size;
+        u8 * up_data_ptr = lf_data_ptr + one_side_size;
+        u8 * dn_data_ptr = up_data_ptr + one_side_size;
+        u8 * fw_data_ptr = dn_data_ptr + one_side_size;
+        u8 * bk_data_ptr = fw_data_ptr + one_side_size;
+
+        memcpy(rt_data_ptr, cubemap->data[0], one_side_size);
+        memcpy(lf_data_ptr, cubemap->data[1], one_side_size);
+        memcpy(up_data_ptr, cubemap->data[2], one_side_size);
+        memcpy(dn_data_ptr, cubemap->data[3], one_side_size);
+        memcpy(fw_data_ptr, cubemap->data[4], one_side_size);
+        memcpy(bk_data_ptr, cubemap->data[5], one_side_size);
+    }
+ 
  
     template<typename T>
     void deserialize_specific_asset_buffer(T * asset, MemBuffer buffer);
 
     template<>
-    void deserialize_specific_asset_buffer<Mesh>(Mesh * mesh, MemBuffer buffer) {
+    void deserialize_specific_asset_buffer<Texture2D>(Texture2D * texture,
+                                                      MemBuffer buffer)
+    {
+        assert(texture);
+        AssetHeader<Texture2D> texture_header;
+        u64 texture_header_size = sizeof(AssetHeader<Texture2D>);
+        memcpy(&texture_header, buffer.data, texture_header_size);
+
+        u8 * tex_data_ptr = buffer.data8 + texture_header.data_offset;
+
+        memory::Allocator * allocator = &context->memory;
+        void * data = allocator->alloc(texture_header.data_size);
+        assert(data);
+        texture->data = data;
+        texture->_allocator = allocator;
+        texture->channels = texture_header.channels;
+        texture->format = texture_header.format;
+        texture->gpu_format = texture_header.gpu_format;
+        texture->size = texture_header.size;
+
+        assert(texture_header.data_size == texture->serialized_data_size());
+
+        memcpy(texture->data, tex_data_ptr, texture_header.data_size);
+        // NOTE(kacper): here memory is not freed, it should be freed after
+        //               gfx::gpu_upload(). Allocator is known since it is pointed
+        //               by Texture2D::_allocator but idk if it is good idea.
+        //               Perhaps there will be just one texture staging allocator
+        //               for that known globally.
+        // allocator->free(data);
+    }
+
+    template<>
+    void deserialize_specific_asset_buffer<Cubemap>(Cubemap * cubemap,
+                                                    MemBuffer buffer)
+    {
+        assert(cubemap);
+        AssetHeader<Cubemap> cubemap_header;
+        u64 cubemap_header_size = sizeof(AssetHeader<Cubemap>);
+        memcpy(&cubemap_header, buffer.data, cubemap_header_size);
+
+        u8 * tex_data_ptr = buffer.data8 + cubemap_header.data_offset;
+
+        memory::Allocator * allocator = &context->memory;
+        void * data = allocator->alloc(cubemap_header.data_size);
+        assert(data);
+        cubemap->channels = cubemap_header.channels;
+        cubemap->format = cubemap_header.format;
+        cubemap->gpu_format = cubemap_header.gpu_format;
+        cubemap->size = cubemap_header.size;
+
+        u64 one_side_size = cubemap_header.data_size / 6;
+
+        // TODO(kacper): reorder when parsing
+        cubemap->data[4] = data;
+        cubemap->data[5] = (u8*)cubemap->data[4] + one_side_size;
+        cubemap->data[2] = (u8*)cubemap->data[5] + one_side_size;
+        cubemap->data[3] = (u8*)cubemap->data[2] + one_side_size;
+        cubemap->data[0] = (u8*)cubemap->data[3] + one_side_size;
+        cubemap->data[1] = (u8*)cubemap->data[0] + one_side_size;
+
+        assert(cubemap_header.data_size == cubemap->serialized_data_size());
+
+        memcpy(data, tex_data_ptr, cubemap_header.data_size);
+        // NOTE(kacper): here memory is not freed, it should be freed after
+        //               gfx::gpu_upload(). Allocator is known since it is pointed
+        //               by Texture2D::_allocator but idk if it is good idea.
+        //               Perhaps there will be just one texture staging allocator
+        //               for that known globally.
+        // allocator->free(data);
+    }
+ 
+    template<>
+    void deserialize_specific_asset_buffer<Mesh>(Mesh * mesh,
+                                                 MemBuffer buffer)
+    {
         AssetHeader<Mesh> mesh_header;
         u64 mesh_header_size = sizeof(AssetHeader<Mesh>);
         memcpy(&mesh_header, buffer.data, mesh_header_size);
@@ -170,10 +280,15 @@ namespace serialization {
             //    assert(asset);
             //    deserialize_specific_asset_buffer(asset, buffer);
             //} break;
-        case AssetType<Texture>::index: {
-            //Texture * asset = get_asset<Texture>(handle);
-            //assert(asset);
-            //deserialize_specific_asset_buffer(asset, buffer);
+        case AssetType<Texture2D>::index: {
+            Texture2D * asset = get_asset<Texture2D>(handle);
+            assert(asset);
+            deserialize_specific_asset_buffer(asset, buffer);
+        } break;
+        case AssetType<Cubemap>::index: {
+            Cubemap * asset = get_asset<Cubemap>(handle);
+            assert(asset);
+            deserialize_specific_asset_buffer(asset, buffer);
         } break;
         default: {
             assert(0);
@@ -188,8 +303,12 @@ namespace serialization {
         assert(main_header.signature == asset_file_signature);
 
         AssetHandle handle =
-            create_asset((const char*)main_header.name, "",
-                         main_header.handle.type);
+            create_init_asset((const char*)main_header.name, 
+                               main_header.handle.type);
+
+        if(handle.type == AssetType<Mesh>::index) {
+            assert(get_asset<Mesh>(handle)->State::is_initialized());
+        }
         assert(handle = main_header.handle);
 
         AssetMetadata *  metadata = get_metadata(handle);
@@ -211,6 +330,7 @@ namespace serialization {
 
             metadata->deps[i] = serialized_dep->handle;
         }
+
         u8 * asset_header_ptr = buffer.data8 + main_header.data_offset;
         u64 asset_data_size = (buffer.data8 + buffer.size) - asset_header_ptr;
         MemBuffer asset_buffer = {.data8 = asset_header_ptr,
@@ -243,11 +363,12 @@ namespace serialization {
         return 0;
     }
     template int save_asset<Mesh>(Mesh*, const char*, AssetContext*);
-    template int save_asset<Texture>(Texture*, const char*, AssetContext*);
+    template int save_asset<Texture2D>(Texture2D*, const char*, AssetContext*);
+    template int save_asset<Cubemap>(Cubemap*, const char*, AssetContext*);
 
     int save_asset(AssetHandle handle,
                    const char * path,
-                   AssetContext * context )
+                   [[maybe_unused]]AssetContext * context )
     {
         switch(handle.type){
         case AssetType<Mesh>::index: {
@@ -260,8 +381,13 @@ namespace serialization {
             //    assert(asset);
             //    return save_asset(asset, path);
             //} break;
-        case AssetType<Texture>::index: {
-            Texture * asset = get_asset<Texture>(handle);
+        case AssetType<Texture2D>::index: {
+            Texture2D * asset = get_asset<Texture2D>(handle);
+            assert(asset);
+            return save_asset(asset, path);
+        } break;
+        case AssetType<Cubemap>::index: {
+            Cubemap * asset = get_asset<Cubemap>(handle);
             assert(asset);
             return save_asset(asset, path);
         } break;
@@ -272,41 +398,12 @@ namespace serialization {
         return -1;
     }
 
-        //template<typename T>
-    //int create_asset_tree_savelist_rec(T * asset,
-    //                                   StringView path,
-    //                                   AssetContext * asset_context)
-    //{
-    //    assert(asset);
-    //    AssetMetadata * metadata = get_metadata(asset->handle);
-
-    //    int ret;
-    //    for(u32 i=0; i<metadata->deps.size(); i++) {
-    //        //TODO(kacper): do not ignore recursive ret value?
-    //        save_asset_tree_rec(metadata->deps[i], path, asset_context);
-    //    }
-
-    //    char filename[PROTO_ASSET_MAX_PATH_LEN];
-    //    strview_copy(filename, metadata->name);
-    //    strview_cat(filename,  AssetType<T>::name);
-    //    strview_cat(filename,  ".past");
-
-    //    char outfilepath[PROTO_ASSET_MAX_NAME_LEN];
-    //    strview_copy(outfilepath, path);
-    //    platform::path_ncat(outfilepath, filename, PROTO_ASSET_MAX_PATH_LEN);
-
-    //    io::println(outfilepath);
-    //    return 0;
-    //        //save_asset(asset,)
-    //}
-
-
     int save_asset_tree_rec(AssetHandle handle,
                             StringView dirpath,
                             AssetContext * asset_context)
     {
         assert(asset_context);
-        AssetContext & ctx = *asset_context;
+        //AssetContext & ctx = *asset_context;
         namespace sys = proto::platform;
         // TODO(kacper): access check file exists
 
@@ -328,8 +425,7 @@ namespace serialization {
         char filepath[PROTO_ASSET_MAX_PATH_LEN];
         for(u32 i=0; i<savelist.size(); i++) {
             AssetMetadata * metadata = get_metadata(savelist[i]);
-
-            strview_copy(filepath, dirpath);
+                   strview_copy(filepath, dirpath);
             sys::path_ncat(filepath, metadata->name, PROTO_ASSET_MAX_PATH_LEN);
             strview_cat(filepath, "_");
             strview_cat(filepath, AssetType(savelist[i]).name);
@@ -344,9 +440,12 @@ namespace serialization {
 
 
     AssetHandle load_asset_dir(StringView path,
-                               AssetContext * context)
+                               AssetContext * asset_context)
     {
         namespace sys = proto::platform;
+
+        log_info(debug::category::data,
+                 "Loading assets from directory ", path);
         AssetHandle ret = invalid_asset_handle;
         auto filenames = sys::ls(path);
         for(auto filename : filenames) {
@@ -355,9 +454,10 @@ namespace serialization {
 
             // NOTE(kacper): remember strcmp is stupid
             if(ext.length() == 4 && !strncmp("past", ext, ext.length())) {
+
                 strview_copy(asset_path, path);
                 sys::path_ncat(asset_path, filename, 256);
-                ret = load_asset(asset_path, context);
+                ret = load_asset(asset_path, asset_context);
             }
         }
         return invalid_asset_handle;
@@ -365,9 +465,9 @@ namespace serialization {
  
 
     AssetHandle load_asset(StringView path,
-                           AssetContext * context)
+                           [[maybe_unused]]AssetContext * context)
     {
-        AssetContext & ctx = *context;
+        //AssetContext & ctx = *context;
         namespace sys = proto::platform;
         assert(!strncmp(sys::extension_substr(path), "past", 4));
         sys::File file;

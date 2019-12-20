@@ -6,11 +6,17 @@
 
 
 #include "proto/core/common/types.hh"
+#include "proto/core/util/Bitfield.hh"
 #include "proto/core/event-system.hh"
 namespace proto {
 
 const static char * ascii =
     " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
+
+
+struct KeyState : Bitfield<u8> {
+    constexpr static u8 pressed_bit = BIT(0);
+};
 
 struct KeyEvent {
     //    u32 device;
@@ -18,16 +24,25 @@ struct KeyEvent {
     u32 code;
 };
 
-struct MouseEvent {
+struct MouseMoveEvent {
     vec2 coord;
     vec2 delta;
 };
 
+struct MouseButtonEvent {
+    vec2 coord;
+    vec2 delta;
+};
+
+
 using KeyInputChannel = Channel<KeyEvent>;
 using KeyInputSink = Sink<KeyEvent>;
 
-using MouseInputChannel = Channel<MouseEvent>;
-using MouseInputSink = Sink<MouseEvent>;
+using MouseMoveInputChannel = Channel<MouseMoveEvent>;
+using MouseMoveInputSink = Sink<MouseMoveEvent>;
+
+using MouseButtonInputChannel = Channel<MouseButtonEvent>;
+using MouseButtonInputSink = Sink<MouseButtonEvent>;
 
 namespace input {
 

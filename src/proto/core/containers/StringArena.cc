@@ -5,7 +5,7 @@
 
 namespace proto {
 void StringArena::_move(StringArena&& other) {
-    DataholderBase::dataholder_move(meta::forward<StringArena>(other));
+    StateBase::state_move(meta::forward<StringArena>(other));
     _data = other._data;
     _cursor = other._cursor;
     _capacity = other._capacity;
@@ -17,11 +17,11 @@ void StringArena::_move(StringArena&& other) {
 StringArena::StringArena() {} // noop, uninitialized state
 
 StringArena::StringArena(StringArena&& other) {
-    _move(meta::forward<StringArena>(other));
+    _move(meta::move(other));
 }
 
 StringArena& StringArena::operator=(StringArena&& other) {
-    _move(meta::forward<StringArena>(other));
+    _move(meta::move(other));
     return *this;
 }
 
@@ -30,7 +30,7 @@ void StringArena::init(memory::Allocator * allocator) {
 }
 
 void StringArena::init(u64 init_capacity, memory::Allocator * allocator) {
-    DataholderBase::dataholder_init();
+    StateBase::state_init();
     assert(allocator);
     _allocator = allocator;
 
@@ -76,12 +76,13 @@ StringView StringArena::operator[](u64 index) {
 }
 
 void StringArena::reserve(u64 new_capacity) {
-    //FIXME(kacper): repoint StringView pointers...
-    //               or implemenet offset based StringView
+    assert(_cursor >= _data);
+    assert((_data + _capacity) >= _cursor);
+
     assert(_allocator);
     if(new_capacity <= _capacity) return;
 
-    u64 bufsz = new_capacity * sizeof(u8);
+    u64 bufsz = new_capacity * sizeof(char);
     assert(bufsz);
 
     u64 cursor_offset = _cursor - _data;
@@ -97,6 +98,13 @@ void StringArena::reserve(u64 new_capacity) {
 }
 void StringArena::grow(u64 least_capacity) {
     reserve(2*least_capacity);
+}
+
+bool StringArena::contains(StringView lookup) {
+    for(auto str : *this)
+        if(strview_cmp(str, lookup)) return true;
+
+    return false;
 }
 
 void StringArena::store(StringView str) {

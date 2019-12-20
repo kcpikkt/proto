@@ -1,52 +1,55 @@
-CXX := clang++
-CXXFLAGS := -std=c++17 -Wall -Wextra -g -Wno-unused-function -DPROTO_DEBUG 
+
+cxx ?= clang++
+cxxflags =  -fPIC -std=c++17 -Wall -Wextra -Wno-unused-function
+dllflags = -shared -rdynamic
+ldflags = 
+
+debug ?= 1
+
+ifeq ($(debug), 1)
+cppflags = -DDEBUG -DPROTO_DEBUG
+cxxflags += -g
+#rdynamic for function names in glibc backtrace()
+ldflags += -rdynamic
+endif
 
 ifeq ($(OS),Windows_NT)
-	PLATFORM := WINDOWS
-    CCFLAGS += -D WIN32
-    ifeq ($(PROCESSOR_ARCHITEW6432),AMD64)
-        CCFLAGS += -D AMD64
+	platform := WINDOWS
+    cppflags += -D WIN32
+    ifeq ($(PROCESSOR_ARCHITECTURE),AMD64)
+        cppflags += -D AMD64
     else
         ifeq ($(PROCESSOR_ARCHITECTURE),AMD64)
-            CCFLAGS += -D AMD64
+            cppflags += -D AMD64
         endif
         ifeq ($(PROCESSOR_ARCHITECTURE),x86)
-            CCFLAGS += -D IA32
+            cppflags += -D IA32
         endif
     endif
 else
-    UNAME_S := $(shell uname -s)
-    ifeq ($(UNAME_S),Linux)
-		PLATFORM := LINUX
-        CCFLAGS += -D LINUX
+    uname_s := $(shell uname -s)
+    ifeq ($(uname_s),Linux)
+		platform := LINUX
+        cppflags += -D LINUX
     endif
-    ifeq ($(UNAME_S),Darwin)
-		PLATFORM := OSX
-        CCFLAGS += -D OSX
+    ifeq ($(uname_s),Darwin)
+		platform := OSX
+        cppflags += -D OSX
     endif
-    UNAME_P := $(shell uname -p)
-    ifeq ($(UNAME_P),x86_64)
-        CCFLAGS += -D AMD64
+    uname_p := $(shell uname -p)
+    ifeq ($(uname_p),x86_64)
+        cppflags += -D AMD64
     endif
-    ifneq ($(filter %86,$(UNAME_P)),)
-        CCFLAGS += -D IA32
+    ifneq ($(filter %86,$(uname_p)),)
+        cppflags += -D IA32
     endif
-    ifneq ($(filter arm%,$(UNAME_P)),)
-        CCFLAGS += -D ARM
+    ifneq ($(filter arm%,$(uname_p)),)
+        cppflags += -D ARM
     endif
 endif
 
-
-ifeq ($(PLATFORM), LINUX)
-INCLUDES := -I src/ -I vendor/ -I src/tools/gl3w/include/
-LIBS := -L/usr/lib -lX11 -lGL -lGLX -lGLEW  -ldl
-LDFLAGS =  #-rpath /usr/local/lib --enable-new-dtags
-else ifeq ($(PLATFORM), WINDOWS)
-INCLUDES := -I src/  -I include
-LDFLAGS := -LC:/lib -lkernel32 -luser32 -lgdi32 -lopengl32
-endif
-
-ifeq ($(PLATFORM), LINUX)
+# todo get rid of that, no mercy for windows people, get unix tools, scrub!
+ifeq ($(platform), LINUX)
 define makedir
 	mkdir -p $(1)
 endef
@@ -57,7 +60,7 @@ define if-file-not-exist
 	if [ ! -f "$(1)" ]; then $(2); fi
 endef
 
-else ifeq ($(PLATFORM), WINDOWS)
+else ifeq ($(platform), WINDOWS)
 define winpath
 	$(subst /,\\,$(1))
 endef
@@ -80,120 +83,151 @@ endef
 
 endif
 
-GL_EXT_HEADERS := wglext.h wgl.h glext.h glxext.h glcorearb.h
-GL_EXT_DIR := include/gl
-GL_EXT = $(GL_EXT_HEADERS:%.h=$(GL_EXT_DIR)/%.h)
-GL_EXT_REPO_URL := https://www.khronos.org/registry/OpenGL/api/GL
+src_dir := src/proto
+obj_dir := obj
+ar_obj_dir := obj/ar
+bin_dir := bin
+lib_dir := lib
+test_src_dir := test
+vendor_dir := vendor
 
-SRCDIR := src/proto
-TESTSRCDIR := test
+ifeq ($(platform), LINUX)
+	runtime_name = proto-runtime
+	library_name = libproto.a
+	runtime      = $(bin_dir)/$(runtime_name)
+	library      = $(lib_dir)/$(library_name)
+	standalone   = $(bin_dir)/$(client_name)$($(client_name),-,proto-)standalone
 
-OBJDIR := obj
-VENDORDIR := vendor
-AROBJDIR := obj/ar
-BINDIR := bin
-LIBDIR := lib
-TESTDIR := test
+	proto_srcs = $(shell find $(src_dir) -name *.cc)
+	proto_objs := $(proto_srcs:$(src_dir)/%.cc=$(obj_dir)/%.o)
 
-LIBS += -L $(LIBDIR)
+	proto_runtime_objs = \
+		$(filter %/entry-point.o %-runtime.o, $(proto_objs))
+	proto_lib_objs = \
+		$(filter-out $(proto_runtime_objs), $(proto_objs))
+	proto_lib_ar_objs := \
+		$(addprefix $(ar_obj_dir)/,$(subst /,_,$(proto_lib_objs:$(obj_dir)/%.o=%.o)))
 
-#todo linux find regex
-ifeq ($(PLATFORM), LINUX)
-	SRCS = $(shell find $(SRCDIR) -name *.cc)
-	TESTSRCS = $(shell find $(TESTSRCDIR)/proto -name *.cc)
-	OBJS := $(SRCS:$(SRCDIR)/%.cc=$(OBJDIR)/%.o)
-	TESTOBJS := $(TESTSRCS:$(TESTSRCDIR)/proto/%.cc=$(OBJDIR)/test/%.o)
-	AROBJS := $(addprefix $(AROBJDIR)/,$(subst /,_,$(OBJS:$(OBJDIR)/%.o=%.o)))
-else ifeq ($(PLATFORM), WINDOWS)
-	SRCS = 													\
-		$(subst $(realpath .),.,							\
-		$(subst \,/,										\
-		$(shell dir /S /B /A:A $(call winpath, $(SRCDIR)) | \
-				findstr /I /R \\[a-zA-Z0-9_-]*\.cc$$ )))
+	proto_deps := $(proto_objs:.o=.d)
+
+	test_srcs = $(shell find $(test_src_dir)/proto -name *.cc)
+	test_objs := $(test_srcs:$(test_src_dir)/proto/%.cc=$(obj_dir)/test/%.o)
+
+	includes := -I src/ -I vendor/ -I vendor/gl3w/include/
+	libs := -L./lib -L/usr/lib -lX11 -lGL -lGLX -lGLEW  -ldl
 endif
 
-
-DEPS := $(OBJS:.o=.d)
-
-
-ifeq ($(PLATFORM), LINUX)
-RUNTIME_NAME = proto-runtime
-LIBRARY_NAME = libproto.a
-TEST_NAME = proto-test
-RUNTIME = $(BINDIR)/$(RUNTIME_NAME)
-LIBRARY = $(LIBDIR)/$(LIBRARY_NAME)
-TEST = $(BINDIR)/proto-test
-CATCH2GCH = $(VENDORDIR)/catch2/catch.hpp.gch
-else ifeq ($(PLATFORM), WINDOWS)
-RUNTIME_NAME = proto-runtime.exe
-LIBRARY_NAME = proto.lib
-RUNTIME = $(BINDIR) \$(RUNTIME_NAME)
-LIBRARY = $(LIBDIR)\$(LIBRARY_NAME)
+ifdef client_src_dir
+	client_srcs = $(shell find $(client_src_dir) -name *.cc)
+	client_obj_dir = $(client_src_dir)/obj
+	client_objs = $(client_srcs:$(client_src_dir)/%.cc=$(client_obj_dir)/%.o)
+	client_deps := $(client_objs:.o=.d)
 endif
 
-.PHONY: all
-all: runtime
+# TARGETS
 
 .PHONY: runtime
-runtime: $(RUNTIME)
+runtime: $(runtime)
 
 .PHONY: test
-test: $(TEST)
+test: $(test)
 
-.PHONY: demo
-demo:
-	$(eval OBJS_CLIENT = $(filter-out %-runtime.o, $(OBJS)))
-	$(CXX) -fPIC -std=c++17 -c -o src/demos/test/test.o \
-    src/demos/test/test.cc -I /shared/projects/proto/src $(INCLUDES)
-	$(CXX) -shared -o src/demos/test/libtest.so \
-	src/demos/test/test.o $(OBJS_CLIENT)
+.PHONY: standalone_setup
+standalone_setup:
+	$(eval cppflags += "-DPROTO_STANDALONE")
 
-#-rdynamic is for function names in stacktrace, debug only
-$(RUNTIME): $(LIBRARY) Makefile $(LIBRARY) demo
-	$(CXX) -g -rdynamic -o $@ $(LIBRARY) $(LIBS) $(LDFLAGS) 
+.PHONY: standalone
+standalone: standalone_setup runtime $(standalone)
 
-$(LIBRARY): $(OBJS) Makefile obj/gl3w.o
-	ar rcs $(LIBRARY) $(AROBJS) $(AROBJDIR)/gl3w.o
+.PHONY: client
+client: runtime $(client_objs) $(library)
+	$(if $(client_src_dir),,\
+	$(error Client sources directory path variable 'client_src_dir' is not set. ))
+	$(if $(client_name),,\
+	$(error Client dynamic library name 'client_name' is not set. ))
+	$(if $(client_srcs),,\
+	$(error No source files in $(client_src_dir) ))
 
-$(CATCH2GCH): $(VENDORDIR)/catch2/catch.hpp Makefile
-#	Precompilation of rather hefty catch2 header
-	$(CXX) -fPIC -D CATCH_CONFIG_MAIN $(CXXFLAGS) -c $< $(INCLUDES) -o $@
+#   While hot-swapping dl there runtime records that
+#   file changed and tries to fetch it before linker has written
+#   all of it, hence outputting to part. rename should to be atomic.
+	$(cxx) -fPIC $(dllflags) $(ldflags) -o $(bin_dir)/$(client_name).so.part \
+		$(client_objs) $(library) $(libs) $(client_libs)
+	mv $(bin_dir)/$(client_name).so.part $(bin_dir)/$(client_name).so
 
-$(TEST): $(OBJS) $(TESTOBJS)
-#	Filtering out entry-point as catch2 provide its own.
-# 	Alternatively recompile all OBJS with -D PROTO_MAIN=0
-	$(eval OBJS_NOENTRYPOINT = $(filter-out %/entry-point.o, $(OBJS)))
-	$(CXX) -rdynamic -o $@ $(OBJS_NOENTRYPOINT) $(TESTOBJS) $(LIBS) $(LDFLAGS) 
+	$(eval outfile = $(bin_dir)/run-$(client_name).sh)
 
-obj/gl3w.o: vendor/gl3w/src/gl3w.c
-	$(CXX) -fPIC $(CXXFLAGS) -MMD -MP -c $< $(INCLUDES) -o $@
-	cp $@ $(AROBJDIR)/$@
+#   NOTE(kacper): bit of a headache to write $@ to file in make... 
+#                 let me know if you have better idea how to do it.
+	@echo "#!/bin/bash" > $(outfile)
+	@echo "$(runtime) $(bin_dir)/$(client_name).so \"__dollar__at\"" >> $(outfile)
+	@sed -i '$ s/__dollar/$$/' $(outfile)
+	@sed -i '$ s/__at/@/' $(outfile)
+	@chmod +x $(bin_dir)/run-$(client_name).sh
 
-$(GL_EXT): $(GL_EXT_DIR)/%.h: Makefile 
-	$(call makedir, $(GL_EXT_DIR))
-	$(call if-file-not-exist, $@,						\
-		echo fetching $(notdir $@))
-	$(call if-file-not-exist, $@,						\
-		wget $(GL_EXT_REPO_URL)/$(notdir $@) -O $@)
+$(standalone): $(proto_runtime_objs) $(client_objs) $(library)
+	$(if $(client_src_dir),,\
+	$(error Client sources directory path variable 'client_src_dir' is not set. ))
+	$(if $(client_name),,\
+	$(error Client dynamic library name 'client_name' is not set. ))
+	$(if $(client_srcs),,\
+	$(error No source files in $(client_src_dir) ))
 
-$(TESTOBJS): $(OBJDIR)/test/%.o: $(TESTSRCDIR)/proto/%.cc
-	$(call makedir, $(dir $@))
-	$(CXX) -fPIC $(CXXFLAGS) -MMD -MP -c $< $(INCLUDES) -o $@
+	$(cxx) $(ldflags) -o $@ $(proto_runtime_objs) $(client_objs) $(library) $(libs) 
 
-$(OBJS): $(OBJDIR)/%.o: $(SRCDIR)/%.cc
+$(client_objs): $(client_obj_dir)/%.o: $(client_src_dir)/%.cc
 	@$(call makedir, $(dir $@))
-	$(CXX) -fPIC $(CXXFLAGS) -MMD -MP -c $< $(INCLUDES) -o $@
-	@$(call makedir, $(AROBJDIR) )
-	$(eval AROBJNAME := $(AROBJDIR)/$(subst /,_,$(@:$(OBJDIR)/%.o=%.o)))
-	cp $@ $(AROBJNAME)
+	$(cxx) -c -fPIC $(cxxflags) -MMD -MP $< $(includes) $(client_includes) -o $@
 
-$(OBJDIR)/glfw3.o: ./src/tools/gl3w/src/gl3w.c
-	gcc -MMD -MP -c $< $(INCLUDES) -o $@
+$(library): $(proto_lib_objs)
+	ar rcs $(library) $(proto_lib_ar_objs) 
 
+$(runtime): $(proto_runtime_objs) $(library) Makefile
+	$(cxx) $(ldflags) -o $@ $(proto_runtime_objs) $(library) $(libs) 
+
+#$(CATCH2GCH): $(VENDORDIR)/catch2/catch.hpp Makefile
+##	Precompilation of rather hefty catch2 header
+#	$(CXX) -fPIC -D CATCH_CONFIG_MAIN $(CXXFLAGS) -c $< $(INCLUDES) -o $@
+
+$(test): $(test_objs) $(library)
+#	Filtering out entry-point as catch2 provide its own.
+# 	Alternatively recompile all proto_objs with -DPROTO_MAIN=0
+	$(cxx) $(ldflags) -o $@ $(library) $(test_objs) $(libs)
+
+$(proto_runtime_objs): $(obj_dir)/%.o: $(src_dir)/%.cc
+	@$(call makedir, $(dir $@))
+	$(cxx) -fPIC $(cxxflags) $(cppflags) -MMD -MP -c $< $(includes) -o $@
+
+$(proto_lib_objs): $(obj_dir)/%.o: $(src_dir)/%.cc
+	@$(call makedir, $(dir $@))
+	$(cxx) -fPIC $(cxxflags) $(cppflags) -MMD -MP -c $< $(includes) -o $@
+# 	because ar is stupid
+	@$(call makedir, $(ar_obj_dir) )
+	$(eval ar_obj_name := $(ar_obj_dir)/$(subst /,_,$(@:$(obj_dir)/%.o=%.o)))
+	cp $@ $(ar_obj_name)
+
+$(test_objs): $(obj_dir)/test/%.o: $(test_src_dir)/proto/%.cc
+	$(call makedir, $(dir $@))
+	$(cxx) -fPIC $(cxxflags) $(cppflags) -MMD -MP -c $< $(includes) -o $@
+
+#obj/gl3w.o: vendor/gl3w/src/gl3w.c
+#	$(CXX) -fPIC $(CXXFLAGS) -MMD -MP -c $< $(INCLUDES) -o $@
+#	cp $@ $(AROBJDIR)/$@
+
+# TODO(kacper): auto downloading this stuff?
+# doesnt everybody have this alredy in /usr/lib?
+#$(GL_EXT): $(GL_EXT_DIR)/%.h: Makefile 
+#	$(call makedir, $(GL_EXT_DIR))
+#	$(call if-file-not-exist, $@,						\
+#		echo fetching $(notdir $@))
+#	$(call if-file-not-exist, $@,						\
+#		wget $(GL_EXT_REPO_URL)/$(notdir $@) -O $@)
 
 .PHONY: clean
 clean:
-	$(call remove, $(RUNTIME) $(OBJS) $(AROBJS) $(DEPS) $(TESTOBJS) $(CATCH2GCH) $(OBJDIR)/glfw3.o)
+	$(call remove, $(runtime) $(proto_objs) \
+		$(proto_ar_objs) $(proto_deps) $(TESTOBJS) \
+		$(client_objs) $(client_deps) $(CATCH2GCH) $(OBJDIR)/glfw3.o)
 
-
--include $(DEPS)
+-include $(proto_deps)
+-include $(client_deps)

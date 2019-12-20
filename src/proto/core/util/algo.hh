@@ -1,5 +1,6 @@
 #pragma once
 namespace proto {
+//TODO(kcaper): proper declval in SFINAE decltypes?
 
 template<typename A, typename B,
          typename HigherPrecType = decltype(A() + B()),
@@ -26,10 +27,18 @@ inline HigherPrecType clamp(A val, B minval = 0.0f, B maxval = 1.0f) {
     return max(minval, min(maxval, (HigherPrecType)val));
 }
 
-
-
 constexpr inline size_t next_multiple(size_t of, size_t val) {
     return val + (of - (val % of));
+}
+
+template<typename A, typename B,
+         typename HigherPrecType = decltype(A() + B()),
+         // SFINAE: same as above
+         typename = decltype(A() <  B()),
+         typename = decltype(A() >= B())> 
+bool belongs(A value, B lower, B upper) {
+    return ((HigherPrecType)value >= (HigherPrecType)lower &&
+            (HigherPrecType)value <  (HigherPrecType)upper);
 }
 
 } // namespace proto

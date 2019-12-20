@@ -19,6 +19,9 @@ namespace platform {
     static const char * indent = "    ";
     static const char * separator =
 "    ------------------------------------------------";
+
+#define PROTO_MAX_PATH 256
+
 #define PROTO_EXTERNAL extern "C"
 
 // SET CONTEXT
@@ -88,6 +91,48 @@ typedef PROTO_CLIENT_UPDATE_FUNCTION_SIGNATURE(ClientUpdateFunction);
 #define PROTO_UPDATE                                       \
     PROTO_EXTERNAL PROTO_CLIENT_UPDATE_FUNCTION_SIGNATURE \
 (PROTO_CLIENT_UPDATE_FUNCTION)
+
+// LINK
+// *******************************************************************
+#define PROTO_CLIENT_LINK_FUNCTION proto_client_link
+#define PROTO_CLIENT_LINK_FUNCTION_NAME PROTO_STR(PROTO_CLIENT_LINK_FUNCTION)
+
+#define PROTO_CLIENT_LINK_FUNCTION_SIGNATURE(NAME)  \
+    void NAME()
+
+typedef PROTO_CLIENT_LINK_FUNCTION_SIGNATURE(ClientLinkFunction);
+
+#define PROTO_LINK                                       \
+    PROTO_EXTERNAL PROTO_CLIENT_LINK_FUNCTION_SIGNATURE \
+(PROTO_CLIENT_LINK_FUNCTION)
+
+// UNLINK
+// *******************************************************************
+#define PROTO_CLIENT_UNLINK_FUNCTION proto_client_unlink
+#define PROTO_CLIENT_UNLINK_FUNCTION_NAME PROTO_STR(PROTO_CLIENT_UNLINK_FUNCTION)
+
+#define PROTO_CLIENT_UNLINK_FUNCTION_SIGNATURE(NAME)  \
+    void NAME()
+
+typedef PROTO_CLIENT_UNLINK_FUNCTION_SIGNATURE(ClientUnlinkFunction);
+
+#define PROTO_UNLINK                                       \
+    PROTO_EXTERNAL PROTO_CLIENT_UNLINK_FUNCTION_SIGNATURE \
+(PROTO_CLIENT_UNLINK_FUNCTION)
+
+// CLOSE
+// *******************************************************************
+#define PROTO_CLIENT_CLOSE_FUNCTION proto_client_close
+#define PROTO_CLIENT_CLOSE_FUNCTION_NAME PROTO_STR(PROTO_CLIENT_CLOSE_FUNCTION)
+
+#define PROTO_CLIENT_CLOSE_FUNCTION_SIGNATURE(NAME)  \
+    void NAME()
+
+typedef PROTO_CLIENT_CLOSE_FUNCTION_SIGNATURE(ClientCloseFunction);
+
+#define PROTO_CLOSE                                       \
+    PROTO_EXTERNAL PROTO_CLIENT_CLOSE_FUNCTION_SIGNATURE \
+(PROTO_CLIENT_CLOSE_FUNCTION)
 
 } // namespace platform
 } // namespace proto

@@ -17,19 +17,20 @@
 // proper dir structure
 // drop stl
 // drop glfw ?
-
-// TODO:
 // swap proto::debug::channel to proto::debug::category
 // proper logging api please
+// string_view?
+
+// TODO:
+// auto gpu uploads
 // variadic optional arguments to add_component ?
 // fortune's algorithm
 // ecs systems sync every frame
-// some handy debug UI?
+// some handy debug UI? IMGUI, stupid
 // fixed_array
 // allcators
 // font rasterization api
 // rewrite and integrate modular-glsl as a build tool
 // sound
-// string_view?
 // balancing, defragmentating anysize allocator
-// io::to_string<float>
+// to_string<float>

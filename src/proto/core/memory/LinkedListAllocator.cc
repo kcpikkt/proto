@@ -3,13 +3,30 @@
 #include "proto/core/debug/stacktrace.hh"
 #include "proto/core/util/bitfield.hh"
 #include "proto/core/util/algo.hh"
-#include <assert.h>
+#include "proto/core/debug/assert.hh"
+#include "proto/core/common/types.hh"
 
 #if defined(PROTO_DEBUG)
 #include "proto/core/io.hh"
 #endif
 
 using namespace proto::memory;
+
+namespace proto {
+void memdump(void * mem) {
+    u64 off = ((u64)mem)%16;
+    u8* line = (u8*)( ((u64)mem) - off - (16 * 8));
+    for(u8 i=0; i<17; i++) {
+        printf("%#010x: ", (u64)line);
+        for(u8 j=0; j<16; j++) {
+            printf( (i == 8 && j == off) ? "*" : " ");
+            printf("%02x", *(line+j));
+        }
+        line += 16;
+        puts("");
+    }
+}
+}
 
 void LinkedListAllocator::emplace_init_node()
 {
@@ -27,10 +44,10 @@ void LinkedListAllocator::emplace_init_node()
 
         u8 init_block_offset = ((byte*)init_block - (byte*)_arena);
 
-        assert( init_block_offset < _size );
+        proto_assert( init_block_offset < _size );
 
         init_header->size = _size - init_block_offset;
-        assert( init_header->size > _min_block_size );
+        proto_assert( init_header->size > _min_block_size );
 
         init_header->magic_number = header_magic_number;
         init_header->first_addr_byte = static_cast<byte>((size_t) init_block);
@@ -56,10 +73,10 @@ void LinkedListAllocator::emplace_init_node()
 
 int LinkedListAllocator::init(size_t init_size)
 {
-    assert(_arena == nullptr);
-    assert(_size  == 0);
+    proto_assert(_arena == nullptr);
+    proto_assert(_size  == 0);
 
-    assert(init_size > (2 * sizeof(Header) + _min_block_size));
+    proto_assert(init_size > (2 * sizeof(Header) + _min_block_size));
 
     _arena = (void*) malloc(init_size);
 
@@ -72,7 +89,7 @@ int LinkedListAllocator::init(size_t init_size)
         (max_alignment - 1);
 
     if(_arena) {
-        assert(is_aligned(_arena, max_alignment));
+        proto_assert(is_aligned(_arena, max_alignment));
         _size = init_size;
 
         emplace_init_node();
@@ -84,11 +101,11 @@ int LinkedListAllocator::init(size_t init_size)
 
 int LinkedListAllocator::init(void * mem, size_t size)
 {
-    assert(_arena == nullptr);
-    assert(_size  == 0);
+    proto_assert(_arena == nullptr);
+    proto_assert(_size  == 0);
 
-    assert(size > (2 * sizeof(Header) + _min_block_size));
-    assert(mem);
+    proto_assert(size > (2 * sizeof(Header) + _min_block_size));
+    proto_assert(mem);
 
     _arena = mem;
 
@@ -98,7 +115,7 @@ int LinkedListAllocator::init(void * mem, size_t size)
         (max_alignment - alignof(Header));
 
     if(_arena) {
-        assert(is_aligned(_arena, 16));
+        proto_assert(is_aligned(_arena, 16));
         _size = size;
 
         emplace_init_node();
@@ -109,6 +126,7 @@ int LinkedListAllocator::init(void * mem, size_t size)
 }
 
 int LinkedListAllocator::init(Allocator * other_allocator, size_t size){
+
     void * data = other_allocator->alloc(size);
     if(!data) {
         //TODO(kacper): print debug markers
@@ -134,10 +152,10 @@ void * LinkedListAllocator::alloc(size_t requested_size, size_t alignment)
     // default max alignment
     alignment = max_alignment;
 
-    assert(is_power_of_two(alignment));
-    assert(_arena != nullptr);
-    assert(_first != nullptr);
-    assert(_size  != 0);
+    proto_assert(is_power_of_two(alignment));
+    proto_assert(_arena != nullptr);
+    proto_assert(_first != nullptr);
+    proto_assert(_size  != 0);
 
     requested_size = max(requested_size, _min_block_size);
 
@@ -189,10 +207,10 @@ void * LinkedListAllocator::realloc(void * block,
 {
     Header * node = get_header(block);
 
-    assert(node);
-    assert(is_aligned(block, max_alignment));
-    assert(node->magic_number == header_magic_number);
-    assert(node->first_addr_byte == static_cast<byte>((size_t)block));
+    proto_assert(node);
+    proto_assert(is_aligned(block, max_alignment));
+    proto_assert(node->magic_number == header_magic_number);
+    proto_assert(node->first_addr_byte == static_cast<byte>((size_t)block));
 
     if(node->size >= requested_size)
         return block;
@@ -204,7 +222,7 @@ void * LinkedListAllocator::realloc(void * block,
     // previous in memory though it would be useful only in few
     // cases and I dont really think it is worth implementing.
     // But if so, then it should be last check because it would be heaviest.
-    if(node->next_in_mem) {
+    if(node->next_in_mem && false) {
 
         size_t expand_size = sizeof(Header) + node->next_in_mem->size;
 
@@ -220,7 +238,7 @@ void * LinkedListAllocator::realloc(void * block,
                 insert_sort(merged_node);
 
 
-            assert(get_block(merged_node) == block);
+            proto_assert(get_block(merged_node) == block);
 
 #if defined(PROTO_DEBUG)
             sanity_check();
@@ -275,22 +293,22 @@ LinkedListAllocator::try_split(Header * node,
         // aka go back to the first header aligned address behind the block
         new_node = get_header(new_block);
 
-        assert(new_node >= (void*)tmp_bcursor);
+        proto_assert(new_node >= (void*)tmp_bcursor);
 
         size_t padding = (byte*)new_node -
             ((byte*)block + needed_size);
 
         //printf("%zu %zu\n", requested_size, padding);
-        assert((needed_size + padding) % max_alignment == 0);
+        proto_assert((needed_size + padding) % max_alignment == 0);
 
-        assert(tmp_bcursor > (void*)block);
+        proto_assert(tmp_bcursor > (void*)block);
 
         new_node->size =
             ((byte*)block + node->size) - (byte*)new_block; // =residue?
 
         node->size = (byte*)new_node - (byte*)block;
 
-        assert(node->size == needed_size + padding);
+        proto_assert(node->size == needed_size + padding);
 
         new_node->next_in_mem = node->next_in_mem;
         node->next_in_mem = new_node;
@@ -309,7 +327,6 @@ LinkedListAllocator::try_split(Header * node,
         } else {
             _used -= new_node->size;
         }
-
         // NOTE(kacper): try_split does not check if split block is linked.
         //               Whether it was or not, if split was successful
         //               allocator is now in invalid state until node and new_node
@@ -320,9 +337,9 @@ LinkedListAllocator::try_split(Header * node,
 
 LinkedListAllocator::Header *
 LinkedListAllocator::merge_with_next_in_mem (Header * node) {
-    assert(node->magic_number == header_magic_number);
-    assert(node->next_in_mem);
-    assert(node->next_in_mem->flags & Header::FREE);
+    proto_assert(node->magic_number == header_magic_number);
+    proto_assert(node->next_in_mem);
+    proto_assert(node->next_in_mem->flags & Header::FREE);
     
     size_t expand_size = sizeof(Header) + node->next_in_mem->size;
 
@@ -352,9 +369,15 @@ LinkedListAllocator::merge_with_next_in_mem (Header * node) {
 void LinkedListAllocator::free(void * block) {
     Header * header = get_header(block);
 
-    assert(is_aligned(block, max_alignment));
-    assert(header->magic_number == header_magic_number);
-    assert(header->first_addr_byte == static_cast<byte>((size_t)block));
+    proto_assert(is_aligned(block, max_alignment));
+    proto_assert(header->magic_number == header_magic_number);
+    proto_assert(header->first_addr_byte == static_cast<byte>((size_t)block));
+
+    if(header->flags & Header::FREE) {
+        debug_warn(debug::category::memory,
+                   "Attempted to free already free memory.");
+    }
+
     bitfield_set(&header->flags, Header::FREE);
     _used -= header->size;
 
@@ -371,21 +394,21 @@ void LinkedListAllocator::free(void * block) {
 void LinkedListAllocator::unlink_node(Header * node,
                                       Header * prev)
 {
-    assert(node);
+    proto_assert(node);
     //if(_first == _last) {
-    //    assert(_first == node);
-    //    assert(!prev);
+    //    proto_assert(_first == node);
+    //    proto_assert(!prev);
     //    _first = nullptr;
     //    _last = nullptr;
     //    node->next = nullptr;
     //} else
     if(prev) {
-        assert(prev->next);
-        assert(prev->next == node);
-        assert(node != _first);
+        proto_assert(prev->next);
+        proto_assert(prev->next == node);
+        proto_assert(node != _first);
 
         if(node == _last) {
-            assert(node->next == nullptr);
+            proto_assert(node->next == nullptr);
             _last = prev;
         }
 
@@ -395,16 +418,16 @@ void LinkedListAllocator::unlink_node(Header * node,
         Header * prev_lookup = nullptr;
         Header * lookup = _first;
         do{
-            assert(lookup->magic_number == header_magic_number);
+            proto_assert(lookup->magic_number == header_magic_number);
 
             if(lookup == node){
                 if(prev_lookup) {
-                    assert(prev_lookup->next);
-                    assert(prev_lookup->next == node);
-                    assert(node != _first);
+                    proto_assert(prev_lookup->next);
+                    proto_assert(prev_lookup->next == node);
+                    proto_assert(node != _first);
 
                     if(node == _last) {
-                        assert(node->next == nullptr);
+                        proto_assert(node->next == nullptr);
                         _last = prev_lookup;
                     }
 
@@ -413,9 +436,9 @@ void LinkedListAllocator::unlink_node(Header * node,
                 }
 
                 if(lookup == _first) {
-                    assert(prev_lookup == nullptr);
+                    proto_assert(prev_lookup == nullptr);
                     if(lookup == _last) {
-                        assert(lookup->next == nullptr);
+                        proto_assert(lookup->next == nullptr);
                         _first = nullptr;
                         _last = nullptr;
                     } else {
@@ -430,17 +453,19 @@ void LinkedListAllocator::unlink_node(Header * node,
             lookup = lookup->next;
         } while(lookup);
         debug::stacktrace();
-        assert(0 && "tried to unlink non existing node" );
+        proto_assert(0 && "tried to unlink non existing node" );
     }
 }
+
 
 // NOTE(kacper): there is no reason, except for aesthetic, to not inline this code 
 LinkedListAllocator:: Header *
 LinkedListAllocator::find_free_node(size_t requested_size, Header ** prev_node){
-    assert(_first != nullptr);
+    proto_assert(_first != nullptr);
     Header * lookup = _first;
     do{
-        assert(lookup->magic_number == header_magic_number);
+        
+        proto_assert(lookup->magic_number == header_magic_number);
 
         if( (lookup->flags & Header::FREE) &&
             (lookup->size >= requested_size))
@@ -455,12 +480,12 @@ LinkedListAllocator::find_free_node(size_t requested_size, Header ** prev_node){
 }
 
 void LinkedListAllocator::insert_sort(Header * node) {
-    assert(node);
+    proto_assert(node);
 
-    assert(node->next == nullptr);
+    proto_assert(node->next == nullptr);
 
     if(!_first || !_last) {
-        assert(!_first && !_last);
+        proto_assert(!_first && !_last);
         _first = node;
         _last = node;
         return;
@@ -478,17 +503,17 @@ void LinkedListAllocator::insert_sort(Header * node) {
             inserted->next = lookup;
 
             if(lookup == _first) {
-                assert(prev_lookup == nullptr);
+                proto_assert(prev_lookup == nullptr);
                 _first = inserted;
             } else {
-                assert(prev_lookup->next == lookup);
+                proto_assert(prev_lookup->next == lookup);
                 prev_lookup->next = inserted;
             }
             node_inserted = true;
             break;
         }
 
-        assert(lookup != lookup->next);
+        proto_assert(lookup != lookup->next);
 
         prev_lookup = lookup;
         lookup = lookup->next;
@@ -496,7 +521,7 @@ void LinkedListAllocator::insert_sort(Header * node) {
 
     // no hit, push back
     if(!node_inserted) {
-        assert(inserted->next == nullptr);
+        proto_assert(inserted->next == nullptr);
         _last = (_last->next = inserted);
         _last->next = nullptr;
     }
@@ -511,35 +536,35 @@ bool LinkedListAllocator::is_linked(Header * node) {
     Header * lookup = _first;
     while(lookup){
         if(lookup == node) {
-            assert(node != _last || node->next == nullptr);
+            proto_assert(node != _last || node->next == nullptr);
             return true;
         }
         lookup = lookup->next;
     }
-    assert(node->next == nullptr);
-    assert(node != _last);
-    assert(node != _first);
+    proto_assert(node->next == nullptr);
+    proto_assert(node != _last);
+    proto_assert(node != _first);
     return false;
 }
 
 void LinkedListAllocator::insert_sort(Header * fst, Header * snd) {
-    assert(fst);
-    assert(snd);
-    assert(fst != snd);
+    proto_assert(fst);
+    proto_assert(snd);
+    proto_assert(fst != snd);
 
     // nodes have to be unlinked partial check
-    assert(fst->next == nullptr);
-    assert(snd->next == nullptr);
+    proto_assert(fst->next == nullptr);
+    proto_assert(snd->next == nullptr);
 
-    assert(!is_linked(fst));
-    assert(!is_linked(snd));
+    proto_assert(!is_linked(fst));
+    proto_assert(!is_linked(snd));
                                   
     Header * smaller = ( fst->size <= snd->size ? fst : snd);
     Header * bigger = ( fst->size <= snd->size ? snd : fst);
-    assert(smaller != bigger);
+    proto_assert(smaller != bigger);
 
     if(!_first || !_last) {
-        assert(!_first && !_last);
+        proto_assert(!_first && !_last);
         _first = smaller;
         _last = bigger;
         _first->next = _last;
@@ -556,17 +581,17 @@ void LinkedListAllocator::insert_sort(Header * fst, Header * snd) {
 
     //log_info(1, "sort");
     while(lookup != nullptr){
-        assert(lookup != inserted);
+        proto_assert(lookup != inserted);
 
         if(inserted->size <= lookup->size) {
             // insert
             inserted->next = lookup;
 
             if(lookup == _first) {
-                assert(prev_lookup == nullptr);
+                proto_assert(prev_lookup == nullptr);
                 _first = inserted;
             } else {
-                assert(prev_lookup->next == lookup);
+                proto_assert(prev_lookup->next == lookup);
                 prev_lookup->next = inserted;
             }
 
@@ -580,7 +605,7 @@ void LinkedListAllocator::insert_sort(Header * fst, Header * snd) {
                 break;
             }
         }
-        assert(lookup != lookup->next);
+        proto_assert(lookup != lookup->next);
 
         prev_lookup = lookup;
         lookup = lookup->next;
@@ -588,14 +613,14 @@ void LinkedListAllocator::insert_sort(Header * fst, Header * snd) {
 
     // no hit, push back
     if(!smaller_inserted) {
-        assert(smaller->next == nullptr);
-        assert(!bigger_inserted);
+        proto_assert(smaller->next == nullptr);
+        proto_assert(!bigger_inserted);
         _last = (_last->next = smaller);
         _last->next = nullptr;
     }
 
     if(!bigger_inserted) {
-        assert(bigger->next == nullptr);
+        proto_assert(bigger->next == nullptr);
         _last = (_last->next = bigger);
         _last->next = nullptr;
     }
@@ -607,11 +632,10 @@ void LinkedListAllocator::insert_sort(Header * fst, Header * snd) {
 
 #if defined(PROTO_DEBUG)
 void LinkedListAllocator::sanity_check() {
-    assert(_last->next == nullptr);
-    assert(_first != nullptr);
-    assert(_first_in_mem != nullptr);
-    assert(_last != nullptr);
-    assert(_last->next == nullptr);
+    proto_assert(_first != nullptr);
+    proto_assert(_first_in_mem != nullptr);
+    proto_assert(_last != nullptr);
+    proto_assert(_last->next == nullptr);
 
     size_t size_sum = 0;
     size_t used_sum = 0;
@@ -645,8 +669,9 @@ void LinkedListAllocator::sanity_check() {
                         "with an address of a previous node plus its total size");
         }
 
-        if(lookup->next_in_mem)
-            assert(lookup < lookup->next_in_mem);
+        if(lookup->next_in_mem) {
+            proto_assert(lookup < lookup->next_in_mem);
+        }
 
         prev_lookup = lookup;
         lookup = lookup->next_in_mem;
@@ -658,8 +683,8 @@ void LinkedListAllocator::sanity_check() {
     prev_lookup = nullptr;
     while(lookup) {
         if(lookup->next) {
-            assert(lookup != _last);
-            assert(lookup->size <= lookup->next->size);
+            proto_assert(lookup != _last);
+            proto_assert(lookup->size <= lookup->next->size);
         }
         prev_lookup = lookup;
         lookup = lookup->next;
@@ -692,7 +717,7 @@ void LinkedListAllocator::debug_print() {
     Header * prev_lookup = nullptr;
     printf("in mem view:\n");
     while(lookup) {
-        printf("%p (%zu)", (size_t)((byte*)lookup - (byte*)_arena),
+        printf("%#010x (%zu)", (size_t)lookup,
                lookup->size);
         if(lookup->flags & Header::FREE)
             printf(" free");

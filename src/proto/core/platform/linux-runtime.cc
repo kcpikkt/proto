@@ -1,14 +1,19 @@
 #include "proto/core/platform/common.hh"
 #if defined(PROTO_PLATFORM_LINUX)
 
+#include "proto/core/platform/OSAllocator.hh"
 #include "proto/core/platform/linux-clock.hh"
 #include "proto/core/graphics/common.hh"
 #include "proto/core/graphics/ShaderProgram.hh"
+#include "proto/core/graphics/primitives.hh"
+#include "proto/core/graphics/gl.hh"
 #include "proto/core/version.hh"
 #include "proto/core/debug/logging.hh"
 #include "proto/core/input.hh"
 #include "proto/core/asset-system/interface.hh"
+#include "proto/core/util/namespace-shorthands.hh"
 #include "proto/core/meta.hh"
+#include "proto/core/math/random.hh"
 #include "proto/core/context.hh"
 #include "proto/core/io.hh"
 
@@ -31,24 +36,26 @@
 #include <X11/Xlib.h>
 #include <X11/XKBlib.h>
 
+// switches
+#define DEFAULT_TEXTURES 1
+#define DEFAULT_SHADERS 1
+#define DEFAULT_MESHES 1
+
 void breakpoint() {};
 
 using namespace proto;
 using namespace proto::platform;
 namespace proto { Context * context = nullptr; };
 
-static PROTO_CLIENT_SETUP_FUNCTION_SIGNATURE
-(proto_client_setup_stub) {
-    puts("setup stub");
+static PROTO_CLIENT_SETUP_FUNCTION_SIGNATURE  (proto_client_setup_stub)  {}
+static PROTO_CLIENT_INIT_FUNCTION_SIGNATURE   (proto_client_init_stub)   {}
+static PROTO_CLIENT_UPDATE_FUNCTION_SIGNATURE (proto_client_update_stub) {
+    log_info(debug::category::main, "No update procedure provided, exiting.");
+    proto::context->exit_sig = true;
 }
-static PROTO_CLIENT_INIT_FUNCTION_SIGNATURE
-(proto_client_init_stub) {
-    puts("init stub");
-}
-static PROTO_CLIENT_UPDATE_FUNCTION_SIGNATURE
-(proto_client_update_stub) {
-    puts("update stub");
-}
+static PROTO_CLIENT_LINK_FUNCTION_SIGNATURE   (proto_client_link_stub)   {}
+static PROTO_CLIENT_UNLINK_FUNCTION_SIGNATURE (proto_client_unlink_stub) {}
+static PROTO_CLIENT_CLOSE_FUNCTION_SIGNATURE  (proto_client_close_stub)  {}
 
 //namespace proto { Context * context = nullptr; }
 
@@ -66,9 +73,11 @@ namespace platform {
 
 proto::ivec2 mouse_lock_pos = proto::ivec2(200,200);
 static void X_event_callback(XEvent& X_event) {
-    static MouseEvent prev_mouse_event{};
+    static MouseMoveEvent prev_mouse_move_event{};
+
     if(X_event.type == KeyPress || X_event.type == KeyRelease) {
         KeyEvent event;
+
         event.code =
             XkbKeycodeToKeysym(_context.display,
                                X_event.xkey.keycode, 0,
@@ -76,19 +85,23 @@ static void X_event_callback(XEvent& X_event) {
 
         _context.key_input_channel.emit(event);
     } else if(X_event.type == MotionNotify) {
-        MouseEvent event;
-
-                event.coord = proto::vec2(X_event.xmotion.x,
+        MouseMoveEvent event;
+        event.coord = proto::vec2(X_event.xmotion.x,
                                   X_event.xmotion.y);
 
-        event.delta = prev_mouse_event.coord - event.coord;
+        event.delta = prev_mouse_move_event.coord - event.coord;
 
-        prev_mouse_event = event;
+        prev_mouse_move_event = event;
 
         if(!(X_event.xmotion.x == mouse_lock_pos.x &&
              X_event.xmotion.y == mouse_lock_pos.y)) {
-            _context.mouse_input_channel.emit(event);
+            _context.mouse_move_input_channel.emit(event);
         }
+    } else if (X_event.type == ButtonPress || X_event.type == ButtonRelease) {
+        MouseButtonEvent event;
+        event.coord = proto::vec2(X_event.xbutton.x,
+                                  X_event.xbutton.y);
+        _context.mouse_button_input_channel.emit(event);
     } else if (X_event.type == ConfigureNotify) {
 
         if(_context.window_size.x != X_event.xconfigure.width &&
@@ -104,6 +117,8 @@ static void X_event_callback(XEvent& X_event) {
 }
 
 static void X_handle_events() {
+    XQueryKeymap(_context.display, _context.key_state);
+
     XEvent ev;
     while(XPending(_context.display)) {
         XNextEvent(_context.display, &ev);
@@ -126,11 +141,15 @@ typedef GLXFBConfig (*glXChooseFBConfigProc)
 RuntimeSettings settings;
 void * clientlib_h;
 
-int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** argv){
+int proto::platform::runtime(int argc, char ** argv){
 
     proto::context = &_context;
+    auto& ctx = _context;
 
+    ctx.argc = argc; ctx.argv = argv;
+    namespace mem = proto::memory;
 
+    // just for cmdline args
     /***************************************************************
      * RUNTIME SETUP
      */
@@ -140,6 +159,11 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
     assert(argc > 1);
     _context.clientlib_path = argv[1];
 
+    //_context.cmdline.init(argc, &tmp_presetup_memory);
+    //debug_info(1, ctx.cmdline.size());
+
+    //for(s32 i=0; i<argc; i++) _context.cmdline.store(argv[i]);
+
     // NOTE(kacper): here runtime first time opens dl to pass RuntimeSettings
     //               struct pointer to client_setup function, where client lib
     //               can setup some runtime startup settings.
@@ -148,6 +172,7 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
     //               reflected after hot-reload.
     ClientSetupFunction  * client_setup  = proto_client_setup_stub;
 
+    assert(_context.clientlib_path.is_cstring());
     clientlib_h = dlopen(_context.clientlib_path, RTLD_LAZY);
 
     const char * dlerr = dlerror();
@@ -160,18 +185,25 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
         dlsym(clientlib_h, PROTO_CLIENT_SETUP_FUNCTION_NAME);
     if(maybe_client_setup)
        DLSYM_ASSIGN( client_setup, maybe_client_setup );
+    else 
+        debug_warn(debug::category::main,
+                   "no setup function found in client library.");
 
     client_setup(&settings);
 
     /***************************************************************
      * OBTAINING WINDOW & OPENGL INITIALIZATION
      */
+    //bool window_mode = settings.mode.check(RuntimeSettings::window_mode_bit);
+    //bool opengl_mode = settings.mode.check(RuntimeSettings::opengl_mode_bit);
+    //meh, 
+    //assert(!(window_mode xor opengl_mode));
 
-    // NOTE(kacper):
-    // IMO I should not have to get addresses of those functions
-    // manually since they are GL 1.3, am I right?
-    // Though, even if those function pointers were already bound,
-    // it should still work so this only adds redundancy.
+        // NOTE(kacper):
+        // IMO I should not have to get addresses of those functions
+        // manually since they are GL 1.3, am I right?
+        // Though, even if those function pointers were already bound,
+        // it should still work so this only adds redundancy.
     glXChooseFBConfig =
         (PFNGLXCHOOSEFBCONFIGPROC) 
         glXGetProcAddress((const GLubyte*)"glXChooseFBConfig");
@@ -186,14 +218,14 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
 
     int glx_major, glx_minor;
     assert_info((glXQueryVersion( _context.display, &glx_major, &glx_minor ) && 
-                 glx_major == 1 && glx_minor > 2) ,
+                glx_major == 1 && glx_minor > 2) ,
                 proto::debug::category::main,
                 "Invalid GLX version");
 
     // So every linux window manager is actually just a root X window?
     Window root = DefaultRootWindow(_context.display);
 
-    _context.window_size = proto::ivec2(960,1024);
+    _context.window_size = proto::ivec2(1920,1024);
     mouse_lock_pos = _context.window_size/2;
 
     _context.window =
@@ -204,28 +236,32 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
 
     assert(_context.window);
     XSelectInput(_context.display,
-                 _context.window,
-                 StructureNotifyMask |
-                 PointerMotionMask |
-                 ExposureMask |
-                 KeyPressMask);
+                _context.window,
+                StructureNotifyMask |
+                PointerMotionMask |
+                ExposureMask |
+                KeyPressMask |
+                KeyReleaseMask |
+                ButtonPressMask);
 
     static int visual_attribs[] =
         {GLX_RENDER_TYPE, GLX_RGBA_BIT,
-         GLX_DRAWABLE_TYPE, GLX_WINDOW_BIT,
-         GLX_DOUBLEBUFFER, true,
-         GLX_RED_SIZE, 1,
-         GLX_GREEN_SIZE, 1,
-         GLX_BLUE_SIZE, 1,
-         GLX_DEPTH_SIZE, 3,
-         None
+        GLX_DRAWABLE_TYPE, GLX_WINDOW_BIT,
+        GLX_DOUBLEBUFFER, true,
+        GLX_RED_SIZE, 1,
+        GLX_GREEN_SIZE, 1,
+        GLX_BLUE_SIZE, 1,
+        GLX_DEPTH_SIZE, 3,
+        GLX_SAMPLE_BUFFERS  , 1, // MSAA
+        GLX_SAMPLES         , 4, // MSAA
+        None
         };
 
     int fbcount = 0;
 
     GLXFBConfig * fbc = glXChooseFBConfig(_context.display,
-                                          DefaultScreen(_context.display),
-                                          visual_attribs, &fbcount);
+                                        DefaultScreen(_context.display),
+                                        visual_attribs, &fbcount);
     // so visual is a bit like winapi pixel format, isn't it?
     XVisualInfo * visual = glXGetVisualFromFBConfig(_context.display, fbc[0]); 
     assert(visual);
@@ -243,12 +279,12 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
 
     static int context_attribs[] =
         {GLX_CONTEXT_MAJOR_VERSION_ARB, 4,
-         GLX_CONTEXT_MINOR_VERSION_ARB, 3,
-         None };
+        GLX_CONTEXT_MINOR_VERSION_ARB, 3,
+        None };
 
     GLXContext gl_context =
         glXCreateContextAttribsARB(_context.display, fbc[0], NULL, true,
-                                   context_attribs);
+                                context_attribs);
 
     assert(gl_context);
 
@@ -257,42 +293,37 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
                 "Could not match any framebuffer configuration");
 
 
-    XMapWindow(_context.display, _context.window);
+    if(settings.mode.check(RuntimeSettings::window_mode_bit))
+        XMapWindow(_context.display, _context.window);
+
     XStoreName(_context.display, _context.window, "proto!");
     glXMakeCurrent(_context.display, _context.window, gl_context);
 
-
-    log_info(proto::debug::category::main, separator);
-    log_info(proto::debug::category::main, indent,
-             "proto framework v",
-             PROTO_VERSION_MAJOR , ".",
-             PROTO_VERSION_MINOR , ".",
-             PROTO_VERSION_BUILD , ".",
-             PROTO_VERSION_REVISION);
-
-    log_info(proto::debug::category::main, indent,
-             "OpenGL " ,glGetString(GL_VERSION),
-             ", GLSL " ,glGetString(GL_SHADING_LANGUAGE_VERSION));
-
-    log_info(proto::debug::category::main, indent);
-
-    log_info(proto::debug::category::main, indent,
-             "client: ", _context.clientlib_path);
-
-    log_info(proto::debug::category::main, separator);
+    assert(!glGetError());
 
     glewExperimental = GL_TRUE;
     if(glewInit() != GLEW_OK)
         debug_error(proto::debug::category::main, "glewInit() failed.");
+    
 
-    glEnable(GL_BLEND);
-    //glEnable(GL_MULTISAMPLE);  
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
-    glViewport(0, 0, _context.window_size.x, _context.window_size.y);
+    log_info(proto::debug::category::main, separator);
+    log_info(proto::debug::category::main, indent,
+            "proto framework v",
+            PROTO_VERSION_MAJOR , ".",
+            PROTO_VERSION_MINOR , ".",
+            PROTO_VERSION_BUILD , ".",
+            PROTO_VERSION_REVISION);
 
-    assert(!glGetError());
+    log_info(proto::debug::category::main, indent,
+            "OpenGL " ,glGetString(GL_VERSION),
+            ", GLSL " ,glGetString(GL_SHADING_LANGUAGE_VERSION));
+
+    log_info(proto::debug::category::main, indent);
+
+    log_info(proto::debug::category::main, indent,
+            "client: ", _context.clientlib_path);
+
+    log_info(proto::debug::category::main, separator);
 
     //TODO(kacper): glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &texture_units)
 
@@ -300,7 +331,6 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
      * CONTEXT INITIALIZATION
      */
     // MEMORY
-    namespace mem = proto::memory;
 
     u64 _mem_size = mem::gigabytes(2);
     void * _mem = malloc(_mem_size);
@@ -321,14 +351,16 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
     _context.asset_metadata_allocator
         .init(&_context.memory, mem::megabytes(50));
 
-    _context.key_input_channel.init(100, &_context.memory);
-    _context.mouse_input_channel.init(100, &_context.memory);
+    _context.key_input_channel.init(10, &_context.memory);
+    _context.mouse_move_input_channel.init(10, &_context.memory);
+    _context.mouse_button_input_channel.init(10, &_context.memory);
 
     // INITS
     // OpenGLContext
     set_debug_marker(_context.meshes, "context.texture_slots",
-                     "local reflection of OpenGL texture units binding");
+                    "local reflection of OpenGL texture units binding");
     _context.texture_slots.init_resize(32, &_context.memory);
+    _context.texture_slots_index.init(32);
 
     // AssetContext
     //set_debug_marker(_context.assets, "context.assets", "main asset registry");
@@ -344,278 +376,271 @@ int proto::platform::runtime([[maybe_unused]]int argc,[[maybe_unused]] char ** a
     set_debug_marker(_context.textures, "context.textures", "main texture array");
     _context.textures.init(100, &_context.memory);
 
+    set_debug_marker(_context.cubemaps, "context.cubemaps", "main cubemaps array");
+    _context.cubemaps.init(10, &_context.memory);
+
+    set_debug_marker(_context.cubemaps, "context.shader_programs",
+                     "main shader_programs array");
+    _context.shader_programs.init(10, &_context.memory);
+
+    set_debug_marker(_context.textures, "context.framebuffers",
+                     "main framebufffer array");
+    _context.framebuffers.init(0, &_context.memory);
+
+    _context.entities.init(10, &_context.memory);
+    _context.comp.transform.init(10, &_context.memory);
+    _context.comp.render_mesh.init(10, &_context.memory);
+    _context.comp.pointlights.init(10, &_context.memory);
+
+
     // Context
 
-    if(settings.asset_paths &&
-       settings.asset_paths.length())
-    {
+    if(settings.asset_paths && settings.asset_paths.length()) {
         _context.asset_paths
             .init_split(settings.asset_paths, ':', &_context.memory);
-    } else {
+    } else
         _context.asset_paths.init(&_context.memory);
-        debug_warn(proto::debug::category::main,
-                   "Asset search paths have not been set.");
-    }
 
-    struct { u8 ch[4]; } emergency_texture_data[] =
+    if(settings.shader_paths && settings.shader_paths.length())
+        _context.shader_paths
+            .init_split(settings.shader_paths, ':', &_context.memory);
+    else 
+        _context.shader_paths.init(&_context.memory);
+
+    _context.shader_paths.store("src/proto/shaders");
+
+    // DEFAULT TEXTURES
+    struct { u8 ch[4]; } default_checkerboard_texture_data[] =
         {{ 255,   0, 255, 255}, { 255, 255, 255, 255},
          { 255, 255, 255, 255}, { 255,   0, 255, 255}};
 
-    _context.default_ambient_map =
-        create_asset("default_ambient_map", "",
-                     AssetType<Texture>::index);
-    _context.default_diffuse_map =
-        create_asset("default_diffuse_map", "",
-                     AssetType<Texture>::index);
-    _context.default_specular_map =
-        create_asset("default_specular_map", "",
-                     AssetType<Texture>::index);
+    struct { u8 ch[4]; } default_white_texture_data[] = {{ 255, 255, 255, 255}};
+    struct { u8 ch[4]; } default_black_texture_data[] = {{   0,   0,   0, 255}};
 
-    if(!_context.default_ambient_map) 
-        debug_warn(debug::category::main,
-                   "Could not create default_ambient_map");
+    Texture2D & default_white_texture =
+        create_asset_rref<Texture2D>("defualt_white_texture");
 
-    if(!_context.default_diffuse_map) 
-        debug_warn(debug::category::data,
-                   "Could not create default_diffuse_map");
+    default_white_texture.init(ivec2(1,1), GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
+    default_white_texture.data = (void*)default_white_texture_data;
+    graphics::gpu_upload(&default_white_texture);
+    _context.default_white_texture_h = default_white_texture.handle;
 
-    if(!_context.default_specular_map) 
-        debug_warn(debug::category::main,
-                   "Could not create default_specular_map");
+    Texture2D & default_black_texture =
+        create_asset_rref<Texture2D>("defualt_black_texture");
 
-    Texture * default_ambient_texture =
-        get_asset<Texture>(_context.default_ambient_map);
-    assert(default_ambient_texture);
-    default_ambient_texture->data = (void*)emergency_texture_data;
-    default_ambient_texture->size = ivec2(2,2);
-    default_ambient_texture->channels = 4;
+    default_black_texture.init(ivec2(1,1), GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
+    default_black_texture.data = (void*)default_black_texture_data;
+    graphics::gpu_upload(&default_black_texture);
+    _context.default_black_texture_h = default_black_texture.handle;
 
-    Texture * default_diffuse_texture =
-        get_asset<Texture>(_context.default_diffuse_map);
-    assert(default_diffuse_texture);
-    default_diffuse_texture->data = (void*)emergency_texture_data;
-    default_diffuse_texture->size = ivec2(2,2);
-    default_diffuse_texture->channels = 4;
+    Texture2D & default_checkerboard_texture =
+        create_asset_rref<Texture2D>("defualt_checkerboard_texture");
 
-    Texture * default_specular_texture =
-        get_asset<Texture>(_context.default_specular_map);
-    assert(default_specular_texture);
-    default_specular_texture->data = (void*)emergency_texture_data;
-    default_specular_texture->size = ivec2(2,2);
-    default_specular_texture->channels = 4;
+    default_checkerboard_texture.init(ivec2(2,2), GL_RGBA8, GL_RGBA);
+    default_checkerboard_texture.data = (void*)default_checkerboard_texture_data;
+    graphics::gpu_upload(&default_checkerboard_texture);
+    _context.default_checkerboard_texture_h = default_checkerboard_texture.handle;
 
 
-    /*
-    proto::memory::linear_allocator temp_allocator;
-    temp_allocator.init(1024 * 5);
+#if DEFAULT_MESHES
+    Mesh & cube = create_init_asset_rref<Mesh>("default_cube");
+    cube.vertices.resize(36);
+    assert(sizeof(cube_vertices) == sizeof(Vertex) * 36);
+    memcpy(cube.vertices._data, cube_vertices, sizeof(Vertex) * 36);
+    graphics::gpu_upload(&cube);
+    _context.cube_h = cube.handle;
 
-    struct option opts[] = {
-                            {"game", 1, NULL, 'g'},
-                            {0,0,0,0}
-    };
+    Mesh & quad = create_init_asset_rref<Mesh>("default_quad");
+    quad.vertices.resize(4);
+    assert(sizeof(quad_vertices) == sizeof(Vertex) * 4);
+    memcpy(quad.vertices._data, quad_vertices, sizeof(Vertex) * 4);
+    graphics::gpu_upload(&quad);
+    _context.quad_h = quad.handle;
 
-    int opt_index = 0;
-    int opt = 0;
-
-    size_t cwd_path_len = fs::cwd_length() + 1;
-    _context.cwd_path =
-        (char*)temp_allocator.alloc(cwd_path_len, alignof(char));
-
-    fs::cwd(_context.cwd_path, cwd_path_len);
-
-    size_t gamelib_path_len = 0;
-
-    while((opt = getopt_long(argc, argv, "g:", opts, &opt_index)) != -1) {
-        switch(opt) {
-        case 'g': {
-                int gamelib_status_result = fs::status(optarg, nullptr);
-
-                if(gamelib_status_result) {
-                    printf("game file %s does not exist", optarg);
-                } else {
-                    gamelib_path_len = strlen(optarg) + 1;
-                    _context.gamelib_path =
-                        (char*)temp_allocator.alloc(gamelib_path_len, alignof(char));
-
-                    strcpy(_context.gamelib_path, optarg);
-                }
-            } break;
-            default:
-                puts("help");
-        }
-    }
-
-    size_t exe_path_len = cwd_path_len + strlen(argv[0]) + 1;
-    _context.exe_path =
-        (char*)temp_allocator.alloc(exe_path_len , alignof(char));
-
-    strcpy(_context.exe_path, _context.cwd_path);
-    strcat(_context.exe_path, "/");
-    strcat(_context.exe_path, argv[0]);
-
-    _context._allocator.init
-        (gamelib_path_len + cwd_path_len + exe_path_len +
-         1024);
-
-    _context.exe_path =
-        strcpy((char*) _context._allocator.alloc(exe_path_len,
-                                                      alignof(char)),
-               _context.exe_path);
-
-    _context.cwd_path =
-        strcpy((char*) _context._allocator.alloc(cwd_path_len,
-                                                      alignof(char)),
-               _context.cwd_path);
-
-    if(gamelib_path_len != 0)
-    _context.gamelib_path =
-        strcpy((char*) _context._allocator.alloc(exe_path_len,
-                                                      alignof(char)),
-               _context.exe_path);
-
-    temp_allocator.release();
+    Mesh & std_basis = create_init_asset_rref<Mesh>("default_std_basis");
+    std_basis.vertices.resize(6);
+    assert(sizeof(std_basis_vertices) == sizeof(Vertex) * 6);
+    memcpy(std_basis.vertices._data, std_basis_vertices, sizeof(Vertex) * 6);
+    graphics::gpu_upload(&std_basis);
+    _context.std_basis_h = std_basis.handle;
+#endif
 
 
+#if DEFAULT_SHADERS
 
-    // puts(proto_banner);
-    // puts(separator);
+    auto& quad_shader =
+        create_init_asset_rref<ShaderProgram>("default_quad_shader");
+    quad_shader.attach_shader_file(ShaderType::Vert, "quad_vert.glsl");
+    quad_shader.attach_shader_file(ShaderType::Frag, "quad_frag.glsl");
+    quad_shader.link();
+    _context.quad_shader_h = quad_shader.handle;
 
-    printf("%sproto runtime, version %d.%d.%d.%d\n",
-           indent,
-           PROTO_VERSION_MAJOR,
-           PROTO_VERSION_MINOR,
-           PROTO_VERSION_BUILD,
-           PROTO_VERSION_REVISION);
-    puts(separator);
+    auto& std_basis_shader =
+        create_init_asset_rref<ShaderProgram>("default_std_basis_shader");
+    std_basis_shader.attach_shader_file(ShaderType::Vert, "pass_mvp_vert.glsl");
+    std_basis_shader.attach_shader_file(ShaderType::Frag, "std_basis_frag.glsl");
+    std_basis_shader.link();
+    _context.std_basis_shader_h = std_basis_shader.handle;
 
-    size_t test_size = 288;
-    proto::memory::LinkedListAllocator al;
-    // proto::memory::LinkedListAllocator al2;
-    // al2.init(test_size);
-    al.init(test_size);
-    auto pp = [&]() {
-                printf("\n");
-                for(int i = 0; i<24; i++) printf("%.2d ", i);
-                printf("\n");
-                for(size_t i = 0; i<24; i++) printf("---");
-                printf("\n");
+    auto& gbuffer_shader =
+        create_init_asset_rref<ShaderProgram>("default_gbuffer_shader");
+    gbuffer_shader.attach_shader_file(ShaderType::Vert, "g-buffer_vert.glsl");
+    gbuffer_shader.attach_shader_file(ShaderType::Frag, "g-buffer_frag.glsl");
+    gbuffer_shader.link();
+    _context.gbuffer_shader_h = gbuffer_shader.handle;
 
-                for(size_t i = 0; i<test_size; i++) {
-                    printf("%.2X ", *((unsigned char*)al.raw() + i));
-                    if((i+1)%24 == 0) printf("\n");
-                }
-            };
-    printf("header size %lu\n", sizeof(proto::memory::LinkedListAllocator::header));
-    namespace mem = proto::memory;
-    // unsigned char * p;
-    // size_t sz = 32;
-    // p = (unsigned char*)al.alloc(sz, 16); if(!p) assert(0);
-    // for(size_t i=0; i<sz; i++) p[i] = 255;
-    // unsigned char * h = (unsigned char*)al.get_header(al._first);
-    // for(size_t i=0; i<sizeof(mem::LinkedListAllocator::header); i++) h[i] = i;
+    
+    _context.skybox_shader_h =
+        create_init_asset_rref<ShaderProgram>("default_skybox_shader")
+            .$_attach_shader_file(ShaderType::Vert, "pass_mvp_vert.glsl")
+            .$_attach_shader_file(ShaderType::Frag, "skybox_frag.glsl")
+            .$_link().handle;
+#endif
 
+    _context.default_framebuffer = &_context.framebuffers.push_back();
+    _context.default_framebuffer->FBO = 0;
+    _context.default_framebuffer->size = _context.window_size;
+    _context.default_framebuffer->color_attachments.init(&_context.memory);
 
-    // p = (unsigned char*)al.alloc(sz, 16); if(!p) assert(0);
-    // for(size_t i=0; i<sz; i++) p[i] = 255;
-    pp();
-   */
+    _context.current_read_framebuffer = _context.default_framebuffer;
+    _context.current_draw_framebuffer = _context.default_framebuffer;
 
-    ClientSetContextFunction  * client_set_context = nullptr;
-    ClientInitFunction   * client_init   = proto_client_init_stub;
+    random::seed_mt64(settings.mt64_seed);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    glDisable(GL_MULTISAMPLE);  
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glViewport(0, 0, _context.window_size.x, _context.window_size.y);
+    
+
+    //if((_context.inotify_fd = inotify_init1(IN_NONBLOCK)) == -1) {
+    //    debug_error(debug::category::main,
+    //                "inotify_init1() failed.");
+    //}
+    //_context.watched_files.init(3, &_context.memory);
+
+    ClientSetContextFunction * client_set_context = nullptr;
+    ClientInitFunction *   client_init   = proto_client_init_stub;
     ClientUpdateFunction * client_update = proto_client_update_stub;
-
-    //void * clientlib_h = dlopen(clientlib_path,
-    //                             RTLD_LAZY);
-
-    StringView clientlib_path = _context.clientlib_path;
+    ClientLinkFunction *   client_link   = proto_client_link_stub;
+    ClientUnlinkFunction * client_unlink = proto_client_unlink_stub;
+    ClientCloseFunction *  client_close  = proto_client_close_stub;
 
     assert(clientlib_h);
 
-    time_t clientlib_mtime;
-    struct stat clientlib_statbuf;
-    stat(clientlib_path, &clientlib_statbuf);
-    // NOTE(kacper):
-    // this is supposed to be #define st_mtime st_mtim.tv_sec for back compat
-    // I dont need anthing more than more precise than seconds here
-    clientlib_mtime = clientlib_statbuf.st_mtime;
-
-    void * maybe_set_context =
-        dlsym(clientlib_h, PROTO_CLIENT_SET_CONTEXT_FUNCTION_NAME);
-
-    assert_info(maybe_set_context,
-                proto::debug::category::main,
-                "Could not locate "
-                PROTO_CLIENT_SET_CONTEXT_FUNCTION_NAME
-                " in client library. "
-                "Are you sure you included proto/proto.hh?");
-
-    DLSYM_ASSIGN( client_set_context, maybe_set_context );
-
-    void * maybe_client_init =
-        dlsym(clientlib_h, PROTO_CLIENT_INIT_FUNCTION_NAME);
-    if(maybe_client_init)
-       DLSYM_ASSIGN( client_init, maybe_client_init );
-
-    void * maybe_client_update =
-        dlsym(clientlib_h, PROTO_CLIENT_UPDATE_FUNCTION_NAME);
-    if(maybe_client_update)
-       DLSYM_ASSIGN( client_update, maybe_client_update );
-
-    // live reload 
-    int inotify_fd = inotify_init1(IN_NONBLOCK);
-    assert(inotify_fd != -1);
-
-    int clientlib_watch_fd = inotify_add_watch(inotify_fd,
-                                                clientlib_path, 
-                                                IN_MODIFY);
-
-    //proto::context = &_context;
-    client_set_context(&_context);
-    assert(clientlib_watch_fd != -1);
-    // read from fd
-
-    //client_init();
-
     static_assert(proto::meta::is_integer<time_t>::value);
+
+    assert(_context.clientlib_path.is_cstring());
+
+    struct stat clientlib_statbuf;
+    stat(_context.clientlib_path, &clientlib_statbuf);
+
+    decltype(meta::declval<timespec>().tv_sec)
+        clientlib_mtime = clientlib_statbuf.st_mtime;
+
+    auto clientlib_bind_procs =
+        [&](){
+            void * maybe_set_context =
+                dlsym(clientlib_h, PROTO_CLIENT_SET_CONTEXT_FUNCTION_NAME);
+
+            assert_info(maybe_set_context,
+                        proto::debug::category::main,
+                        "Could not locate "
+                        PROTO_CLIENT_SET_CONTEXT_FUNCTION_NAME
+                        " in client library. "
+                        "Are you sure you included proto/proto.hh?");
+
+            DLSYM_ASSIGN( client_set_context, maybe_set_context );
+
+            void * maybe_client_init =
+                dlsym(clientlib_h, PROTO_CLIENT_INIT_FUNCTION_NAME);
+            if(maybe_client_init)
+                DLSYM_ASSIGN( client_init, maybe_client_init );
+
+            void * maybe_client_update =
+                dlsym(clientlib_h, PROTO_CLIENT_UPDATE_FUNCTION_NAME);
+            if(maybe_client_update)
+                DLSYM_ASSIGN( client_update, maybe_client_update );
+
+            void * maybe_client_link =
+                dlsym(clientlib_h, PROTO_CLIENT_LINK_FUNCTION_NAME);
+            if(maybe_client_link)
+                DLSYM_ASSIGN( client_link, maybe_client_link );
+
+            void * maybe_client_unlink =
+                dlsym(clientlib_h, PROTO_CLIENT_UNLINK_FUNCTION_NAME);
+            if(maybe_client_unlink)
+                DLSYM_ASSIGN( client_unlink, maybe_client_unlink );
+
+            void * maybe_client_close =
+                dlsym(clientlib_h, PROTO_CLIENT_CLOSE_FUNCTION_NAME);
+            if(maybe_client_close)
+                DLSYM_ASSIGN( client_close, maybe_client_close );
+        };
+
+    clientlib_bind_procs();
+
+    client_set_context(&_context);
 
     struct timespec time_res;
     assert(!clock_getres(CLOCK_MONOTONIC_RAW, &time_res));
 
-    proto::context = &_context;
     client_init();
     assert(!glGetError());
 
-    _context.clock.init(60.0f);
+    _context.clock.init(2.0f);
     while(!_context.exit_sig) {
+        //_context.clock.tick();
+        _context.clock.elapsed_time += 0.016666f;
 
-        _context.clock.tick();
-        // temoporary code
-        // TODO(kacper):
-        // reimplement as a virtual platform api??
-        stat(clientlib_path, &clientlib_statbuf);
+        stat(_context.clientlib_path, &clientlib_statbuf);
         if(clientlib_mtime != clientlib_statbuf.st_mtime) {
             clientlib_mtime = clientlib_statbuf.st_mtime;
+
+            debug_info(proto::debug::category::main,
+                       "client library changed on disk, attempting hot-swap.");
+
+            assert(clientlib_h);
+
+            void * client_preserve = nullptr;
+            client_unlink();
+            dlclose(clientlib_h);
+
+            clientlib_h = dlopen(_context.clientlib_path, RTLD_LAZY);
+            client_set_context(&_context);
+            client_link();
+
+            const char * dlerr = dlerror();
+            assert_info(!dlerr,
+                        proto::debug::category::main,
+                        "Error occured when opening client dynamic library ",
+                        _context.clientlib_path, ": ", dlerr);
+
+            clientlib_bind_procs();
+
             // reloading code
             debug_info(proto::debug::category::main,
                        "client dynamic library reloaded");
-
         }
-        //io::print(_context.count, "\n");
-
-        //setup
-        //init
-        //link
-        //update
-        //unlink
-        //close
 
         client_update();
+
         X_handle_events();
         glXSwapBuffers(_context.display, _context.window);
     }
 
+    client_close();
     dlclose(clientlib_h);
 
+    dlerr = dlerror();
+    assert_info(!dlerr,
+                proto::debug::category::main,
+                "Error occured when closing client dynamic library ",
+                _context.clientlib_path, ": ", dlerr);
     return 0;
 }
 

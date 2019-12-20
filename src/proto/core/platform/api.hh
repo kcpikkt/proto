@@ -6,6 +6,7 @@
 #include "proto/core/memory/common.hh"
 
 namespace proto {
+    struct String;
     struct StringArena;
 namespace platform {
     const char* cwd(char * buf, size_t len);
@@ -36,10 +37,12 @@ namespace platform {
 
     // TODO(kacper): move it to string.hh
     // case insensivite strcmp
-    int strcmp_i(const char * str1, const char * str2); 
     int strncmp_i(const char * str1, const char * str2, u32 n); 
 
     bool is_directory(StringView path);
+    bool is_file(StringView path);
+
+    String search_for_file(StringArena& dirs, StringView filename);
 
     // TODO(kacper): allocate inside, return unique_ptr to string arena;
     // TODO(kacper): ls_rel, ls_abs?
@@ -87,6 +90,7 @@ namespace platform {
         int file_desc = -1;
     #endif
     };
+
 
 } // namespace platform
 } // namespace proto

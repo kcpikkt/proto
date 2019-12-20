@@ -4,10 +4,14 @@ bin/*
 lib/*
 src/tools/gl3w/*
 vendor/*
+rec/*
+outmesh/*
 include/*
 proto.config
 proto.creator*
 proto.files
 proto.includes
 .vs/
-README.md
+*.so
+parse*
+src/demos/test/*

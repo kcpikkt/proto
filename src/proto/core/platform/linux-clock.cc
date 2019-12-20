@@ -80,8 +80,6 @@ void proto::platform::LinuxClockImpl::tick() {
     _prev_frame_start_time = _frame_start_time;
     clock_gettime(CLOCK_MONOTONIC_RAW, &_frame_start_time);
 
-    //_delta_time.tv_sec = _frame_end_time.tv_sec - _prev_frame_start_time.tv_sec;
-    //_delta_time.tv_nsec = _frame_end_time.tv_nsec - _prev_frame_start_time.tv_nsec;
     _delta_time = timespec_diff(_frame_end_time, _prev_frame_start_time);
 
     delta_time = (float) _delta_time.tv_nsec / one_sec;

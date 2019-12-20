@@ -9,6 +9,7 @@
 
 namespace proto {
 namespace serialization {
+
     constexpr static u64 asset_file_signature = 0x79677967;
     struct AssetFileHeader {
         u64 signature = asset_file_signature;

@@ -13,8 +13,10 @@ namespace proto {
 
     struct InvalidAsset;
     struct Mesh;
-    struct Texture;
+    struct Texture2D;
+    struct Cubemap;
     struct Material;
+    struct ShaderProgram;
 
     using AssetTypeIndex = u8;
 
@@ -36,7 +38,9 @@ namespace proto {
     PROTO_ASSET_TYPE(InvalidAsset, 0);
     PROTO_ASSET_TYPE(Mesh,         1);
     PROTO_ASSET_TYPE(Material,     2);
-    PROTO_ASSET_TYPE(Texture,      3);
+    PROTO_ASSET_TYPE(Texture2D,    3);
+    PROTO_ASSET_TYPE(Cubemap,      4);
+    PROTO_ASSET_TYPE(ShaderProgram,5);
 
     struct AssetHandle {
         u32 hash = 0;
@@ -64,13 +68,17 @@ namespace proto {
         AssetType(AssetTypeIndex index){
             switch(index){
             case AssetType<Mesh>::index:
-                map_type_info<Mesh>();         break;
+                map_type_info<Mesh>();          break;
             case AssetType<Material>::index:
-                map_type_info<Material>();     break;
-            case AssetType<Texture>::index:
-                map_type_info<Texture>();      break;
+                map_type_info<Material>();      break;
+            case AssetType<Texture2D>::index:
+                map_type_info<Texture2D>();     break;
+            case AssetType<Cubemap>::index:
+                map_type_info<Cubemap>();       break;
+            case AssetType<ShaderProgram>::index:
+                map_type_info<ShaderProgram>(); break;
             default:
-                map_type_info<InvalidAsset>(); break;
+                map_type_info<InvalidAsset>();  break;
             }
         }
 

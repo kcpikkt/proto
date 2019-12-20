@@ -15,11 +15,10 @@ namespace memory {
     // The latter is by default aligned with max alignment (usually 16 bytes).
     // Because of that and hefty (32 byte) headers it is rather wasteful
     // to use this allocator for tiny things.
-    // Consider proto::memory::strings_allocator if you need allocator for c-strings.
 
-    // NOTE: Though it max aligns by default it may still consist of
+    // NOTE: Though it max aligns by default it may still have of
     //       alloc method with alignment parameter just for compaitibility,
-    //       keep in mind that this paramter is ignored.
+    //       parameter is just ignored.
 
     struct LinkedListAllocator : Allocator, PROTO_DEBUG_MARKER
     {
@@ -72,6 +71,8 @@ namespace memory {
         void * realloc(void * block, size_t requested_size, size_t alignment);
 
         void free(void * block);
+
+        // private
 
         void unlink_node(Header * node, Header * prev = nullptr);
 

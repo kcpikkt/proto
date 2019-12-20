@@ -6,7 +6,9 @@
 #include "proto/core/memory.hh"
 #include "proto/core/debug/logging.hh"
 #include "proto/core/containers/StringArena.hh"
+#include "proto/core/util/String.hh"
 #include "proto/core/context.hh"
+#include "proto/core/io.hh"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -50,13 +52,13 @@ const char * basename_substr(const char * path, u32 * no_ext_len) {
 
 StringView basename_view(StringView path) {
     u32 index = 0;
-    const char * basename;
+    const char * basename = path.str();
     char c;
-    while(c = path[index],
-          index < path.length() && c != '\0')
-    {
+    while(index < path.length()) {
+        c = path[index];
+        if(c == '\0') break;
         // no backslashes in names, ok?
-        if(c == '/' || c == '\\') { basename = path + index + 1; }
+        if(c == '/' || c == '\\') { basename = path.str() + index + 1; }
         index++;
     }
     if(index != path.length())
@@ -64,7 +66,7 @@ StringView basename_view(StringView path) {
                    "StringView contains null character on index "
                    "less than its length.", index, " ", path.length());
 
-    u32 basename_offset = basename - path;
+    u32 basename_offset = basename - path.str();
     u32 len = path.length() - basename_offset;
 
     index = path.length() - basename_offset;
@@ -84,12 +86,12 @@ const char * dirname_substr(const char * path, u32 * len) {
     if(len) *len = dirname_len(path);
     return path;
 }
+//FIXME(kacper): empty string crash
+//NOTE(kacper):  btw, write tests for them for gods sake
 
 StringView dirname_view(const char * path) {
     return StringView(path, dirname_len(path));
 }
-
-
 
 u32 dirname_len(const char * path) {
     size_t index = strlen(path);
@@ -121,7 +123,6 @@ StringView extension_view(const char * path) {
 }
 
 
-#include "proto/core/io.hh"
 // case insensitive
 int strcmp_i(const char * str1, const char * str2) {
     for(u32 i=0; true; i++, str1++, str2++) {
@@ -159,19 +160,38 @@ bool is_directory(StringView path) {
     return S_ISDIR(statbuf.st_mode);
 }
 
-// struct File
-// it does not allocate memory soo maybe idk
-//File::File(){}
-//
-//File::File(memory::Allocator * allocator){
-//    init(allocator);
-//}
-//
-//int File::init(memory::Allocator * allocator){
-//    assert(allocator);
-//    _allocator = allocator;
-//    return 0;
-//}
+bool is_file(StringView path) {
+    struct stat statbuf;
+    if (stat(path, &statbuf) != 0) return false;
+    return S_ISREG(statbuf.st_mode);
+}
+
+String search_for_file(StringArena& dirs, StringView filename) {
+    String ret;
+
+    static char filepath[PROTO_MAX_PATH];
+    strview_copy(filepath, filename);
+
+    if(access(filepath, F_OK) == -1) {
+        for(u32 i=0; i < dirs.count(); i++) {
+            if(!is_directory(dirs[i])) continue;
+
+            strview_copy(filepath, dirs[i]);
+
+            platform::path_ncat(filepath, filename, 512);
+
+            if(access(filepath, F_OK) != -1) {
+                ret.init(filepath, &context->memory);
+                break;
+            }
+        }
+    } else {
+        //TOOD(kacper): use proper allocator for that
+        ret.init(filename, &context->memory);
+    }
+    return ret;
+}
+
 StringArena ls(StringView dirpath) {
     StringArena arena;
 
@@ -195,7 +215,8 @@ StringArena ls(StringView dirpath) {
         closedir(d);
     }
 
-    arena.init(arena_cap, &context->gp_string_allocator);
+    arena.init(arena_cap, &context->memory);
+    set_debug_marker(arena, "sys::ls() return arena");
     d = opendir(dirpath_cstr);
     if(d) {
         while((dir = readdir(d)) != NULL)
@@ -204,6 +225,30 @@ StringArena ls(StringView dirpath) {
     }
     return arena;
 }
+
+
+    //void watch_file(StringView filepath, void(callback*)()) {
+    //    if(proto::context->inotify_fd == -1) {
+    //        debug_error(debug::category::main,
+    //                    "Cannot watch file ", path,
+    //                    ", inotify instance not initialized.");
+    //        return;
+    //    }
+    //    
+    //    static char _filepath[PROTO_MAX_PATH];
+    //    strview_copy(_filepath, filepath);
+    //
+    //    int watch_fd =
+    //        inotify_add_watch(_context.inotify_fd, _filepath, IN_MODIFY);
+    //
+    //    if(watch_fd == -1) {
+    //        debug_error(debug::category::main,
+    //                    "inofify_add_watch() failed for file ", filepath);
+    //        return;
+    //    }
+    //
+    //    context->watched_files.push_back(watch_fd);
+    //}
 
 const char *
 path_ncat(char * dest,

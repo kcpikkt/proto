@@ -12,6 +12,9 @@ namespace proto {
         Array<AssetMetadata> meshes;
         Array<AssetMetadata> materials;
         Array<AssetMetadata> textures;
+        Array<AssetMetadata> cubemaps;
+        Array<AssetMetadata> shader_programs;
+
         memory::Allocator * _allocator;
 
         void init(size_t init_capacity, memory::Allocator * allocator);

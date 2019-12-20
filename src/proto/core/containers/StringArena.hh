@@ -4,13 +4,14 @@
 #include "proto/core/memory/common.hh"
 #include "proto/core/containers/Array.hh"
 #include "proto/core/util/StringView.hh"
-#include "proto/core/DataholderCRTP.hh"
+#include "proto/core/StateCRTP.hh"
 #include "proto/core/util/Bitfield.hh"
+#include "proto/core/debug/markers.hh"
 
 namespace proto {
 
-struct StringArena : DataholderCRTP<StringArena> {
-    using DataholderBase = DataholderCRTP<StringArena>;
+struct StringArena : StateCRTP<StringArena>, debug::Marker{
+    using StateBase = StateCRTP<StringArena>;
 
     // to allow for range-for
     struct Iterator {
@@ -46,9 +47,15 @@ struct StringArena : DataholderCRTP<StringArena> {
         static constexpr u8 free_bit = 0;
 
         Offset() {}
-        // lazyness over 9k (I would rather call it DRY!)
+
         Offset(decltype(value) val, decltype(length) len)
             : length(len), value(val) {}
+
+        void _copy(const Offset& other) {
+            memcpy(this, &other, sizeof(Offset)); //idk
+        }
+        Offset(const Offset& other) { _copy(other); }
+        Offset& operator=(const Offset& other) { _copy(other); return *this; }
     };
 
     constexpr static u64 default_init_capacity = 32;
@@ -95,6 +102,8 @@ struct StringArena : DataholderCRTP<StringArena> {
     void grow(u64 least_capacity);
 
     void store(StringView str);
+
+    bool contains(StringView str);
 
     void destroy_shallow();
 

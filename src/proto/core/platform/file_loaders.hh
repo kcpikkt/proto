@@ -1,3 +1,4 @@
+// DEPRECATED, BE SANE, USE ASSIMP OR SOMETHING
 #pragma once
 #include "proto/core/platform/common.hh"
 #include "proto/core/common.hh"
@@ -6,12 +7,15 @@
 #include "proto/core/debug/logging.hh"
 #include "proto/core/debug/markers.hh"
 #include "proto/core/graphics/Mesh.hh"
-#include "proto/core/graphics/Texture.hh"
+#include "proto/core/graphics/Texture2D.hh"
 #include "proto/core/asset-system/interface.hh"
 #include "proto/core/context.hh"
 #include "proto/core/platform/api.hh"
+#include "proto/core/util/parsing.hh"
 #include "proto/core/math/hash.hh"
 #include "proto/core/string.hh"
+#include "proto/core/util/String.hh"
+
 
 //FIXME(kacper): Why stbi does not want to run off my custom allocator?
 void * malloc_proxy(size_t sz){
@@ -54,6 +58,7 @@ namespace proto{
                                       AssetContext * asset_context,
                                       AssetMetadata * dependant_asset = nullptr)
     {
+        //stbi_set_flip_vertically_on_load()
         assert(buffer);
         assert(size);
         assert(allocator);
@@ -65,15 +70,15 @@ namespace proto{
 
         AssetHandle handle = create_asset(name,
                                           sys::dirname_view(filepath),
-                                          AssetType<Texture>::index);
+                                          AssetType<Texture2D>::index);
         if(!handle) {
             debug_warn(debug::category::data,
                        "Could not create asset for ", name,
                        " in file ", filepath);
             return handle;
         }
-        Texture * texture =
-            get_asset<Texture>(handle);
+        Texture2D * texture =
+            get_asset<Texture2D>(handle);
 
         //TODO(kacper): proper message
         if(!texture) debug_warn(1, "texture is null");
@@ -82,7 +87,6 @@ namespace proto{
         assert(x);
         assert(y);
         assert(n);
-        //texture->data = stbi_load(filepath, &x, &y, &n, 0);
 
         assert(texture->data);
         texture->channels = n;
@@ -90,6 +94,12 @@ namespace proto{
 
         if(dependant_asset)
             add_dependency(dependant_asset, handle);
+
+        log_info(debug::category::data,
+                 "Loaded texture ", name,
+                 ", size ", texture->size,
+                 ", ", (int)texture->channels, " channel",
+                 ((texture->channels > 1) ? "s" : " ") );
 
         return handle;
     }
@@ -107,6 +117,8 @@ namespace proto{
         //if(dependant_asset)
         //    dependant_asset->deps.reserve();
 
+        u32 materials_count = 0;
+        u32 textures_count = 0;
         auto create_new_material =
             [&](StringView name) -> AssetHandle {
                 AssetHandle handle =
@@ -128,6 +140,7 @@ namespace proto{
                 if(dependant_asset)
                     add_dependency(dependant_asset, handle);
 
+                materials_count++;
                 return handle;
             };
 
@@ -165,15 +178,18 @@ namespace proto{
                     cursor+=2;
                     current_mat->specular_color = extract_vec3(&cursor);
                 } else if(!strncmp(cursor, "a", 1)) {
-                    cursor+=1;
+                    cursor+=2;
                     current_mat->alpha = extract_float(&cursor);
                 } else if(!strncmp(cursor, "Ta", 2)) {
-                    cursor+=1;
+                    cursor+=2;
                     current_mat->alpha = 1.0 - extract_float(&cursor);
+                } else if(!strncmp(cursor, "Ns", 2)) {
+                    cursor+=2;
+                    current_mat->shininess = extract_float(&cursor);
                 } else if(!strncmp(cursor, "map_", 4)) {
                     cursor+=4;
                     AssetMetadata * metadata = get_metadata(handle);
-                    Texture * texture_already = nullptr;
+                    Texture2D * texture_already = nullptr;
                     AssetHandle * map = nullptr;
                     StringView texpath;
 
@@ -201,9 +217,11 @@ namespace proto{
                     if(map && texpath) {
                         AssetHandle handle =
                             make_handle(sys::basename_view(texpath),
-                                        AssetType<Texture>::index);
+                                        AssetType<Texture2D>::index);
 
-                        texture_already = get_asset<Texture>(handle);
+                        texture_already = get_asset<Texture2D>(handle);
+
+                        if(!texture_already) textures_count++;
 
                         *map = (texture_already)
                             ? texture_already->handle
@@ -216,6 +234,11 @@ namespace proto{
         AssetHandle ret = invalid_asset_handle;
         // TODO(kacper): set it to some null state
         if(current_mat) ret = current_mat->handle;
+
+        log_info(debug::category::data,
+                 "Loaded ", sys::basename_view(filepath),
+                 ", ", materials_count, " materials",
+                 ", ", materials_count, " textures");
         return ret;
     }
 
@@ -242,11 +265,10 @@ namespace proto{
         sizeof(supported_asset_file_formats) /
         sizeof(supported_asset_file_formats[0]);
 
-    u32 verify_file_format(const char * filepath) {
+    u32 verify_file_format(StringView filepath) {
         for(u32 i=0; i<supported_asset_file_formats_count; i++){
-            if(platform::strcmp_i(platform::extension_substr(filepath),
-                                  supported_asset_file_formats[i].extension)
-               == 0) return i;
+            if(strview_cmp_i(platform::extension_view(filepath),
+                             supported_asset_file_formats[i].extension)) return i;
         }
         return 0;
     }
@@ -260,6 +282,7 @@ namespace proto{
                                     AssetContext * asset_context,
                                     AssetMetadata * dependant_asset = nullptr)
     {
+
         //TEMP
         bool optimize_for_space = false;
 
@@ -684,6 +707,7 @@ namespace proto{
                             : uvs[index_sets[i].uv_index
                                   + index_offset]
                 };
+
             mesh_extreme =
                 max(glm::length(mesh->vertices[i].position),mesh_extreme);
         }
@@ -728,96 +752,67 @@ namespace proto{
     //search_for_asset_file(StringView filepath)
     //==============================================================
     AssetHandle
-    parse_asset_file_rec(StringView filepath,
+    parse_asset_file_rec(StringView filename,
                          AssetContext * asset_context,
                          AssetMetadata * dependant_asset)
     {
+        //PROTO_DEPRECATED;
+        namespace sys = proto::platform;
+        assert(proto::context);
+        auto& ctx = *proto::context;
+        AssetHandle ret;
 
-        char _filepath[PROTO_ASSET_MAX_PATH_LEN];
-        strview_copy(_filepath, filepath);
+        char _filename[PROTO_ASSET_MAX_PATH_LEN];
+        strview_copy(_filename, filename);
 
         // FIXME(kacper): well idk, I guess we are using backslashes for
         //                every platform anyway
-        str_trans(_filepath, [](char c){ return (c == '\\' ? '/' : c); });
+        str_transform(_filename,
+                      [](char c){ return (c == '\\' ? '/' : c); });
 
-        //log_info(1,"parsing asset file ", _filepath);
+        String filepath = sys::search_for_file(ctx.asset_paths, _filename);
 
-        AssetHandle ret;
-
-        char finalpath[2 * PROTO_ASSET_MAX_PATH_LEN];
-
-        strview_copy(finalpath, _filepath);
-
-        if(access(finalpath, F_OK) == -1) {
-
-            bool found = false;
-            for(s32 i=0; i < asset_context->asset_paths.count(); i++) {
-                StringView searchpath = asset_context->asset_paths[i];
-                strview_copy(finalpath, searchpath);
-
-                platform::path_ncat(finalpath, _filepath,
-                                    2 * PROTO_ASSET_MAX_PATH_LEN);
-
-                if(access(finalpath, F_OK) != -1) {
-                    found = true; 
-                    break;
-                }
-            }
-            if(!found) {
-                debug_warn(debug::category::data,
-                        "Could not find asset file ", _filepath);
-                io::println("...searched:");
-
-                strview_copy(finalpath, _filepath);
-
-                io::println(finalpath);
-
-                for(s32 i=0; i < asset_context->asset_paths.count(); i++) {
-                    StringView searchpath = asset_context->asset_paths[i];
-                    strview_copy(finalpath, searchpath);
-                    io::println(finalpath);
-                    platform::path_ncat(finalpath, _filepath,
-                                        2 * PROTO_ASSET_MAX_PATH_LEN);
-                    io::println(finalpath);
-                }
-                io::flush();
-
-                return invalid_asset_handle;
-            }
+        if(!filepath) {
+            debug_warn(debug::category::data,
+                    "Could not find asset file ", _filename);
+            return invalid_asset_handle;
         }
 
-        u32 file_format_index = verify_file_format(finalpath);
+        u32 file_format_index = verify_file_format(filepath);
+
         if(!file_format_index) {
             debug_warn(debug::category::data,
-                       "Failed to load assets from ", finalpath,
-                       ", unsupported external asset file format ");
+                       "Failed to load assets from ", filepath.view(),
+                       ": unsupported external asset file format ");
             return invalid_asset_handle;
         }
 
         platform::File file;
-        assert(!file.open(finalpath, platform::file_read));
+        assert(!file.open(filepath.view(), platform::file_read));
 
         memory::Allocator * allocator = &(context->memory);
-        u8 * buf = (u8*)allocator->alloc(file.size());
+        u8 * buf = (u8*)allocator->alloc(file.size() + 1);
 
         assert(buf);
         assert(file.size() == file.read(buf, file.size() ));
+        buf[file.size()] = '\0';
 
+        log_info(debug::category::data, "Parsing file ", filepath.view());
         switch(file_format_index) {
         case _AssetFileFormatIndex::obj: {
             ret = parse_obj_asset_file_buffer_rec
-                (buf, file.size(), finalpath,
+                (buf, file.size(), filepath,
                  &context->memory, asset_context, dependant_asset);
         } break;
         case _AssetFileFormatIndex::mtl: {
             ret = parse_mtl_asset_file_buffer_rec
-                (buf, file.size(), finalpath,
+                (buf, file.size(), filepath,
                  &context->memory, asset_context, dependant_asset);
         }break;
         case _AssetFileFormatIndex::jpg: // fallthrough 
         case _AssetFileFormatIndex::png: {
             ret = parse_image_asset_file_buffer_rec
-                (buf, file.size(), finalpath,
+                (buf, file.size(), filepath,
                  &context->memory, asset_context, dependant_asset);
         }break;
         default: {
