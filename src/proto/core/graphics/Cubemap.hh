@@ -38,6 +38,10 @@ struct Cubemap : TextureInterface {
 
     void init(ivec2 size, u32 format, u32 gpu_format, u32 datatype);
 
+    inline Cubemap& $_init(ivec2 size, u32 format, u32 gpu_format, u32 datatype){
+        init( size, format, gpu_format, datatype); return *this;
+    }
+
 };
 
 } // namespace proto

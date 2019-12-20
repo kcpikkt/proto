@@ -14,3 +14,4 @@ proto.includes
 .vs/
 *.so
 parse*
+src/demos/test/*

@@ -13,8 +13,9 @@ struct Framebuffer {
     void init(ivec2 size, u32 init_color_attachments_count = 1);
 
     u32 add_color_attachment(Texture2D&); // overload for renderbuffer
-    void add_depth_attachment(Renderbuffer&); // overload for tex
-    void add_depth_attachment(Texture2D&); // overload for tex
+    void add_depth_attachment(Renderbuffer&);
+    void add_depth_attachment(Texture2D&);
+    void add_depth_attachment(Cubemap&); 
 
     // chaining methods
     Framebuffer& $_init(ivec2 size, u32 init_color_attachments_count);
@@ -22,6 +23,7 @@ struct Framebuffer {
     Framebuffer& $_add_color_attachment(Texture2D&);
     Framebuffer& $_add_depth_attachment(Renderbuffer&);
     Framebuffer& $_add_depth_attachment(Texture2D&);
+    Framebuffer& $_add_depth_attachment(Cubemap&);
 
     void finalize();
 };

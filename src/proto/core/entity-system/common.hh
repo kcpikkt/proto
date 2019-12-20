@@ -2,6 +2,7 @@
 #include "proto/core/common/types.hh"
 #include "proto/core/asset-system/common.hh"
 #include "proto/core/math/common.hh"
+#include "proto/core/graphics/Framebuffer.hh"
 
 namespace proto {
 
@@ -80,6 +81,7 @@ struct Component {
 
 struct PointlightComp : Component {
     vec3 color = vec3(1.0);
+    AssetHandle shadow_map;
 };
 
 struct TransformComp : Component {

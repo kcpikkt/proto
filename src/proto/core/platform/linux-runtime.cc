@@ -595,7 +595,7 @@ int proto::platform::runtime(int argc, char ** argv){
     _context.clock.init(2.0f);
     while(!_context.exit_sig) {
         //_context.clock.tick();
-         _context.clock.elapsed_time += 0.016666f;
+        _context.clock.elapsed_time += 0.016666f;
 
         stat(_context.clientlib_path, &clientlib_statbuf);
         if(clientlib_mtime != clientlib_statbuf.st_mtime) {

@@ -29,7 +29,7 @@ void main() {
         frag_color = vec4(0.0); return;}
 
     const float gamma = 1.6;
-    const float exposure = 1.6;
+    const float exposure = 1.0;
     vec3 hdr_color = texture(u_tex, frag_in.uv).rgb;
     vec3 bloom = texture(u_bloom, frag_in.uv).rgb;
     hdr_color += bloom;

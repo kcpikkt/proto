@@ -61,13 +61,14 @@ vec3 frag_ambient;
 
 #define DIRLIGHT_SHADOW 1
 #define ANTIALIAS 0
-#define VOLUMETRIC 1
+#define VOLUMETRIC 0
+#define VOLUMETRIC_POINT 1
 #define SSR 0
 
 #define ALIAS_THRES 0.15
 
 
-#if VOLUMETRIC
+#if VOLUMETRIC || VOLUMETRIC_POINT
 // super slow volumetric light fog, purely experimental
 
 // based on 
@@ -295,20 +296,45 @@ float dirlight_vol = 0.0;
     vec3 frag2light;
     vec3 frag2light_norm;
     // POINT LIGHTS
-    for(int i=0; i<pointlight_count-2; i++) {
+    for(int i=0; i<pointlight_count; i++) {
         if(u_pointlight[i].on != 0) {
+            frag2light = u_pointlight[i].position - g_frag_pos;
+            frag2light_norm = normalize(frag2light);
+
+            float dist_factor = 1.0/pow(length(frag2light)/1.3,2.0);
+
+            float pointlight_vol = 0.0;
+#if VOLUMETRIC_POINT 
+            float frag2cam_dist = length(frag2cam);
+
+            float march_step = 0.04 ;
+            vec3 march_pos = g_frag_pos; 
+
+            int steps = 0;
+            for(steps; (steps * march_step) < frag2cam_dist; steps++) {
+                march_pos = g_frag_pos + frag2cam_norm * steps * march_step;
+
+                vec3 march2light = u_pointlight[i].position - march_pos;
+                
+                pointlight_vol +=
+                    (sin(u_time/10) * 0.3 + 0.5 + 0.0)/
+                    pow(length(march2light), 2.0) *
+                    vol_fog_noise(march_pos );
+            }
+            pointlight_vol /= (steps * 1.0);
+            pointlight_vol = clamp(pointlight_vol,0.0,1.0);   
+#endif
+
 
             light =
                 u_pointlight[i].color *
-                u_pointlight[i].intensity * g_ssao;
+                u_pointlight[i].intensity * g_ssao * dist_factor; /// 
 
-            frag2light = u_pointlight[i].position - g_frag_pos;
-            frag2light_norm = normalize(frag2light);
 
             angle_falloff =
                 clamp(dot(g_normal, frag2light_norm), 0.0, 1.0);
 
-            diffuse = light * angle_falloff * g_albedo / pow(length(frag2light),2.0);
+            diffuse = light * angle_falloff * g_albedo /9.0;
 
             angle_falloff = dot(reflect(frag2light_norm, g_normal), -frag2cam_norm);
             angle_falloff = clamp(angle_falloff, 0.0, 1.0);
@@ -317,7 +343,9 @@ float dirlight_vol = 0.0;
             diffuse *= (1.0 - angle_falloff);
 
             frag_diffuse += diffuse;
+            frag_ambient += pointlight_vol * vec3(1.0);
             frag_specular += light * angle_falloff * g_specular + ssr/2.0;
+
 
 #if 0
            shadowmap_depth = texture(u_pointlight[i].shadow_map,

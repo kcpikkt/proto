@@ -47,6 +47,21 @@ namespace proto {
 
     }
 
+    void Framebuffer::add_depth_attachment(Cubemap & cubemap) {
+        if(size != cubemap.size)
+            debug_warn(debug::category::graphics,
+                       "Attaching cubemap of size ", cubemap.size,
+                       " to framebuffer of size ", size);
+
+        if(cubemap.flags.check(TextureInterface::on_gpu_bit))
+            graphics::bind_texture(&cubemap);
+        else
+            graphics::gpu_upload(&cubemap);
+
+        glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, cubemap.gl_id, 0);
+    }
+
+
     void Framebuffer::add_depth_attachment(Renderbuffer & renderbuffer) {
        if(size != renderbuffer.size)
             debug_warn(debug::category::graphics,
@@ -154,5 +169,10 @@ namespace proto {
     Framebuffer& Framebuffer::$_add_depth_attachment(Texture2D & texture) {
         add_depth_attachment(texture); return *this;
     }
+
+    Framebuffer& Framebuffer::$_add_depth_attachment(Cubemap & cubemap) {
+        add_depth_attachment(cubemap); return *this;
+    }
+
 } // namespace proto
 

@@ -19,8 +19,6 @@ using namespace proto;
 PROTO_SETUP { // (RuntimeSettings * settings)
 }
 
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image/stb_image_write.h"
 
 u8 client_data_begin; //////////////////////////////
 
@@ -71,6 +69,10 @@ AssetHandle ssao_gaussian_shader_h;
 AssetHandle skybox_shader_h;
 AssetHandle gaussian_shader_h;
 AssetHandle hdr_shader_h;
+AssetHandle lamp_shader_h;
+
+Framebuffer teapot_0_shadow_framebuf;
+Framebuffer teapot_1_shadow_framebuf;
 
 AssetHandle skybox_h;
 AssetHandle skyboxa_h;
@@ -78,7 +80,6 @@ AssetHandle skyboxa_h;
 Entity sponza;
 Entity teapot_0;
 Entity teapot_1;
-Entity teapot_2;
 
 u8 client_data_end; 
 
@@ -96,35 +97,9 @@ void mouse_move_callback(MouseMoveEvent& ev) {
 } MouseMoveInputSink mouse_move_input_sink;
 
 
-void* capture_buffer ;
-s32 capture_frame = 0;
-char capture_name[256];
-
-void capture() {
-    capture_frame++;
-    stbi_flip_vertically_on_write(1);
-
-    GLint viewport[4];
-    glGetIntegerv(GL_VIEWPORT, viewport);
-
-    int x = viewport[0];
-    int y = viewport[1];
-    int width = viewport[2];
-    int height = viewport[3];
-
-    glPixelStorei(GL_PACK_ALIGNMENT, 1);
-    glReadPixels(x, y, width, height, GL_RGB, GL_UNSIGNED_BYTE, capture_buffer);
-
-    sprint(capture_name, 128, "rec/1/capture", capture_frame, ".png");
-    stbi_write_png(capture_name, width, height, 3, capture_buffer, 0);
-}
-
-
 PROTO_INIT {
     auto& ctx = *proto::context;
 
-    capture_buffer =
-        ctx.memory.alloc(ctx.window_size.x * ctx.window_size.y * 3);
     assert(capture_buffer);
     mouse_move_input_sink.init(ctx.mouse_move_input_channel, mouse_move_callback);
 
@@ -158,28 +133,65 @@ PROTO_INIT {
     teapot_1 = create_entity();
 
     {
-    add_component<PointlightComp>(teapot_0);
-    auto& transform = add_component<TransformComp>(teapot_0);
-    transform.position = vec3(0.0, -1000.0, 0.0);
-    transform.scale = vec3(0.085);
+        auto& teapot_shadow_map = 
+            create_asset_rref<Cubemap>("teapot_0_shadow_map")
+            .$_init(ivec2(1024), GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_FLOAT);
 
-    if(Mesh * teapot_mesh = get_asset<Mesh>( make_handle<Mesh>("teapot") )) {
-        add_component<RenderMeshComp>(teapot_0).mesh = make_handle<Mesh>("teapot");
-    } else
-        debug_info(debug::category::main, "Failed to assign mesh to entity.");
+        auto& pointlight_comp = add_component<PointlightComp>(teapot_0);
+
+        pointlight_comp.shadow_map = teapot_shadow_map.handle;
+
+        teapot_0_shadow_framebuf
+            .$_init(teapot_shadow_map.size, 0)
+            .$_bind()
+            .$_add_depth_attachment(teapot_shadow_map)
+            .finalize();
+
+        auto& transform = add_component<TransformComp>(teapot_0);
+        transform.position = vec3(0.0, -1000.0, 0.0);
+        transform.scale = vec3(0.085);
+
+        if(Mesh * teapot_mesh = get_asset<Mesh>( make_handle<Mesh>("teapot") )) {
+            add_component<RenderMeshComp>(teapot_0).mesh =
+                make_handle<Mesh>("teapot");
+        } else
+            debug_info(debug::category::main,
+                       "Failed to assign mesh to entity.");
     }
 
     {
-    add_component<PointlightComp>(teapot_1);
-    auto& transform = add_component<TransformComp>(teapot_1);
-    transform.position = vec3(0.0, -100.0, 0.0);
-    transform.scale = vec3(0.085);
+        auto& teapot_shadow_map = 
+            create_asset_rref<Cubemap>("teapot_1_shadow_map")
+            .$_init(ivec2(1024), GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_FLOAT);
 
-    if(Mesh * teapot_mesh = get_asset<Mesh>( make_handle<Mesh>("teapot") )) {
-        add_component<RenderMeshComp>(teapot_1).mesh = make_handle<Mesh>("teapot");
-    } else
-        debug_info(debug::category::main, "Failed to assign mesh to entity.");
+        auto& pointlight_comp = add_component<PointlightComp>(teapot_1);
+
+        pointlight_comp.shadow_map = teapot_shadow_map.handle;
+
+        teapot_1_shadow_framebuf
+            .$_init(teapot_shadow_map.size, 0)
+            .$_bind()
+            .$_add_depth_attachment(teapot_shadow_map)
+            .finalize();
+
+        auto& transform = add_component<TransformComp>(teapot_1);
+        transform.position = vec3(0.0, -100.0, 0.0);
+        transform.scale = vec3(0.085);
+
+        if(Mesh * teapot_mesh = get_asset<Mesh>( make_handle<Mesh>("teapot") )) {
+            add_component<RenderMeshComp>(teapot_1).mesh =
+                make_handle<Mesh>("teapot");
+        } else
+            debug_info(debug::category::main,
+                       "Failed to assign mesh to entity.");
     }
+
+    lamp_shader_h =
+        create_init_asset_rref<ShaderProgram>("lamp_shader")
+        .$_attach_shader_file(ShaderType::Vert, "lamp_vert.glsl")
+        .$_attach_shader_file(ShaderType::Geom, "lamp_geom.glsl")
+        .$_attach_shader_file(ShaderType::Frag, "lamp_frag.glsl")
+        .$_link().handle;
 
     for(auto& t : ctx.textures) gfx::gpu_upload(&t);
     for(auto& m : ctx.meshes) gfx::gpu_upload(&m);
@@ -393,7 +405,7 @@ PROTO_INIT {
 
 ////////////////////////////////////////////////////////////////////////////
 
-#define TAKE 1
+#define TAKE 0
 
 PROTO_UPDATE {
     auto& ctx = *proto::context;
@@ -416,8 +428,8 @@ PROTO_UPDATE {
         angle_axis(sin(time/10.0) + 1.4, vec3(0.0,1.0,0.0));
     #elif TAKE == 3
     float stime = time/10.0;
-    ctx.camera.position = vec3(3.1 - sin(stime)/2.0,
-                               0.85 + cos(stime*2.0)/1.5 ,
+    ctx.camera.position = vec3(3.1 - (cos(-stime + 4) + pow(sin(stime),2)) * 0.2,
+                               1.25 - cos(stime*2.0)/1.5 ,
                                5.0 + sin(stime) * 7.0);
  
     {
@@ -440,15 +452,78 @@ PROTO_UPDATE {
  
  
     #endif 
+
+    #if 0
+    ///pointlight_shadows
+    Array<mat4> shadow_transforms;
+    shadow_transforms.init_resize(6, &ctx.memory);
+
+    float aspect = 1.0;
+    float near = 3.0f, far = 80.0f;
+    mat4 shadow_proj = glm::perspective((float)M_PI/2, 1.0f, near, far);
+
+    shadow_transforms[0] =
+        (glm::lookAt(vec3(0.0), vec3( 1.0,0.0,0.0), vec3(0.0,-1.0,0.0)));
+    shadow_transforms[1] =
+        (glm::lookAt(vec3(0.0), vec3(-1.0,0.0,0.0), vec3(0.0,-1.0,0.0)));
+    shadow_transforms[2] =
+        (glm::lookAt(vec3(0.0), vec3(0.0, 1.0,0.0), vec3(0.0, 0.0,1.0)));
+    shadow_transforms[3] = 
+        (glm::lookAt(vec3(0.0), vec3(0.0,-1.0,0.0), vec3(0.0, 0.0,-1.0)));
+    shadow_transforms[4] =
+        (glm::lookAt(vec3(0.0), vec3(0.0,0.0, 1.0), vec3(0.0,-1.0,0.0)));
+    shadow_transforms[5] =
+        (glm::lookAt(vec3(0.0), vec3(0.0,0.0,-1.0), vec3(0.0,-1.0,0.0)));
+
+    for(auto& pointlight : context->comp.pointlights) {
+        TransformComp * pointlight_transform =
+            get_component<TransformComp>(pointlight.entity);
+
+        assert(pointlight_transform);
+        mat4 view = glm::translate(mat4(1.0), pointlight_transform->position);
+
+        for(auto& render_mesh : context->comp.render_mesh) {
+            if(render_mesh.entity == pointlight.entity) continue;
+
+            TransformComp * mesh_transform =
+                get_component<TransformComp>(render_mesh.entity);
+
+            assert(mesh_transform);
+            mat4 model = mesh_transform->model();
+
+            Mesh * mesh = get_asset<Mesh>(render_mesh.mesh);
+
+            if(!mesh) {
+                debug_error(1, "abandoned component :/"); continue;
+            }
+            get_asset_ref<ShaderProgram>(lamp_shader_h)
+                .$_use()
+                .$_set_float("u_far", 80.0f)
+                .$_set_mat4 ("u_model", &model)
+                .$_set_mat4 ("u_view", &view)
+                .$_set_mat4 ("u_shadow_t[0]", &shadow_transforms[0])
+                .$_set_mat4 ("u_shadow_t[1]", &shadow_transforms[1])
+                .$_set_mat4 ("u_shadow_t[2]", &shadow_transforms[2])
+                .$_set_mat4 ("u_shadow_t[3]", &shadow_transforms[3])
+                .$_set_mat4 ("u_shadow_t[4]", &shadow_transforms[4])
+                .$_set_mat4 ("u_shadow_t[5]", &shadow_transforms[5]);
+
+            gfx::bind_framebuffer(teapot_0_shadow_framebuf);
+ 
+            gfx::render_mesh(mesh, true);
+        }
+    }
+    #endif 
+
     gfx::reset_framebuffer();
 
     glClearColor(0.1f,0.1f,0.1f,1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glViewport(0, 0, ctx.window_size.x, ctx.window_size.y);
 
-    gfx::render_skybox(gfx::bind_texture(skybox_h));
+    gfx::render_skybox(skybox_h);
 
-    // shadows
+    // direcional shadows
     #if 1
     gfx::bind_framebuffer(dirlight_shadowmap_buf);
     glViewport(0, 0, dirlight_shadowmap_buf.size.x,
@@ -662,7 +737,6 @@ PROTO_UPDATE {
     gfx::render_texture_quad(gfx::bind_texture(postbuf_ping_h),
                              vec2(0.0), 2.0f*halfscr);
 
-    capture();
     #endif
     //gfx::render_std_basis();
 
@@ -671,7 +745,7 @@ PROTO_UPDATE {
     gfx::stale_all_texture_slots();
 }
 
-#if 0 // framebuffers as handles
+#if 0 // framebuffers cant be stored in lib 
 PROTO_UNLINK {
     // yeah, thats hacky
     u64 preserved_data_size = &client_data_end - &client_data_begin;
