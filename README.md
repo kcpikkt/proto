@@ -1,13 +1,13 @@
 # proto [![Build Status](https://travis-ci.org/kcpikkt/proto.svg?branch=master)](https://travis-ci.org/kcpikkt/proto)
 proto is my bottom-up apprach to building game/demo framework.
-It is supposed to handle everything from interfacing with the platform, input, timekeeping, memory managment, 
+It is supposed to handle everything from interfacing with the platform, input, timekeeping, memory managment
 to sound, rendering, entity-component system, asset managment and more.
 In this early stage it doesn't do all of that well yet but I was capable to pull off a small demo: [link](https://youtu.be/WClkKQ8i9xY)
 
 ![70MB+ preview gif, may take a bit to load...](/prev0.gif)
 
 It uses IdTech-like architecture where game/demo is a dynamic library that can be hot-swapped at any time.
-It has its own asset file format - .past (.p(roto)a(s)sset?) which is basically just memory dump for faster loads
+It has its own asset file format - .past (.p(roto)as(sse)t?) which is basically just memory dump for faster loads
 and cli under src/tools, that currently serves just as an parser from external formats to pasts.
  
 # Dependencies
@@ -21,7 +21,7 @@ though is written with being multiplatform in mind.
 
 Scarce dependencies allow proto to be built with just simple makefile.
 
-make runtime - builds proto-runtime which takes path to client dynamic library it is supposed to run as its
+make runtime - builds proto-runtime which takes path to client dynamic library, it is supposed to run, as its
 first command line argument.
 ```sh
 $ make runtime
