@@ -100,7 +100,6 @@ void mouse_move_callback(MouseMoveEvent& ev) {
 PROTO_INIT {
     auto& ctx = *proto::context;
 
-    assert(capture_buffer);
     mouse_move_input_sink.init(ctx.mouse_move_input_channel, mouse_move_callback);
 
     ctx.camera.position = vec3(0.0,1.65,10.0);

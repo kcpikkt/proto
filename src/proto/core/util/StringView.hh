@@ -1,4 +1,5 @@
 #pragma once
+#include <string.h>
 #include "proto/core/common.hh"
 #include "proto/core/debug/assert.hh"
 

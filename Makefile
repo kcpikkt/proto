@@ -49,39 +49,39 @@ else
 endif
 
 # todo get rid of that, no mercy for windows people, get unix tools, scrub!
-ifeq ($(platform), LINUX)
-define makedir
-	mkdir -p $(1)
-endef
-define remove
-	rm -f $(1)
-endef
-define if-file-not-exist
-	if [ ! -f "$(1)" ]; then $(2); fi
-endef
-
-else ifeq ($(platform), WINDOWS)
-define winpath
-	$(subst /,\\,$(1))
-endef
-define unixpath
-	$(subst \,/,$(subst \\,/,$(1)))
-endef
-define makedir
-	$(eval ARG := $(call winpath, $(patsubst %/,%,$(1))))
-	if not exist $(ARG) mkdir $(ARG)
-endef
-define remove
-	del /Q /F $(call winpath, $(1)) 2> nul
-endef
-define if-file-exist
-	if exist $(call winpath,$(1)) ($(2))
-endef
-define if-file-not-exist
-	if not exist $(call winpath,$(1)) ($(2))
-endef
-
-endif
+#ifeq ($(platform), LINUX)
+#define makedir
+#	mkdir -p $(1)
+#endef
+#define remove
+#	rm -f $(1)
+#endef
+#define if-file-not-exist
+#	if [ ! -f "$(1)" ]; then $(2); fi
+#endef
+#
+#else ifeq ($(platform), WINDOWS)
+#define winpath
+#	$(subst /,\\,$(1))
+#endef
+#define unixpath
+#	$(subst \,/,$(subst \\,/,$(1)))
+#endef
+#define makedir
+#	$(eval ARG := $(call winpath, $(patsubst %/,%,$(1))))
+#	if not exist $(ARG) mkdir $(ARG)
+#endef
+#define remove
+#	del /Q /F $(call winpath, $(1)) 2> nul
+#endef
+#define if-file-exist
+#	if exist $(call winpath,$(1)) ($(2))
+#endef
+#define if-file-not-exist
+#	if not exist $(call winpath,$(1)) ($(2))
+#endef
+#
+#endif
 
 src_dir := src/proto
 obj_dir := obj
@@ -118,10 +118,12 @@ ifeq ($(platform), LINUX)
 endif
 
 ifdef client_src_dir
+ifdef client_name
 	client_srcs = $(shell find $(client_src_dir) -name *.cc)
-	client_obj_dir = $(client_src_dir)/obj
+	client_obj_dir = $(obj_dir)/client/$(client_name)
 	client_objs = $(client_srcs:$(client_src_dir)/%.cc=$(client_obj_dir)/%.o)
 	client_deps := $(client_objs:.o=.d)
+endif
 endif
 
 # TARGETS
@@ -176,7 +178,7 @@ $(standalone): $(proto_runtime_objs) $(client_objs) $(library)
 	$(cxx) $(ldflags) -o $@ $(proto_runtime_objs) $(client_objs) $(library) $(libs) 
 
 $(client_objs): $(client_obj_dir)/%.o: $(client_src_dir)/%.cc
-	@$(call makedir, $(dir $@))
+	@mkdir -p $(dir $@)
 	$(cxx) -c -fPIC $(cxxflags) -MMD -MP $< $(includes) $(client_includes) -o $@
 
 $(library): $(proto_lib_objs)

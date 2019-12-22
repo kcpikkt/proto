@@ -1,7 +1,6 @@
 #include "proto/core/memory/LinkedListAllocator.hh"
 #include "proto/core/debug/logging.hh"
 #include "proto/core/debug/stacktrace.hh"
-#include "proto/core/util/bitfield.hh"
 #include "proto/core/util/algo.hh"
 #include "proto/core/debug/assert.hh"
 #include "proto/core/common/types.hh"
@@ -185,7 +184,10 @@ void * LinkedListAllocator::alloc(size_t requested_size, size_t alignment)
     }
     // else if split failed node is still in list, no sort needed
 
-    bitfield_unset(&(free_node->flags), Header::FREE);
+    //TODO(kacper): use your BItfield class
+    //bitfield_unset(&(free_node->flags), Header::FREE);
+    free_node->flags &= ~Header::FREE;
+
     _used += get_header(ret)->size;
 
 #if defined(PROTO_DEBUG)
@@ -320,7 +322,9 @@ LinkedListAllocator::try_split(Header * node,
         // NOTE(kacper): we dont reset node->next just yet,
         //               it is used later
 
-        bitfield_set(&new_node->flags, Header::FREE);
+        //TODO(kacper): use your BItfield class
+        //bitfield_set(&new_node->flags, Header::FREE);
+        new_node->flags |= Header::FREE;
 
         if(node->flags & Header::FREE) {
             _used += sizeof(Header) + get_block_padding(new_node);
@@ -378,7 +382,10 @@ void LinkedListAllocator::free(void * block) {
                    "Attempted to free already free memory.");
     }
 
-    bitfield_set(&header->flags, Header::FREE);
+    //TODO(kacper): use your BItfield class
+    //bitfield_set(&header->flags, Header::FREE);
+    header->flags |= Header::FREE;
+
     _used -= header->size;
 
     if(header->next_in_mem->flags & Header::FREE) {

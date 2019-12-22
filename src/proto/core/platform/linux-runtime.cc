@@ -225,7 +225,7 @@ int proto::platform::runtime(int argc, char ** argv){
     // So every linux window manager is actually just a root X window?
     Window root = DefaultRootWindow(_context.display);
 
-    _context.window_size = proto::ivec2(1920,1024);
+    _context.window_size = proto::ivec2(960,1024);
     mouse_lock_pos = _context.window_size/2;
 
     _context.window =
@@ -252,8 +252,9 @@ int proto::platform::runtime(int argc, char ** argv){
         GLX_GREEN_SIZE, 1,
         GLX_BLUE_SIZE, 1,
         GLX_DEPTH_SIZE, 3,
-        GLX_SAMPLE_BUFFERS  , 1, // MSAA
-        GLX_SAMPLES         , 4, // MSAA
+         // deffered rendering, no multisampling unfortunatelly
+         //GLX_SAMPLE_BUFFERS  , 1, // MSAA
+         //GLX_SAMPLES         , 4, // MSAA
         None
         };
 
@@ -262,9 +263,11 @@ int proto::platform::runtime(int argc, char ** argv){
     GLXFBConfig * fbc = glXChooseFBConfig(_context.display,
                                         DefaultScreen(_context.display),
                                         visual_attribs, &fbcount);
+    assert(fbc);
     // so visual is a bit like winapi pixel format, isn't it?
     XVisualInfo * visual = glXGetVisualFromFBConfig(_context.display, fbc[0]); 
     assert(visual);
+
     GLXContext tmp_gl_context =
         glXCreateContext(_context.display, visual, NULL, GL_TRUE);
 
@@ -594,8 +597,7 @@ int proto::platform::runtime(int argc, char ** argv){
 
     _context.clock.init(2.0f);
     while(!_context.exit_sig) {
-        //_context.clock.tick();
-        _context.clock.elapsed_time += 0.016666f;
+        _context.clock.tick();
 
         stat(_context.clientlib_path, &clientlib_statbuf);
         if(clientlib_mtime != clientlib_statbuf.st_mtime) {
