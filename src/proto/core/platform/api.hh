@@ -6,6 +6,7 @@
 #include "proto/core/memory/common.hh"
 
 #include "proto/core/platform/File.hh"
+#include "proto/core/platform/Clock.hh"
 
 namespace proto {
     struct String;

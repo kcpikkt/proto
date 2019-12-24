@@ -1,14 +1,16 @@
 #pragma once
+#include "proto/core/common/types.hh"
 #include "proto/core/platform/macros.hh"
-#if defined(PROTO_PLATFORM_LINUX)
-
-#include "proto/core/platform/clock.hh"
-#include <time.h>
 
 namespace proto {
 namespace platform {
 
-struct LinuxClockImpl : ClockCRTPInterface<LinuxClockImpl> {
+struct Clock {
+    float delta_time;
+    float elapsed_time;
+    u64 tick_count = 0;
+
+#if defined(PROTO_PLATFORM_LINUX)
     using nsec_t = decltype(timespec::tv_nsec);
 
     constexpr static nsec_t one_sec = 1000000000;
@@ -34,15 +36,16 @@ struct LinuxClockImpl : ClockCRTPInterface<LinuxClockImpl> {
     struct timespec _delta_time = {};
 
     struct timespec _desired_time;
+#elif defined(PROTO_PLATFORM_WINDOWS)
+    #error not implemented
+#endif
 
+#if defined(PROTO_PLATFORM_LINUX)
     void timespec_reduce(timespec* ts);
+#endif
     void init(float fps);
     void tick();
 };
 
-}
-}
-
-#else
-#error linux specific header included in non linux platform
-#endif
+} // namespace platform
+} // namespace proto

@@ -157,11 +157,13 @@ namespace proto {
         debug::Level stdout_log_level = debug::level::all;
 
         bool exit_sig = false;
-#    if defined(PROTO_PLATFORM_WINDOWS)
-        platform::WindowsClockImpl clock;
-#    else
-        platform::LinuxClockImpl clock;
-#    endif
+
+        platform::Clock clock;
+        //#    if defined(PROTO_PLATFORM_WINDOWS)
+        //        platform::WindowsClockImpl clock;
+        //#    else
+        //        platform::LinuxClockImpl clock;
+        //#    endif
  
     };
 }
