@@ -15,8 +15,8 @@ namespace serialization {
         u8 channels;
         u64 data_offset;
         u64 data_size;
-        u32 format;
         u32 gpu_format;
+        u32 format;
     };
 }
 
@@ -41,10 +41,8 @@ struct Texture2D :
 
     void init();
     void init(void (*tex_param_config)());
-    void init(ivec2 size, u32 format, u32 gpu_format,
-              u32 datatype = GL_UNSIGNED_BYTE);
-    void init(void * data, ivec2 size, u32 format, u32 gpu_format,
-              u32 datatype = GL_UNSIGNED_BYTE);
+    void init(ivec2 size, u32 gpu_format, u32 format, u32 datatype = GL_UNSIGNED_BYTE);
+    void init(void * data, ivec2 size, u32 gpu_format, u32 format, u32 datatype = GL_UNSIGNED_BYTE);
     void init(memory::Allocator * allocator);
 
     void upload();
@@ -64,16 +62,16 @@ struct Texture2D :
         init(); return *this;
     }
 
-    inline Texture2D& $_init(ivec2 size, u32 format, u32 gpu_format,
+    inline Texture2D& $_init(ivec2 size, u32 gpu_format, u32 format,
                              u32 datatype = GL_UNSIGNED_BYTE)
     {
-        init(size, format, gpu_format, datatype); return *this;
+        init(size, gpu_format, format, datatype); return *this;
     }
 
-    inline Texture2D& $_init(void * data, ivec2 size, u32 format, u32 gpu_format,
+    inline Texture2D& $_init(void * data, ivec2 size, u32 gpu_format, u32 format,
                              u32 datatype = GL_UNSIGNED_BYTE)
     {
-        init(data, size, format, gpu_format,datatype); return *this;
+        init(data, size, gpu_format, format,datatype); return *this;
     }
 
     inline Texture2D& $_upload(){

@@ -353,7 +353,7 @@ namespace serialization {
         MemBuffer buffer = serialize_asset(asset, allocator);
 
         sys::File file;
-        assert(!file.open(path, sys::file_write));
+        assert(!file.open(path, sys::File::write_mode));
         assert(!file.size());
 
         assert( buffer.size == file.write(buffer.data, buffer.size) );
@@ -469,9 +469,11 @@ namespace serialization {
     {
         //AssetContext & ctx = *context;
         namespace sys = proto::platform;
-        assert(!strncmp(sys::extension_substr(path), "past", 4));
+        if(strncmp(sys::extension_substr(path), "past", 4))
+            debug_warn(debug::category::data, "loaded file extension is not .past");
+
         sys::File file;
-        assert(!file.open(path, sys::file_read));
+        assert(!file.open(path, sys::File::read_mode));
         assert( file.size());
         memory::Allocator * allocator = &proto::context->memory;
 

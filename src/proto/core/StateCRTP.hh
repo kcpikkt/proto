@@ -89,7 +89,6 @@ void StateCRTP<T>::_destroy_deep() {
     state_flags.set(_deep_destroyed_bit);
 }
 
-// stick it in the dtor
 template<typename T>
 void StateCRTP<T>::destroy() {
     if(state_flags.check(_initialized_bit)) {

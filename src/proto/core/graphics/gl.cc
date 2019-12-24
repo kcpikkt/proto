@@ -300,9 +300,9 @@ namespace graphics{
 
         for(s32 i=0; i<6; i++) {
             glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0,
-                     cubemap->format,
-                     cubemap->size.x, cubemap->size.y, 0,
                      cubemap->gpu_format,
+                     cubemap->size.x, cubemap->size.y, 0,
+                     cubemap->format,
                      GL_UNSIGNED_BYTE, //cubemap->datatype,
                      cubemap->data[i]);
         }
@@ -322,19 +322,22 @@ namespace graphics{
 
         // Texture2D::data should be null default
 
-        if(texture->datatype == GL_FLOAT) {
-            vardump(get_metadata(texture->handle)->name);
-        }
-
         glTexImage2D(GL_TEXTURE_2D, 0,
-                     texture->format,
-                     texture->size.x, texture->size.y, 0,
                      texture->gpu_format,
+                     texture->size.x, texture->size.y, 0,
+                     texture->format,
                      texture->datatype,
                      texture->data);
 
-        if(texture->flags.check(TextureInterface::mipmap_bit))
+        if(glGetError())
+            debug_info(debug::category::graphics, "glTexImage2D failed");
+
+        if(texture->flags.check(TextureInterface::mipmap_bit)) {
             glGenerateMipmap(GL_TEXTURE_2D);
+
+            if(glGetError())
+                debug_info(debug::category::graphics, "glGenerateMipmap failed");
+        }
 
         texture->flags.set(TextureInterface::on_gpu_bit);
         stale_texture_slot(texture->bound_unit);

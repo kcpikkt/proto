@@ -5,6 +5,8 @@
 #include "proto/core/util/StringView.hh"
 #include "proto/core/memory/common.hh"
 
+#include "proto/core/platform/File.hh"
+
 namespace proto {
     struct String;
     struct StringArena;
@@ -47,50 +49,6 @@ namespace platform {
     // TODO(kacper): allocate inside, return unique_ptr to string arena;
     // TODO(kacper): ls_rel, ls_abs?
     StringArena ls(StringView dirpath);
-
-    using FileModeType = u8;
-    constexpr static FileModeType file_read   = BIT(1);
-    constexpr static FileModeType file_write  = BIT(2);
-    constexpr static FileModeType file_trunc  = BIT(3);
-    constexpr static FileModeType file_create = BIT(4);
-    constexpr static FileModeType file_append = BIT(5);
-
-    struct File {
-        size_t _cached_size = 0;
-        u8 flags = 0;
-
-        constexpr static u8 IS_INITIALIZED = 1;
-        constexpr static u8 IS_OPEN = 2;
-
-        inline bool is_open() {
-            return (flags & IS_OPEN);
-        }
-        inline bool is_initialized() {
-            return (flags & IS_INITIALIZED);
-        }
-
-        //File();
-        //File(memory::Allocator * allocator);
-        //int init(memory::Allocator * allocator);
-        int open(const char * path, FileModeType mode);
-        size_t file_size();
-        int close();
-        u64 size();
-        u64 write(const void * buf, size_t size); 
-        int read(void * buf, size_t size); 
-        int reserve(size_t size);
-
-        //Filepath path;
-    #if defined(PROTO_PLATFORM_WINDOWS)
-        #error not implemented
-    #elif defined(PROTO_PLATFORM_MAC)
-        #error not implemented
-    #else 
-        FILE * file_ptr = nullptr;
-        int file_desc = -1;
-    #endif
-    };
-
 
 } // namespace platform
 } // namespace proto

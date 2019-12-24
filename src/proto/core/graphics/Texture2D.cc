@@ -23,8 +23,8 @@ serialization::AssetHeader<Texture2D> Texture2D::serialization_header_map() {
     serialization::AssetHeader<Texture2D> ret;
     ret.size = size;
     ret.channels = channels;
-    ret.format = format;
     ret.gpu_format = gpu_format;
+    ret.format = format;
     ret.data_offset = sizeof(serialization::AssetHeader<Texture2D>);
     ret.data_size = serialized_data_size();
     return ret;
@@ -93,17 +93,17 @@ void Texture2D::init(){
     //gfx::stale_texture_slot(slot);
 }
 
-void Texture2D::init(ivec2 size, u32 format, u32 gpu_format, u32 datatype){
+void Texture2D::init(ivec2 size, u32 gpu_format, u32 format, u32 datatype){
     init();
-    this->format = format;
     this->gpu_format = gpu_format;
+    this->format = format;
     this->size = size;
     this->datatype = datatype;
 }
 
-void Texture2D::init(void *data, ivec2 size, u32 format, u32 gpu_format, u32 datatype)
+void Texture2D::init(void *data, ivec2 size, u32 gpu_format, u32 format, u32 datatype)
 {
-    init(size, format, gpu_format, datatype);
+    init(size, gpu_format, format, datatype);
     assert(data);
     this->data = data;
 }

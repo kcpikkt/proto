@@ -80,15 +80,16 @@ void ShaderProgram::attach_shader_src(ShaderType type, const char * src) {
 }
 
 void ShaderProgram::attach_shader_file(ShaderType type, StringView path) {
+    namespace sys = proto::platform;
     String filepath =
-        platform::search_for_file(proto::context->shader_paths, path);
+        sys::search_for_file(proto::context->shader_paths, path);
 
     if(!filepath) {
         debug_error(debug::category::graphics,
                     "Could not find shader file ", path); return; }
 
-    platform::File file;
-    assert(!file.open(filepath.view(), platform::file_read));
+    sys::File file;
+    assert(!file.open(filepath.view(), sys::File::read_mode));
 
     memory::Allocator * allocator = &(context->memory);
     u8 * buf = (u8*)allocator->alloc(file.size() + 1);
@@ -124,7 +125,7 @@ void ShaderProgram::link() {
                         proto::debug::category::graphics,
                         "shader program linking failed but was unable to allocate "
                         "error message buffer in "
-                        "linked_list_allocator global_state.memory")
+                        "LinkedListAllocator context.memory")
 
             glGetProgramInfoLog(_program, log_length, NULL, log_buffer);
             debug_error(proto::debug::category::graphics, log_buffer);

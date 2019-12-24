@@ -277,55 +277,6 @@ path_ncat(char * dest,
     return dest;
 }
 
-int File::open(const char * filepath, FileModeType mode) {
-    const char * mode_str;
-    switch(mode) {
-        case (file_read):
-            mode_str = "rb"; break;
-        case (file_write):
-            mode_str = "wb"; break;
-        case (file_read | file_write):
-            mode_str = "wb+"; break;
-        default:
-            assert(0 && "unsupported fileopen mode");
-    }
-    file_ptr = fopen(filepath, mode_str);
-    if(!file_ptr) return -1;
-    file_desc = fileno(file_ptr);
-    if(file_desc == -1) return -2;
-    return 0;
-}
-
-u64 File::write(const void * buf, size_t size) {
-    return fwrite(buf, sizeof(u8), size, file_ptr);
-}
-
-int File::read(void * buf, size_t size) {
-    return fread(buf, sizeof(u8), size, file_ptr);
-}
-
-u64 File::size() {
-    if(_cached_size) return _cached_size;
-
-    fseek (file_ptr , 0 , SEEK_END);
-    u64 ret = ftell (file_ptr);
-    rewind (file_ptr);
-    _cached_size = ret;
-    return ret;
-}
-
-int File::reserve(size_t size) {
-    //   assert(is_initialized);
-    assert(file_ptr);
-    assert(file_desc != -1);
-    return posix_fallocate(file_desc, 0, size);
-}
-int File::close() {
-    //assert(is_initialized);
-    assert(file_ptr);
-    return fclose(file_ptr);
-}
-
 
 } // namespace platform
 } // namespace proto 

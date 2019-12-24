@@ -225,7 +225,7 @@ int proto::platform::runtime(int argc, char ** argv){
     // So every linux window manager is actually just a root X window?
     Window root = DefaultRootWindow(_context.display);
 
-    _context.window_size = proto::ivec2(960,1024);
+    _context.window_size = proto::ivec2(512,512);
     mouse_lock_pos = _context.window_size/2;
 
     _context.window =
@@ -426,6 +426,7 @@ int proto::platform::runtime(int argc, char ** argv){
     default_white_texture.init(ivec2(1,1), GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
     default_white_texture.data = (void*)default_white_texture_data;
     graphics::gpu_upload(&default_white_texture);
+    assert(!glGetError());
     _context.default_white_texture_h = default_white_texture.handle;
 
     Texture2D & default_black_texture =
