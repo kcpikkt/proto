@@ -450,8 +450,16 @@ int proto::platform::runtime(int argc, char ** argv){
     cube.vertices.resize(36);
     assert(sizeof(cube_vertices) == sizeof(Vertex) * 36);
     memcpy(cube.vertices._data, cube_vertices, sizeof(Vertex) * 36);
-    graphics::gpu_upload(&cube);
+
+    cube.indices.resize(36);
+    for(s32 i=0; i<36; i++) cube.indices[i] = i;
+
+    cube.spans.resize(1);
+    cube.spans[0].begin_index = 0;
+    cube.spans[0].index_count = 36;
+
     _context.cube_h = cube.handle;
+    graphics::gpu_upload(&cube);
 
     Mesh & quad = create_init_asset_rref<Mesh>("default_quad");
     quad.vertices.resize(4);
@@ -595,7 +603,7 @@ int proto::platform::runtime(int argc, char ** argv){
     client_init();
     assert(!glGetError());
 
-    _context.clock.init(2.0f);
+    _context.clock.init(30.0f);
     while(!_context.exit_sig) {
         _context.clock.tick();
 

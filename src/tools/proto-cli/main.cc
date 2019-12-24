@@ -103,12 +103,14 @@ AssetHandle fetch_texture(StringView rel_path) {
 
 StringView cmdline_sentences[] = {"parse mesh",
                                   "parse cubemap",
+                                  "parse texture",
 };
 
 void parse_mesh(StringView filepath, StringView outdir);
 void parse_cubemap(StringView, StringView, StringView,
                    StringView, StringView, StringView,
                    StringView);
+void parse_texture(StringView filepath, StringView out);
 
 PROTO_INIT {
     assert(proto::context);
@@ -119,7 +121,7 @@ PROTO_INIT {
 
     if(sentence) {
         /*  */ if(strview_cmp(sentence, "parse mesh")) {
-        log_info(debug::category::main, "Mesh parsing");
+            log_info(debug::category::main, "Mesh parsing");
             if(ctx.argc != 6) {
                 log_error(debug::category::main,
                           "parse mesh [mesh file] [out directory]");
@@ -131,7 +133,7 @@ PROTO_INIT {
             }
             return;
         } else if(strview_cmp(sentence, "parse cubemap")) {
-        log_info(debug::category::main, "Cubemap parsing");
+            log_info(debug::category::main, "Cubemap parsing");
             if(ctx.argc != 12) {
                 log_info(debug::category::main,
                         "parse cubemap [directory] "
@@ -146,6 +148,16 @@ PROTO_INIT {
                               ctx.argv[8], ctx.argv[9], ctx.argv[10],
                               ctx.argv[11]);
             }
+            return;
+        } else if(strview_cmp(sentence, "parse texture")) {
+            log_info(debug::category::main, "Texture parsing");
+
+            if(ctx.argc != 6) 
+                FAIL("parse texture [texture] [out]");
+
+            dirpath = sys::dirname_view(ctx.argv[4]);
+
+            parse_texture(sys::basename_view(ctx.argv[4]), ctx.argv[5]);
             return;
         }
     } else {
@@ -361,7 +373,7 @@ void parse_mesh(StringView filepath, StringView outdir) {
 
                 if(mesh.HasTextureCoords(0))
                     outvertex.uv =
-                        to_vec3( mesh.mTextureCoords[0][face.mIndices[i]]).xy;
+                        vec2(to_vec3( mesh.mTextureCoords[0][face.mIndices[i]]));
                 else
                     outvertex.uv = vec2(0.0);
 
@@ -435,4 +447,8 @@ void parse_cubemap(StringView right, StringView left,
     cubemap.data[5] = get_asset_ref<Texture2D>(bk_tex_h).data;
 
     serialization::save_asset(&cubemap, out);
+}
+
+void parse_texture(StringView filepath, StringView out) {
+    auto tex_h = fetch_texture(filepath);
 }

@@ -1,0 +1,17 @@
+#version 450
+
+in struct VertOut {
+    vec3 position;
+    vec3 normal;
+    vec2 uv;
+} frag_in;
+
+uniform float u_time;
+uniform mat4 u_mvp;
+uniform mat4 u_model;
+
+out vec4 frag_color;
+
+void main() {
+    frag_color = vec4(abs(frag_in.normal), 1.0);
+}

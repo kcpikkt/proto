@@ -736,6 +736,7 @@ PROTO_UPDATE {
     gfx::render_texture_quad(gfx::bind_texture(postbuf_ping_h),
                              vec2(0.0), 2.0f*halfscr);
 
+
     #endif
     //gfx::render_std_basis();
 

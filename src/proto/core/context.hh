@@ -2,14 +2,9 @@
 
 #include "proto/core/platform/macros.hh"
 
-#if defined(PROTO_PLATFORM_WINDOWS)
-# include "proto/core/platform/windows-context.hh"
-# include "proto/core/platform/windows-clock.hh"
-#else
-# include "proto/core/platform/linux-context.hh"
-# include "proto/core/platform/linux-clock.hh"
-#endif
+#include "proto/core/platform/PlatformContext.hh"
 
+#include "proto/core/platform/Clock.hh"
 #include "proto/core/graphics/Mesh.hh"
 #include "proto/core/graphics/Texture2D.hh"
 #include "proto/core/graphics/Material.hh"
@@ -121,12 +116,7 @@ namespace proto {
         AssetContext,
         EntityContext,
         RenderContext,
-
-#   if defined(PROTO_PLATFORM_WINDOWS)
-        platform::WindowsContext
-#   else
-        platform::LinuxContext
-#   endif
+        platform::PlatformContext
     {
         int test = 12;
         memory::LinkedListAllocator memory;
@@ -159,11 +149,5 @@ namespace proto {
         bool exit_sig = false;
 
         platform::Clock clock;
-        //#    if defined(PROTO_PLATFORM_WINDOWS)
-        //        platform::WindowsClockImpl clock;
-        //#    else
-        //        platform::LinuxClockImpl clock;
-        //#    endif
- 
     };
 }

@@ -19,7 +19,7 @@ struct Err {
     static_assert(meta::is_base_of_v<ErrCategoryCRTP<Category>, Category>);
 
     s32 code;
-    operator bool() { return (bool)code; }
+    operator ErrCode() { return code; }
 
     Err(ErrCode code) : code(code) {}
 

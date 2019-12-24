@@ -13,8 +13,6 @@ namespace graphics {
 
 // NOTE(kacper): this function does not bind the mesh
 void render_span(Mesh * mesh, u32 index, bool simple = false) {
-
-    if(index == 1 && index == 2) return;
     assert(proto::context);
     assert(proto::context->current_shader);
     auto& ctx = *proto::context;

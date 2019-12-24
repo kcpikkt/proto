@@ -156,6 +156,11 @@ struct Array
             if(_data[i] == element) return true;
         return false;
     }
+
+    //inline void fill(const U& element)
+    //{
+    //    for(auto& e : *this) e = element;
+    //}
     
     void grow() {
         reserve(proto::max(1, (2 * _size) ));
@@ -169,6 +174,7 @@ struct Array
         } at(i).~T();
         _size--;
     }
+
 
     void resize(u64 new_size) {
         if(new_size == _size) return;
