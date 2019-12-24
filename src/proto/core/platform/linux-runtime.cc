@@ -2,7 +2,6 @@
 #if defined(PROTO_PLATFORM_LINUX)
 
 #include "proto/core/platform/OSAllocator.hh"
-#include "proto/core/platform/linux-clock.hh"
 #include "proto/core/graphics/common.hh"
 #include "proto/core/graphics/ShaderProgram.hh"
 #include "proto/core/graphics/primitives.hh"

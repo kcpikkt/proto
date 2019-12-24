@@ -1,6 +1,5 @@
 #pragma once
 #include "proto/core/platform/macros.hh"
-#if defined(PROTO_PLATFORM_WINDOWS)
 namespace proto {
 namespace platform {
 
@@ -13,9 +12,5 @@ struct WindowsContext {
     // HANDLE stderr_h;
 };
 
-}
-}
-
-#else
-#error windows specific header included in non windows platform
-#endif
+} // namespace platform 
+} // namespace proto
