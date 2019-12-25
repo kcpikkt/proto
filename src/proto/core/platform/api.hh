@@ -45,7 +45,7 @@ namespace platform {
     bool is_directory(StringView path);
     bool is_file(StringView path);
 
-    String search_for_file(StringArena& dirs, StringView filename);
+    String search_for_file(StringView filename, StringArena& dirs);
 
     // TODO(kacper): allocate inside, return unique_ptr to string arena;
     // TODO(kacper): ls_rel, ls_abs?

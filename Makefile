@@ -201,7 +201,7 @@ $(proto_runtime_objs): $(obj_dir)/%.o: $(src_dir)/%.cc
 	$(cxx) -fPIC $(cxxflags) $(cppflags) -MMD -MP -c $< $(includes) -o $@
 
 $(proto_lib_objs): $(obj_dir)/%.o: $(src_dir)/%.cc
-	mkdir -p $(dir $@))
+	mkdir -p $(dir $@)
 	$(cxx) -fPIC $(cxxflags) $(cppflags) -MMD -MP -c $< $(includes) -o $@
 # 	because ar is stupid
 	@$(call makedir, $(ar_obj_dir) )

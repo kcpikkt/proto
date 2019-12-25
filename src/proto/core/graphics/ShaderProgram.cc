@@ -82,7 +82,7 @@ void ShaderProgram::attach_shader_src(ShaderType type, const char * src) {
 void ShaderProgram::attach_shader_file(ShaderType type, StringView path) {
     namespace sys = proto::platform;
     String filepath =
-        sys::search_for_file(proto::context->shader_paths, path);
+        sys::search_for_file(path, proto::context->shader_paths);
 
     if(!filepath) {
         debug_error(debug::category::graphics,

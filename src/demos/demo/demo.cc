@@ -520,7 +520,7 @@ PROTO_UPDATE {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glViewport(0, 0, ctx.window_size.x, ctx.window_size.y);
 
-    gfx::render_skybox(skybox_h);
+    gfx::render_skybox(gfx::bind_texture(skybox_h));
 
     // direcional shadows
     #if 1

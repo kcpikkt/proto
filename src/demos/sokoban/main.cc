@@ -39,7 +39,6 @@ SokobanMap parse_map(StringView _textmap) {
 
     map.bounds = {0,0}; s32 line_len = 0;
 
-
     for(auto& c : textmap) {
         ivec2 current_pos = ivec2(line_len, map.bounds.y);
 
@@ -98,7 +97,8 @@ AssetHandle mytex;
 AssetHandle main_shader_h;
 
 PROTO_INIT {
-    mytex = ser::load_asset("outmesh/vase_round_Texture2D.past");
+    if(!sys::is_file("outmesh/marble_albedo.past")) debug_error(0, "fucked up");
+    mytex = ser::load_asset("outmesh/marble_albedo.past");
     gfx::gpu_upload(get_asset<Texture2D>(mytex));
 
     main_shader_h = 
@@ -174,7 +174,10 @@ PROTO_UPDATE {
 
             main_shader.$_set_mat4  ("u_mvp", &mvp);
                 
-            gfx::render_mesh(&cube, true);
+            texture_slot = gfx::bind_texture(mytex);
+
+            //gfx::render_mesh(&cube, true);
+            gfx::render_texture_quad(texture_slot);
         }
     }
     #endif

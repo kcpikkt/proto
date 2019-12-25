@@ -480,6 +480,7 @@ namespace serialization {
         void * filebuf = allocator->alloc(file.size());
         assert(filebuf);
         assert( file.size() == file.read(filebuf, file.size()) );
+        file.close();
 
         AssetHandle handle =
             deserialize_asset_buffer(MemBuffer{.data = filebuf,
@@ -487,7 +488,6 @@ namespace serialization {
 
         AssetMetadata * metadata = get_metadata(handle);
         assert(metadata);
-        file.close();
         allocator->free(filebuf);
 
         return handle;

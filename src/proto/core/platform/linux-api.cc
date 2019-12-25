@@ -165,7 +165,7 @@ bool is_file(StringView path) {
     return S_ISREG(statbuf.st_mode);
 }
 
-String search_for_file(StringArena& dirs, StringView filename) {
+String search_for_file(StringView filename, StringArena& dirs) {
     String ret;
 
     static char filepath[PROTO_MAX_PATH];
