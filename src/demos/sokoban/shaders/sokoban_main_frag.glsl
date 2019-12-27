@@ -6,6 +6,11 @@ in struct VertOut {
     vec2 uv;
 } frag_in;
 
+layout (std140) uniform Material {
+    float a;
+    float b;
+};
+
 uniform float u_time;
 uniform mat4 u_mvp;
 uniform mat4 u_model;

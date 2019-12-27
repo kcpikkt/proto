@@ -5,8 +5,9 @@
 #include "proto/core/util/namespace-shorthands.hh" 
 #include "proto/core/platform/File.hh" 
 #include "proto/core/util/String.hh" 
-using namespace proto;
+#include "proto/core/preprocessor.hh" 
 
+using namespace proto;
 
 
 struct SokobanMap {
@@ -96,7 +97,43 @@ PROTO_SETUP {
 AssetHandle mytex;
 AssetHandle main_shader_h;
 
+struct Test {
+    Test() {}
+    int a;
+};
+
+//template<typename T, >
+//struct GLSLReflFieldMetadata {
+//    const char * glsl_name;
+//    const char * glsl_type;
+//};
+
+//struct Mat {
+//    REFLECT(GLSLReflectMetadata) (
+//                                  (AssetHandle) albedo, { "sampler2D", "albedo" }
+//                                  (AssetHandle) metallic, { "sampler2D", "albedo" }
+//                                  (AssetHandle) roughness, { "sampler2D", "albedo" }
+//                                  (AssetHandle) cavity, { "sampler2D", "cavity" }
+//                                  );
+//};
+#define REM(...) __VA_ARGS__
+#define EAT(...)
+#define TYPEOF(x) DETAIL_TYPEOF(DETAIL_TYPEOF_PROBE x,)
+#define DETAIL_TYPEOF(...) DETAIL_TYPEOF_HEAD(__VA_ARGS__)
+#define DETAIL_TYPEOF_HEAD(x, ...) REM x
+#define DETAIL_TYPEOF_PROBE(...) (__VA_ARGS__),
+
+u32 ubo;
 PROTO_INIT {
+    TYPEOF((int) a) a = 1;
+
+    FOR_EACH(vardump, 1, 2, 8 );
+    glGenBuffers(1, &ubo);
+    glBindBuffer(GL_UNIFORM_BUFFER, ubo);
+    glBufferData(GL_UNIFORM_BUFFER, 152, NULL, GL_STATIC_DRAW);
+    glBindBuffer(GL_UNIFORM_BUFFER, ubo);
+
+
     if(!sys::is_file("outmesh/marble_albedo.past")) debug_error(0, "fucked up");
     mytex = ser::load_asset("outmesh/marble_albedo.past");
     gfx::gpu_upload(get_asset<Texture2D>(mytex));
@@ -132,7 +169,7 @@ PROTO_UPDATE {
                     "######\n"
                     );
 
-    if(time > 3.0f)
+    if(time > 1.0f)
         ctx.exit_sig = true;
 
     glViewport(0, 0, ctx.window_size.x, ctx.window_size.y);
