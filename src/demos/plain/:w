@@ -1,0 +1,42 @@
+#include "proto/proto.hh"
+
+#include "proto/core/reflection.hh" 
+
+struct GLSLMeaterialFieldRefl {
+    const char * glsl_type;
+    const char * glsl_name;
+};
+
+
+struct Test {};
+#define ARG3 (int) (name) ({}), (int) (ii) ({}), (int) (test) ({}) 
+struct Mat {
+    REFL_FIELDS(GLSLMeaterialFieldRefl)( (int) (name) ({}), (int) (ii) ({}), (int) (test) ({}) );
+};
+#define TEST(seq) REM_PAREN(SEQ_AT_0(seq)) REM_PAREN(SEQ_AT_1(seq));
+
+#define ARG0 
+#define ARG1 (int) (name) ({})
+#define ARG2 (int) (name) ({}), (int) (ii) ({})
+#define ARG9 1,2,3,4,5,6,7,8,9
+//struct Test {};
+//struct Mat {
+//    using FieldReflMetadata = Test;
+//    int name;
+//    struct Refl {
+//        struct Field : FieldRefl, FieldReflMetadata {};
+//        inline constexpr static Field fields[1] = { { { "int", "name" }, {} } };
+//        inline constexpr static int fields_count = 1;
+//    };
+//};
+PROTO_INIT {
+    FOR_EACH_EXP(TEST, (int) (name) ({}), (int) (ii) ({}), (int) (test) ({}) );
+
+    vardump(STR(( FOR_EACH(REM_PAREN, SEQ_TO_LIST(ARG1)) )));
+
+    vardump(VARIADIC_SIZE(ARG0));
+    vardump(VARIADIC_SIZE(ARG1));
+    vardump(VARIADIC_SIZE(ARG2));
+    vardump(VARIADIC_SIZE(ARG3));
+    vardump(VARIADIC_SIZE(ARG9));
+}

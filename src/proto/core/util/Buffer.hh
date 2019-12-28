@@ -6,7 +6,7 @@ namespace proto {
 template<typename T>
 struct Buffer {
     union {
-        void * data;
+        T * data;
         u8   * data8;
         u16  * data16;
         u32  * data32;

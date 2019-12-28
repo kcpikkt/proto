@@ -5,7 +5,18 @@
 #include "proto/core/util/namespace-shorthands.hh" 
 #include "proto/core/platform/File.hh" 
 #include "proto/core/util/String.hh" 
-#include "proto/core/preprocessor.hh" 
+#include "proto/core/reflection.hh" 
+
+struct GLSLMaterialFieldRefl {
+    const char * glsl_type;
+    const char * glsl_name;
+};
+
+
+struct Mat {
+    REFL_FIELDS(GLSLMaterialFieldRefl)((int) (albedo));
+};
+
 
 using namespace proto;
 
