@@ -2,6 +2,7 @@
 #include "proto/core/common.hh"
 #include "proto/core/asset-system/common.hh"
 #include "proto/core/asset-system/common.hh"
+#include "proto/core/reflection.hh"
 
 // 0		Color on and Ambient off
 // 1		Color on and Ambient on
@@ -36,7 +37,12 @@ namespace serialization{
     //    AssetHandle bump_map;
     //};
 } // namespace serialization
-struct Material : Asset {
+struct GLSLMaterialFieldRefl {
+    const char * glsl_type;
+    const char * glsl_name;
+};
+
+struct Material : Asset {;
 
     //serialization::AssetHeader<Material> serialization_header_map() {
     //    serialization::AssetHeader<Material> ret;
@@ -57,9 +63,12 @@ struct Material : Asset {
     //tmp, use bitfield
     bool transparency = false;
 
-    proto::vec3 ambient_color  = proto::vec3(0.2);
-    proto::vec3 diffuse_color  = proto::vec3(0.8);
-    proto::vec3 specular_color = proto::vec3(1.0);
+    REFL_FIELDS(Material, GLSLMaterialFieldRefl)
+    (
+     (vec3) (ambient_color) ({"vec3", "ambient_color"}),
+     (vec3) (diffuse_color) ({"vec3", "diffuse_color"}),
+     (vec3) (specular_color) ({"vec3", "specular_color"})
+    );
     float alpha = 1.0;
     float shininess = 0.0;
 

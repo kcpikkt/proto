@@ -5,18 +5,11 @@
 namespace proto {
 
 using ErrCode = s32;
-using ErrMessage = StringView;
-
-template<typename T>
-struct ErrCategoryCRTP {
-    static ErrMessage message(ErrCode code) {
-        return T::message(code);
-    }
-};
+using ErrMessage = const char *;
 
 template<typename Category>
 struct Err {
-    static_assert(meta::is_base_of_v<ErrCategoryCRTP<Category>, Category>);
+    //    static_assert(meta::is_base_of_v<ErrCategoryCRTP<Category>, Category>);
 
     s32 code;
     operator ErrCode() { return code; }
@@ -27,5 +20,13 @@ struct Err {
         return Category::message(code);
     }
 };
+
+template<typename T>
+struct ErrCategoryCRTP {
+    static ErrMessage message(ErrCode code) {
+        return T::message(code);
+    }
+};
+
 
 } // namespace proto

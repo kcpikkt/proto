@@ -74,35 +74,6 @@ public:
         }
     }
 };
-
-struct Component {
-    Entity entity;
-};
-
-struct PointlightComp : Component {
-    vec3 color = vec3(1.0);
-    AssetHandle shadow_map;
-};
-
-struct TransformComp : Component {
-    vec3 position = vec3(0.0f);
-    quat rotation;
-    // do not use nonuniform scale, I don't handle it yet (why whould you even)
-    vec3 scale = vec3(1.0f);
-
-    inline mat4 model() {
-        mat4 model = mat4(1.0);
-        model = glm::scale(model, scale);
-        model = glm::toMat4(rotation) * model;
-        model = translate(model, position);
-        return model;
-    }
-};
-
-struct RenderMeshComp : Component {
-    AssetHandle mesh;
-};
-
     //using Component_List = meta::typelist<TransformComp,
     //                                      RenderMeshComp>
 

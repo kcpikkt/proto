@@ -105,9 +105,9 @@ struct StringArena : StateCRTP<StringArena>, debug::Marker{
 
     bool contains(StringView str);
 
-    void destroy_shallow();
+    Err<StateBase::ErrCategory> destroy_shallow();
 
-    void destroy_deep();
+    //    Err<StateBase::ErrCategory> destroy_deep();
 };
 
 } // namespace proto

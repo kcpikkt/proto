@@ -121,10 +121,8 @@ template AssetMetadata * create_init_asset<T, AssetMetadata *>   (StringView); \
 template AssetMetadata * create_asset<T, AssetMetadata *, false> (StringView); \
 template AssetMetadata & create_init_asset<T, AssetMetadata &>   (StringView); \
 template AssetMetadata & create_asset<T, AssetMetadata &, false> (StringView); \
-template AssetHandlePair<T>                                            \
-   create_init_asset<T, AssetHandlePair<T>>  (StringView);            \
-template AssetHandlePair<T>                                            \
-   create_asset<T, AssetHandlePair<T>, false> (StringView);    \
+template AssetHandlePair<T> create_init_asset<T, AssetHandlePair<T>>  (StringView);  \
+template AssetHandlePair<T> create_asset<T, AssetHandlePair<T>, false> (StringView); \
 
 INSTANTIATE_CREATE_ASSET_FUNCTIONS_FOR(Mesh);
 INSTANTIATE_CREATE_ASSET_FUNCTIONS_FOR(Material);

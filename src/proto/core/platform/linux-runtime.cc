@@ -15,6 +15,8 @@
 #include "proto/core/math/random.hh"
 #include "proto/core/context.hh"
 #include "proto/core/io.hh"
+#include "proto/core/util/defer.hh"
+#include "proto/core/entity-system.hh"
 
 #include <sys/types.h>
 #include <stdio.h>
@@ -141,6 +143,7 @@ RuntimeSettings settings;
 void * clientlib_h;
 
 int proto::platform::runtime(int argc, char ** argv){
+
 
     proto::context = &_context;
     auto& ctx = _context;
@@ -338,14 +341,14 @@ int proto::platform::runtime(int argc, char ** argv){
     void * _mem = malloc(_mem_size);
     assert(!_context.memory.init(_mem, _mem_size));
 
-    _context.gp_string_allocator
-        .init(&_context.memory, mem::megabytes(5));
+    //_context.gp_string_allocator
+    //    .init(&_context.memory, mem::megabytes(5));
 
-    _context.gp_file_buffering_allocator
-        .init(&_context.memory, mem::megabytes(100));
+    //_context.gp_file_buffering_allocator
+    //    .init(&_context.memory, mem::megabytes(100));
 
-    _context.gp_texture_allocator
-        .init(&_context.memory, mem::megabytes(100));
+    //_context.gp_texture_allocator
+    //    .init(&_context.memory, mem::megabytes(100));
 
     _context.gp_debug_strings_allocator
         .init(&_context.memory, mem::megabytes(5));
@@ -361,8 +364,10 @@ int proto::platform::runtime(int argc, char ** argv){
     // OpenGLContext
     set_debug_marker(_context.meshes, "context.texture_slots",
                     "local reflection of OpenGL texture units binding");
+    // TODO(kcpikkt): get number of slots from openGL
     _context.texture_slots.init_resize(32, &_context.memory);
     _context.texture_slots_index.init(32);
+    _context.texture_slots.set_autodestruct();
 
     // AssetContext
     //set_debug_marker(_context.assets, "context.assets", "main asset registry");
@@ -370,30 +375,42 @@ int proto::platform::runtime(int argc, char ** argv){
 
     set_debug_marker(_context.meshes, "context.meshes", "main mesh array");
     _context.meshes.init(100, &_context.memory);
+    _context.meshes.set_autodestruct(); 
 
     set_debug_marker(_context.materials, "context.materials",
         "main materials array (deprecate: meshes store their materials)");
     _context.materials.init(100, &_context.memory);
+    _context.materials.set_autodestruct(); 
 
     set_debug_marker(_context.textures, "context.textures", "main texture array");
-    _context.textures.init(100, &_context.memory);
+    _context.textures.init(100, &_context.memory); 
+    _context.textures.set_autodestruct(); 
 
     set_debug_marker(_context.cubemaps, "context.cubemaps", "main cubemaps array");
     _context.cubemaps.init(10, &_context.memory);
+    _context.cubemaps.set_autodestruct(); 
 
     set_debug_marker(_context.cubemaps, "context.shader_programs",
                      "main shader_programs array");
     _context.shader_programs.init(10, &_context.memory);
+    _context.shader_programs.set_autodestruct();
 
     set_debug_marker(_context.textures, "context.framebuffers",
                      "main framebufffer array");
     _context.framebuffers.init(0, &_context.memory);
+    _context.framebuffers.set_autodestruct();
 
     _context.entities.init(10, &_context.memory);
-    _context.comp.transform.init(10, &_context.memory);
-    _context.comp.render_mesh.init(10, &_context.memory);
-    _context.comp.pointlights.init(10, &_context.memory);
+    _context.entities.set_autodestruct();
 
+    _context.comp.transform.init(10, &_context.memory);
+    _context.comp.transform.set_autodestruct();
+
+    _context.comp.render_mesh.init(10, &_context.memory);
+    _context.comp.render_mesh.set_autodestruct();
+
+    _context.comp.pointlights.init(10, &_context.memory);
+    _context.comp.pointlights.set_autodestruct();
 
     // Context
 
@@ -403,6 +420,8 @@ int proto::platform::runtime(int argc, char ** argv){
     } else
         _context.asset_paths.init(&_context.memory);
 
+    _context.asset_paths.set_autodestruct();
+
     if(settings.shader_paths && settings.shader_paths.length())
         _context.shader_paths
             .init_split(settings.shader_paths, ':', &_context.memory);
@@ -410,6 +429,7 @@ int proto::platform::runtime(int argc, char ** argv){
         _context.shader_paths.init(&_context.memory);
 
     _context.shader_paths.store("src/proto/shaders");
+    _context.shader_paths.set_autodestruct();
 
     // DEFAULT TEXTURES
     struct { u8 ch[4]; } default_checkerboard_texture_data[] =

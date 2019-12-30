@@ -1,6 +1,7 @@
 #pragma once
 
 #include "proto/core/common/types.hh"
+#include "proto/core/util/defer.hh"
 
 
 #if defined(NDEBUG)

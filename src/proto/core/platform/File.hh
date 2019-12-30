@@ -1,6 +1,7 @@
 #pragma once
 #include "proto/core/error-handling.hh"
 #include "proto/core/util/Bitfield.hh"
+#include "proto/core/util/Buffer.hh"
 
 namespace proto {
 namespace platform {
@@ -57,7 +58,10 @@ struct File
     Err<FileErrCategory> open(StringView filename, Mode mode);
     u64 size();
     u64 write(void const * buf, u64 size); 
-    u64 read(void * buf, u64 size); 
+
+    u64 read(void * mem, u64 size); 
+    u64 read(MemBuffer buf); 
+
     Err<FileErrCategory> reserve(u64 size);
     Err<FileErrCategory> close();
 };

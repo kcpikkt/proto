@@ -13,7 +13,7 @@ struct Array
     : StateCRTP<Array<T>>, debug::Marker {
 
     using DataType = T;
-    using StateBase = StateCRTP<Array<T>>;
+    using State = StateCRTP<Array<T>>;
 
     // to allow for range-for
     struct Iterator {
@@ -49,7 +49,7 @@ struct Array
     memory::Allocator * _allocator = nullptr;
 
     void _move(Array<T>&& other) {
-        StateBase::state_move(meta::forward<Array<T>>(other));
+        State::state_move(meta::forward<Array<T>>(other));
         _data = other._data; other._data = nullptr;
         _allocator = other._allocator; other._allocator = 0;
         _size = other._size; other._size = 0;
@@ -73,7 +73,7 @@ struct Array
     Array<T>& operator=(const Array<T>& other) = delete;
 
     void init(u64 init_capacity, memory::Allocator * allocator) {
-        StateBase::state_init();
+        State::state_init();
         assert(allocator);
         _allocator = allocator;
 
@@ -209,9 +209,9 @@ struct Array
         _capacity = new_capacity;
     }
 
-    void destroy_shallow() {}
+    //Err<typename State::ErrCategory> destroy_shallow() {}
 
-    void destroy_deep() {
+    Err<typename State::ErrCategory> destroy_deep() {
         assert(_allocator);
         if constexpr(has_state) {
             for(u64 i=0; i<_size; i++)
@@ -221,6 +221,7 @@ struct Array
             _allocator->free(_data);
         _size = 0;
         _capacity = 0;
+        return 0;
     }
 };
 

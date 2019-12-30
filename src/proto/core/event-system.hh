@@ -46,6 +46,7 @@ struct Channel {
         assert(allocator);
         _allocator = allocator;
         sinks.init(init_sink_cap, _allocator);
+        sinks.set_autodestruct();
     }
     
     void attach(Sink<EventType> * sink) {
@@ -69,6 +70,7 @@ struct Channel {
         }
         assert(0);
     }
+
 };
 
 

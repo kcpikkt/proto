@@ -100,7 +100,9 @@ namespace proto {
     struct AssetContext {
         AssetRegistry assets;
         memory::LinkedListAllocator asset_metadata_allocator;
-        memory::LinkedListAllocator gp_texture_allocator;
+        // NOTE(kcpikkt): stages are staging areas for assets loaded from files to be uploaded to gpu
+        memory::LinkedListAllocator texture_stage;
+        memory::LinkedListAllocator mesh_stage;
 
         Array<Mesh> meshes;
         Array<Material> materials;
@@ -120,8 +122,6 @@ namespace proto {
     {
         int test = 12;
         memory::LinkedListAllocator memory;
-        memory::LinkedListAllocator gp_file_buffering_allocator;
-        memory::LinkedListAllocator gp_string_allocator;
         memory::LinkedListAllocator gp_debug_strings_allocator;
         Array<StringView> cmdline;
         char ** argv;

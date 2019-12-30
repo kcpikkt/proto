@@ -37,8 +37,12 @@ namespace platform {
         return fwrite(buf, sizeof(u8), size, _file_ptr);
     }
 
-    u64 File::read(void * buf, u64 size) {
-        return fread(buf, sizeof(u8), size, _file_ptr);
+    u64 File::read(void * mem, u64 size) {
+        return fread(mem, sizeof(u8), size, _file_ptr);
+    }
+
+    u64 File::read(MemBuffer buf) {
+        return read(buf.data, buf.size);
     }
 
     Err<FileErrCategory> File::reserve(u64 size) {

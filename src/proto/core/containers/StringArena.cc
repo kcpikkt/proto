@@ -122,16 +122,20 @@ void StringArena::store(StringView str) {
     _cursor += len;
 }
 
-void StringArena::destroy_shallow() {}
-
-void StringArena::destroy_deep() {
-    assert(_data);
-    assert(_allocator);
-    _allocator->free(_data);
-    _count = 0;
-    _capacity = 0;
-    _data = nullptr;
-    _cursor = nullptr;
+Err<StringArena::StateBase::ErrCategory> StringArena::destroy_shallow() {
+    return StateBase::ErrCategory::success;
 }
+
+    //Err<StringArena::StateBase::ErrCategory> StringArena::destroy_deep() {
+    //    assert(_data);
+    //    assert(_allocator);
+    //    _allocator->free(_data);
+    //    _offsets.destroy();
+    //    _count = 0;
+    //    _capacity = 0;
+    //    _data = nullptr;
+    //    _cursor = nullptr;
+    //    return StateBase::ErrCategory::success;
+    //}
 
 }

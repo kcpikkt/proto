@@ -123,15 +123,15 @@ struct Mesh : Asset, StateCRTP<Mesh>{
         glGenBuffers     (1, &EBO);
     }
 
-    void destroy_shallow() {
-        glDeleteVertexArrays(1, &VAO);
-        glDeleteBuffers     (1, &VBO);
-        glDeleteBuffers     (1, &EBO);
-    }
+    //void destroy_shallow() {
+    //    glDeleteVertexArrays(1, &VAO);
+    //    glDeleteBuffers     (1, &VBO);
+    //    glDeleteBuffers     (1, &EBO);
+    //}
 
-    void destroy_deep() {
+    //void destroy_deep() {
 
-    }
+    //}
 
     void init(size_t vertices_cap,
               size_t indices_cap,

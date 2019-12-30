@@ -8,8 +8,7 @@ namespace proto {
     Entity create_entity() {
         auto& ctx = proto::context;
 
-        Entity entity{.id = ++context->entity_generator_data._id,
-                      .gen = 0};
+        Entity entity{.id = ++context->entity_generator_data._id, .gen = 0};
 
         return context->entities.push_back(entity);
     }

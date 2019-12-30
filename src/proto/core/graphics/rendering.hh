@@ -5,8 +5,7 @@
 #include "proto/core/graphics/gl.hh"
 #include "proto/core/math/geometry.hh"
 #include "proto/core/asset-system/interface.hh"
-#include "proto/core/entity-system/common.hh"
-#include "proto/core/entity-system/interface.hh"
+#include "proto/core/entity-system.hh"
 
 namespace proto {
 namespace graphics {

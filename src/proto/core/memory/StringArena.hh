@@ -1,5 +1,29 @@
 #pragma once
 #if 0
+
+
+
+
+
+
+
+
+
+
+
+
+// DEPRECATED use /proto/core/containers/StringArena.hh
+
+
+
+
+
+
+
+
+
+
+
 #include "proto/core/debug.hh"
 #include "proto/core/memory/common.hh"
 #include "proto/core/containers/Array.hh"
