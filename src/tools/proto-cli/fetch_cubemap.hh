@@ -9,6 +9,7 @@
 
 using namespace proto;
 
+#if 0 
 AssetHandle fetch_cubemap(StringView right,   StringView left,
                           StringView up,      StringView down,
                           StringView forward, StringView back)
@@ -70,3 +71,5 @@ AssetHandle fetch_cubemap(StringView right,   StringView left,
        
     return handle;
 }
+
+#endif

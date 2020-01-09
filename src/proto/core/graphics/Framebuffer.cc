@@ -5,6 +5,7 @@
 
 namespace proto {
 
+    #if 0
     void Framebuffer::init(ivec2 size, u32 init_color_attachments_count) {
         this->size = size;
         color_attachments.init(init_color_attachments_count, &context->memory);
@@ -174,5 +175,6 @@ namespace proto {
         add_depth_attachment(cubemap); return *this;
     }
 
+    #endif
 } // namespace proto
 

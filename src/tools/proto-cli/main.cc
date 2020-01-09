@@ -13,10 +13,12 @@
 #include "assimp/scene.h"
 #include "assimp/postprocess.h"
 
-#include "common.hh"
-//#include "fetch_mesh.hh"
-#include "fetch_texture.hh"
-#include "fetch_cubemap.hh"
+#include "cli-common.hh"
+#include "fetch.hh"
+////#include "fetch_mesh.hh"
+//#include "fetch_texture.hh"
+//#include "fetch_cubemap.hh"
+//#include "fetch_model_tree.hh"
 
 using namespace proto;
 
@@ -29,18 +31,85 @@ PROTO_SETUP {
 #define FAIL(...) { \
     log_error(debug::category::main, __VA_ARGS__); return;}
 
-StringView cmdline_sentences[] = {"parse model",
-                                  "parse cubemap",
-                                  "parse texture",
+StringView cmdline_sentences[] = {"parse assets"};
+
+using Opt = argparse::Option;
+Opt options[] = {
+    {"output", 'o', Opt::required_bit | Opt::param_bit},
+    {"search", 's', Opt::param_bit},
 };
+
+ArrayMap<u64, StringView> matched_opt;
+
+void display_help() {
+    log_info(debug::category::main, "<HELPTEXT>");
+}
+
 PROTO_INIT {
     assert(proto::context);
     auto& ctx = *proto::context;
     search_paths.init_split(".", ':', &ctx.memory);
+    mem_buffers.init(&ctx.memory);
+
+    matched_opt.init(&ctx.memory);
 
     StringView sentence =
         argparse::match_sentence(cmdline_sentences, LEN(cmdline_sentences), 2);
 
+    if(!sentence) { display_help(); return;}
+
+    if(strview_cmp(sentence, "parse assets")) {
+
+        StringView output_dir;
+
+        Array<StringView> filepaths; filepaths.init(&ctx.memory);
+
+        if(argparse::match_options(options, LEN(options), matched_opt, filepaths)) {
+            display_help(); return;
+        }
+
+        // cmdline stripped from options consists of filepaths and 4 words of command invocation
+        if(filepaths.size() >= 4) for(u64 i=0; i<4; ++i) filepaths.erase(0);
+
+        if(filepaths.size() == 0) {
+            log_error(debug::category::main, "No asset filepaths supplied.");
+            display_help();
+            return;
+        }
+
+        for(auto [index, val] : matched_opt) {
+            if( !strcmp(options[index].name, "output") ){ output_dir = val; }
+            if( !strcmp(options[index].name, "search") ){ search_paths.store(val); }
+        }
+
+        for(auto path : search_paths)
+            if(!sys::is_directory(path)) log_warn(debug::category::main, path, " is not a directory.");
+
+        assert(output_dir);
+
+        Array<String> conf_filepaths; conf_filepaths.init_resize(filepaths.size(), &ctx.memory);
+        defer { conf_filepaths.destroy(); };
+
+
+        for(u64 i=0; i<filepaths.size(); ++i) {
+            conf_filepaths[i] = sys::search_for_file(filepaths[i], search_paths);
+
+            if(!conf_filepaths[i]) {
+                log_error(debug::category::main, "Could not find file ", filepaths[i]); return; }
+        }
+
+        for(auto& fp : conf_filepaths) {
+            if(fetch(fp.view())) {
+                log_error(debug::category::main, "Failed to fetch data from ", fp.view());
+                return;
+            }
+        }
+
+    } else {
+        log_error(debug::category::main, "Tell me what to do");
+        display_help();
+    }
+#if 0
     if(sentence) {
         //////////////////////////////////////////////////////////////////////////////////////////////////
         /*  */ if(strview_cmp(sentence, "parse texture")) {
@@ -130,22 +199,23 @@ PROTO_INIT {
             return;
         }
     }
-    #if 0
-    if(sentence) {
-        /*  */ if(strview_cmp(sentence, "parse mesh")) {
-            log_info(debug::category::main, "Mesh parsing");
-            if(ctx.argc != 6) {
-                log_error(debug::category::main,
-                          "parse mesh [mesh file] [out directory]");
-            } else {
-                dirpath = ctx.argv[5];
-                basedir = sys::dirname_view(ctx.argv[4]);
+#endif
+    //#if 0
+    //if(sentence) {
+    //    /*  */ if(strview_cmp(sentence, "parse mesh")) {
+    //        log_info(debug::category::main, "Mesh parsing");
+    //        if(ctx.argc != 6) {
+    //            log_error(debug::category::main,
+    //                      "parse mesh [mesh file] [out directory]");
+    //        } else {
+    //            dirpath = ctx.argv[5];
+    //            basedir = sys::dirname_view(ctx.argv[4]);
 
-                            parse_mesh(ctx.argv[4], ctx.argv[5]);
-            }
-            return;
-        } else if(strview_cmp(sentence, "parse cubemap")) {
-    }
-    #endif
+    //                        parse_mesh(ctx.argv[4], ctx.argv[5]);
+    //        }
+    //        return;
+    //    } else if(strview_cmp(sentence, "parse cubemap")) {
+    //}
+    //#endif
 }
 

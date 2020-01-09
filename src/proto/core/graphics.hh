@@ -10,6 +10,7 @@
 #include "proto/core/graphics/Renderbuffer.hh"
 #include "proto/core/graphics/Camera.hh"
 #include "proto/core/graphics/Framebuffer.hh"
+#include "proto/core/graphics/RenderBatch.hh"
 
 #include "proto/core/graphics/gl.hh"
 #include "proto/core/graphics/primitives.hh"

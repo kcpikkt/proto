@@ -42,15 +42,21 @@ namespace proto {
     PROTO_ASSET_TYPE(Cubemap,      4);
     PROTO_ASSET_TYPE(ShaderProgram,5);
 
+#pragma pack(push, 1)
     struct AssetHandle {
         u32 hash = 0;
         using TypeIndex = AssetTypeIndex;
-        TypeIndex type = AssetType<InvalidAsset>::index;
+        // 16 million index hint range is enough
+        u32 idx_hint : 24, type : 8;
+
+        static_assert(sizeof(TypeIndex) == 1);
 
         bool operator==(AssetHandle other) const;
         bool is_valid() const;
         operator bool() const;
     };
+#pragma pack(pop)
+    static_assert(sizeof(AssetHandle) == 8);
 
     // default for runtime typeinfo
     template<typename T>
@@ -89,10 +95,13 @@ namespace proto {
 
     //template<typename T> struct AssetTypeId;
 
-    constexpr static AssetHandle invalid_asset_handle = AssetHandle();
+    constexpr static AssetHandle invalid_asset_handle = AssetHandle{};
 
     struct Asset {
         AssetHandle handle;
+        bool operator==(const Asset& other) const {
+            return handle == other.handle;
+        }
     };
 
     struct InvalidAsset : Asset {};

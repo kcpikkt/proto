@@ -9,6 +9,8 @@
 
 namespace proto {
 
+
+    #if 0
 u64 Texture2D::serialized_data_size() {
     return size.x * size.y * channels * sizeof(u8);
 }
@@ -111,5 +113,6 @@ void Texture2D::init(void *data, ivec2 size, u32 gpu_format, u32 format, u32 dat
 void Texture2D::upload() {
     gfx::gpu_upload(this);
 }
+    #endif
 
 } // namespace proto

@@ -6,19 +6,48 @@
 #include "proto/core/asset-system/common.hh"
 
 namespace proto {
-    struct Texture2D;
-namespace serialization {
+    //    struct Texture2D;
+    //namespace serialization {
+    //
+    //    template<>
+    //    struct AssetHeader<Texture2D> {
+    //        ivec2 size;
+    //        u8 channels;
+    //        u64 data_offset;
+    //        u64 data_size;
+    //        u32 gpu_format;
+    //        u32 format;
+    //    };
+    //}
 
-    template<>
-    struct AssetHeader<Texture2D> {
-        ivec2 size;
-        u8 channels;
-        u64 data_offset;
-        u64 data_size;
-        u32 gpu_format;
-        u32 format;
-    };
-}
+struct Texture2D : Asset{
+    u8 channels; 
+
+    u32 datatype = GL_UNSIGNED_BYTE;
+    u32 format;
+    u32 gpu_format;
+
+    void * cached;
+
+    u32 gl_id;
+    s32 bound_unit = -1;
+    ivec2 size;
+
+    constexpr static u8 on_gpu_bit = BIT(0);
+    constexpr static u8 cached_bit = BIT(1);
+    constexpr static u8 bound_bit  = BIT(2);
+    constexpr static u8 mipmap_bit  = BIT(3);
+    Bitfield<u8> flags = 0;
+
+    // batch id?
+    // batch start index
+    // batch index count
+};
+
+
+
+
+    #if 0
 
 struct Texture2D :
         StateCRTP<Texture2D>,
@@ -78,8 +107,6 @@ struct Texture2D :
         upload(); return *this;
     }
 
-
-
-
 };
+    #endif
 } // namespace proto

@@ -14,6 +14,7 @@
 namespace proto {
 namespace serialization {
 
+    #if 0 
     template<typename T>
     void serialize_specific_asset_to_buffer(T*, MemBuffer buffer);
 
@@ -493,6 +494,7 @@ namespace serialization {
         return handle;
     }
 
+    #endif
 
 } // namespace serialization    
 } // namespace proto

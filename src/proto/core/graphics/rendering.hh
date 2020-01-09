@@ -10,6 +10,7 @@
 namespace proto {
 namespace graphics {
 
+    #if 0
 // NOTE(kacper): this function does not bind the mesh
 void render_span(Mesh * mesh, u32 index, bool simple = false) {
     assert(proto::context);
@@ -174,5 +175,6 @@ void render_gbuffer() {
 }
 
 
+    #endif
 } // namespace graphics
 } // namespace proto

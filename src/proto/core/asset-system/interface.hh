@@ -14,83 +14,51 @@ namespace proto {
     AssetHandle make_handle(StringView name, AssetTypeIndex type);
 
     template<typename T>
-    AssetHandle make_handle(StringView name){
+    inline AssetHandle make_handle(StringView name){
         return make_handle(name, AssetType<T>::index);
     }
 
     // NOTE(kacper): no need for header definition,
     //               all specializations are explicitly instantiated
     template<typename T>
-    T * get_asset(AssetHandle handle);
+    T * get_asset(AssetHandle& handle,
+                  AssetContext * asset_context = proto::context);
 
-    template<typename T>
-    T * get_asset(AssetContext * asset_context,
-                  AssetHandle handle);
-
-    // no fail, never returns null, crashes if null
-    template<typename T>
-    T * get_asset_must(AssetHandle handle);
-
+    // no fail, crash if null
     // same as above but returns reference
     template<typename T>
-    T & get_asset_ref(AssetHandle handle);
+    T & get_asset_ref(AssetHandle& handle,
+                      AssetContext * asset_context = proto::context);
 
-    // just for structured bindings but idk yet
-    template<typename T>
-    struct AssetHandlePair {
-        AssetHandle handle;
-        T& asset;
-        operator T& (){ return asset; }
-        operator AssetHandle (){ return handle; }
-    };
+    AssetMetadata * get_metadata(AssetHandle& handle,
+                                 AssetContext * asset_context = proto::context);
 
-
-    AssetMetadata * get_metadata(AssetHandle handle);
-    AssetMetadata * get_metadata(AssetContext * asset_context,
-                                 AssetHandle handle);
-    // just proxies
-    template<typename T>
-    AssetMetadata * get_metadata(T & asset) {
-        return get_metadata(asset.handle);
-    }
-
-    template<typename T>
-    AssetMetadata * get_metadata(T * asset){
-        return get_metadata(asset->handle);
-    }
-
-    // TODO(kacper): add meta::decay<T>&& = T() parameter
+    // TODO(kcpikkt): add meta::decay<T>&& = T() parameter
     // but first implement decay
-    template<typename T, typename Ret = AssetHandle, bool init = false>
-    Ret create_asset(StringView name); 
-
+    // NOTE(kcpikkt): later: wait, but why exacly? dude, don't leave such unexplainatory comments!
     template<typename T, typename Ret = AssetHandle>
-    Ret create_init_asset(StringView name);
+    Ret create_asset(StringView name,
+                     AssetContext * asset_context = proto::context);
 
     template<typename T>
-    constexpr T&(*create_asset_rref)(StringView) = create_asset<T, T&, false>; 
+    T& create_asset_rref(StringView name,
+                          AssetContext * asset_context = proto::context)
+    {
+        return create_asset<T, T&>(name, asset_context);
+    }
 
-    template<typename T>
-    constexpr AssetHandlePair<T>(*create_asset_rpair)(StringView) =
-        create_asset<T, AssetHandlePair<T>&, false>; 
+    AssetHandle create_asset(StringView name, AssetTypeIndex type,
+                             AssetContext * asset_context = proto::context);
 
-    template<typename T>
-    constexpr T&(*create_init_asset_rref)(StringView) = create_asset<T, T&, true>;
+    //void destroy_asset(AssetHandle handle); 
+    //void destroy_asset(AssetContext * asset_context,
+    //                   AssetHandle handle); 
 
-    template<bool init = false>
-    AssetHandle create_asset(StringView name, AssetTypeIndex type);
+    //void get_deps_rec(Array<AssetHandle> & depslist,
+    //                  AssetHandle handle);
 
-    AssetHandle create_init_asset(StringView name, AssetTypeIndex type);
-
-    void destroy_asset(AssetHandle handle); 
-    void destroy_asset(AssetContext * asset_context,
-                       AssetHandle handle); 
-
-    void get_deps_rec(Array<AssetHandle> & depslist,
-                      AssetHandle handle);
-
-    void add_dependency(AssetMetadata * dependant,
-                        AssetHandle dependency);
+    //void add_dependency(AssetMetadata * dependant,
+    //                    AssetHandle dependency);
 
     
 } // namespace proto

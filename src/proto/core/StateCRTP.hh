@@ -13,6 +13,13 @@
 
 namespace proto {
 
+namespace meta {
+    template<typename T, typename = void> struct has_state : false_t {};
+    template<typename T> struct has_state<T, void_t<typename T::_StateTestingProbe>> : true_t {};
+
+    template<typename T>
+    constexpr static auto has_state_v = has_state<T>::value;
+}
 
 namespace constant {
 } // namespace constant
@@ -31,6 +38,7 @@ struct StateCRTP  {
         inline constexpr static ErrCode out_of_scope_leak = 3;
         inline constexpr static ErrCode destroy_uninitialized = 4;
         inline constexpr static ErrCode destroy_deep_unimplemented = 5;
+        inline constexpr static ErrCode destroy_failed = 6;
 
         constexpr static ErrMessage message(ErrCode code) {
             switch(code) {
@@ -44,6 +52,8 @@ struct StateCRTP  {
                 return "Destructor method called on unitialized state object, no destruction performed.";
             case destroy_deep_unimplemented:
                 return "Destructor method called on unitialized state object, no destruction performed.";
+            case destroy_failed:
+                return "Destructon failed due to... some reasons? catchall error, sry for being lazy, fixme";
             }
             return ErrCategoryExt::message(code); // perhaps it is user side error
         }
@@ -57,6 +67,7 @@ struct StateCRTP  {
     Bitfield<u8> state_flags = 0;
 
     using State = StateCRTP<T>;
+    using _StateTestingProbe = void;
 
     inline bool is_moved() {
         return state_flags.check(_moved_bit); }
@@ -187,7 +198,7 @@ StateCRTP<T, Ext>::~StateCRTP() {
     if(state_flags.check(_autodestruct_bit)) destroy();
 
 #if defined(PROTO_DEBUG)
-    if(state_flags.check(_initialized_bit)) {
+    if(state_flags.check(_initialized_bit) && !state_flags.check(_moved_bit)) {
         if(!state_flags.check(_deep_destroyed_bit)) {
             debug_warn(debug::category::data, ErrCategory::message(ErrCategory::out_of_scope_leak));
             return;

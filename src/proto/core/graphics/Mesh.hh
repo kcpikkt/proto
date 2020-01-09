@@ -11,8 +11,29 @@
 #include "proto/core/StateCRTP.hh"
 #include "proto/core/graphics/Vertex.hh"
 #include <unistd.h>
+
 namespace proto {
 
+struct Mesh : Asset{
+    void * cached;
+
+    constexpr static u8 on_gpu_bit = BIT(0);
+    constexpr static u8 cached_bit = BIT(1);
+    constexpr static u8 indexed_bit = BIT(2);
+    Bitfield<u8> flags = 0;
+
+    u64 vertex_count;
+    u64 index_count;
+    
+    u64 batch_range_begin;
+    u64 batch_range_size;
+    // batch id?
+    // batch start index
+    // batch index count
+};
+
+
+#if 0
 struct Mesh;
 
 template<>
@@ -184,4 +205,5 @@ struct Mesh : Asset, StateCRTP<Mesh>{
 
 };   
 
+#endif
 } // namespace proto

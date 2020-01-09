@@ -10,7 +10,6 @@
 #include <string.h>
 
 namespace proto{
-namespace io{
 namespace {
 //TODO(kacper): move it out of here
 // some explicit instantiation
@@ -38,5 +37,4 @@ void flush() {
 }
 
 } // namespace 
-} // namespace io
 } // namespace proto

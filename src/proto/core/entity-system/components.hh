@@ -1,4 +1,5 @@
 #pragma once
+#include "proto/core/util/Bitfield.hh"
 
 namespace proto {
 
@@ -27,8 +28,15 @@ struct TransformComp : Component {
 };
 
 struct RenderMeshComp : Component {
-    AssetHandle mesh;
-    AssetHandle material;
+    AssetHandle mesh_h;
+    AssetHandle material_h;
+
+    //temp
+    vec3 color = vec3(1.0);
+
+    //TODO(kcpikkt): identify the batch
+    Bitfield<u8> flags = 0;
+    constexpr static u8 batched_bit = BIT(0);
 };
 
 } // namespace proto

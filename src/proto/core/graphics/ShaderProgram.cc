@@ -307,6 +307,7 @@ void ShaderProgram::set_uniform<GL_FLOAT_MAT4, mat4 *>
     set_uniform<GL_SAMPLER_2D, AssetHandle>(name,v); return *this; }
 
 
+    #if 0
 void ShaderProgram::set_material(Material * material) {
     assert(material);
     assert(proto::context);
@@ -367,6 +368,7 @@ void ShaderProgram::set_material(Material * material) {
              gfx::bind_texture(ctx.default_white_texture_h));
 
 }
+    #endif
 
 
 

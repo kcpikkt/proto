@@ -188,7 +188,7 @@ String search_for_file(StringView filename, StringArena& dirs) {
         //TOOD(kacper): use proper allocator for that
         ret.init(filename, &context->memory);
     }
-    return ret;
+    return meta::move(ret);
 }
 
 StringArena ls(StringView dirpath) {

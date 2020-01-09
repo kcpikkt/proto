@@ -12,6 +12,7 @@ namespace proto {
 namespace graphics{
     //namespace gl{
 
+    #if 0
     s32 bind_texture(AssetHandle texture_handle) {
         auto fail =
             [](){
@@ -259,6 +260,7 @@ namespace graphics{
         return bind_framebuffer(*context->default_framebuffer);
     }
 
+    #if 0
     void debug_print_texture_slots() {
         printf("Texture units state\n");
         using Slot = RenderContext::TextureSlot;
@@ -277,6 +279,7 @@ namespace graphics{
             }
         }
     }
+    #endif
 
     // take refs, nofail here, handle taking function can fail
     template<typename T> void gpu_upload(T *);
@@ -344,38 +347,38 @@ namespace graphics{
     }
 
 
-    template<> void gpu_upload<Mesh>(Mesh * mesh) {
-        assert(mesh);
-        if(mesh->flags.check(Mesh::on_gpu_bit)) return;
+    //template<> void gpu_upload<Mesh>(Mesh * mesh) {
+    //    assert(mesh);
+    //    if(mesh->flags.check(Mesh::on_gpu_bit)) return;
 
-        glBindVertexArray(mesh->VAO);
-        glBindBuffer(GL_ARRAY_BUFFER, mesh->VBO);
+    //    glBindVertexArray(mesh->VAO);
+    //    glBindBuffer(GL_ARRAY_BUFFER, mesh->VBO);
 
-        glBufferData(GL_ARRAY_BUFFER,
-                    sizeof(proto::Vertex) * mesh->vertices.size(),
-                    mesh->vertices.raw(),
-                    GL_STATIC_DRAW);
+    //    glBufferData(GL_ARRAY_BUFFER,
+    //                sizeof(proto::Vertex) * mesh->vertices.size(),
+    //                mesh->vertices.raw(),
+    //                GL_STATIC_DRAW);
 
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->EBO);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-                    sizeof(u32) * mesh->indices.size(),
-                    mesh->indices.raw(),
-                    GL_STATIC_DRAW);
+    //    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->EBO);
+    //    glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+    //                sizeof(u32) * mesh->indices.size(),
+    //                mesh->indices.raw(),
+    //                GL_STATIC_DRAW);
 
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(struct Vertex),
-                            (void*) (offsetof(struct Vertex, position)) );
+    //    glEnableVertexAttribArray(0);
+    //    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(struct Vertex),
+    //                        (void*) (offsetof(struct Vertex, position)) );
 
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(struct Vertex),
-                                (void*) (offsetof(struct Vertex, normal)) );
+    //    glEnableVertexAttribArray(1);
+    //    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(struct Vertex),
+    //                            (void*) (offsetof(struct Vertex, normal)) );
 
-        glEnableVertexAttribArray(2);
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(struct Vertex),
-                                (void*) (offsetof(struct Vertex, uv)) );
-        mesh->flags.set(Mesh::on_gpu_bit);
+    //    glEnableVertexAttribArray(2);
+    //    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(struct Vertex),
+    //                            (void*) (offsetof(struct Vertex, uv)) );
+    //    mesh->flags.set(Mesh::on_gpu_bit);
 
-    }
+    //}
 
     const char * error_message() {
         char const * message;
@@ -407,6 +410,6 @@ namespace graphics{
         return message;
     }
 
-    //} // namespace gl
+    #endif
 } // namespace graphics
 } // namespace proto

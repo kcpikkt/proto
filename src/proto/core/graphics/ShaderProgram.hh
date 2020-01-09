@@ -59,6 +59,10 @@ struct ShaderProgram : Asset {
         link(); return *this;
     }
 
+    inline ShaderProgram& $_init() {
+        init(); return *this;
+    }
+
     inline ShaderProgram& $_use() {
         use(); return *this;
     }

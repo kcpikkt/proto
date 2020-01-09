@@ -68,8 +68,8 @@ namespace debug {
                         Ts... ts)
         {
             _log_header(level, log_category, file, line);
-            proto::io::print(ts..., "\n");
-            fflush(stdout);
+            proto::print(ts..., "\n");
+            proto::flush();
         }
         template<typename ...Ts>
         static void _debug_log(const Level level,
@@ -79,8 +79,8 @@ namespace debug {
                         Ts... ts)
         {
             _debug_log_header(level, log_category, file, line);
-            proto::io::print(ts..., "\n");
-            fflush(stdout);
+            proto::print(ts..., "\n");
+            proto::flush();
         }
     };
 #define log_info(CATEGORY, ...) (         \

@@ -11,7 +11,7 @@
 namespace proto {
 
 struct TextureInterface : Asset {
-    u8 channels; // deprecate, use format instead, well maybe have it anyway, idk
+    u8 channels; 
     
     u32 datatype = GL_UNSIGNED_BYTE;
     u32 format;

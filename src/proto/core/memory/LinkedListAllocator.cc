@@ -743,10 +743,10 @@ void LinkedListAllocator::debug_print() {
         prev_lookup = lookup;
         lookup = lookup->next;
     }
-    io::print("(null)\n");
-    io::print("==============================\n");
+    print("(null)\n");
+    print("==============================\n");
 
-    io::flush();
+    flush();
 
     sanity_check();
 }

@@ -1,8 +1,10 @@
 #pragma once
+#include "proto/core/common/types.hh"
 namespace proto {
     struct Vertex {
-        proto::vec3 position;
-        proto::vec3 normal;
-        proto::vec2 uv;
+        vec3 position;
+        vec3 normal;
+        vec3 tangent;
+        vec2 uv;
     };
 } // namespace proto

@@ -14,9 +14,10 @@ layout (std140) uniform Material {
 uniform float u_time;
 uniform mat4 u_mvp;
 uniform mat4 u_model;
+uniform vec3 u_color;
 
 out vec4 frag_color;
 
 void main() {
-    frag_color = vec4(abs(frag_in.normal), 1.0);
+    frag_color = vec4(mix(abs(frag_in.normal), u_color, vec3(0.5)), 1.0);
 }

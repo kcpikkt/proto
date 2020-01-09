@@ -4,11 +4,12 @@
 #include "proto/core/debug/logging.hh"
 #include "proto/core/debug/markers.hh"
 #include "proto/core/memory/common.hh"
+#include "proto/core/util/Optional.hh"
 
 namespace proto{
 
 template<typename T,
-         bool has_state = meta::is_base_of_v<StateCRTP<T>, T> >
+         bool has_state = meta::has_state_v<T> >
 struct Array
     : StateCRTP<Array<T>>, debug::Marker {
 
@@ -89,10 +90,10 @@ struct Array
         resize(init_size);
     }
 
-    u64 size() {
+    u64 size() const {
         return _size;
     }
-    u64 capacity() {
+    u64 capacity() const {
         return _capacity;
     }
 
@@ -126,12 +127,19 @@ struct Array
         return _data[index];
     }
 
+    inline s64 idx_of(const T& val) const {
+        u64 i=0;
+        for(; i<size(); ++i)
+            if(at(i) == val) break;
+        return i;
+    }
+
     template<typename U = T,
              typename = decltype((T)meta::declval<U>())>
     T& push_back(U&& element = T()) { // universal ref btw
         if(_size == _capacity) grow();
         assert(_size < _capacity);
-        at(_size++) = meta::forward<U>(element);
+        new (&at(_size++)) T(meta::forward<U>(element));
         return back();
     }
 
@@ -150,11 +158,12 @@ struct Array
 
     template<typename U = T>
     inline auto contains(const U& element)
-        -> meta::enable_if_t<meta::has_operator_eq_v<U>, bool> const
+        -> meta::enable_if_t<meta::has_operator_eq_v<U>, Optional<u64>> const
     {
         for(u64 i=0; i<_size; i++)
-            if(_data[i] == element) return true;
-        return false;
+            if(_data[i] == element) return i;
+
+        return {};
     }
 
     //inline void fill(const U& element)
@@ -167,12 +176,18 @@ struct Array
     }
 
     void erase(u64 index) {
-        at(index).~T();
+        //at(index).~T();
         u64 i = index;
         for(; i<_size - 1; i++) {
             at(i) = meta::move(at(i + 1));
-        } at(i).~T();
+        } //at(i).~T();
         _size--;
+    }
+
+    u64 find( bool (*predecate)(T&)) {
+        u64 i=0;
+        for(; i<_size; i++) if(predecate(at(i))) break;
+        return i;
     }
 
 
@@ -213,15 +228,15 @@ struct Array
 
     Err<typename State::ErrCategory> destroy_deep() {
         assert(_allocator);
+        auto err = State::ErrCategory::success;
         if constexpr(has_state) {
-            for(u64 i=0; i<_size; i++)
-                _data[i].~T();
+            for(u64 i=0; i<_size; i++) err = _data[i].destroy();
         }
         if(_data)
             _allocator->free(_data);
         _size = 0;
         _capacity = 0;
-        return 0;
+        return err;
     }
 };
 

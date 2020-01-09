@@ -12,6 +12,7 @@
 #include "proto/core/graphics/ShaderProgram.hh"
 #include "proto/core/memory/LinkedListAllocator.hh"
 #include "proto/core/containers/Array.hh"
+#include "proto/core/containers/ArrayMap.hh"
 #include "proto/core/containers/StringArena.hh"
 #include "proto/core/event-system.hh"
 #include "proto/core/asset-system/common.hh"
@@ -25,6 +26,7 @@
 #include "proto/core/input.hh"
 #include "proto/core/util/Bitfield.hh"
 #include "proto/core/util/ModCounter.hh"
+#include "proto/core/util/Pair.hh"
 
 namespace proto {
     // context is all global state of the engine
@@ -98,17 +100,18 @@ namespace proto {
     };
 
     struct AssetContext {
-        AssetRegistry assets;
+        //AssetRegistry assets;
         memory::LinkedListAllocator asset_metadata_allocator;
         // NOTE(kcpikkt): stages are staging areas for assets loaded from files to be uploaded to gpu
-        memory::LinkedListAllocator texture_stage;
-        memory::LinkedListAllocator mesh_stage;
+        //                but we can load directory to gpu mem with glMap so change them to caches
+        memory::LinkedListAllocator texture_cache;
+        memory::LinkedListAllocator mesh_cache;
 
-        Array<Mesh> meshes;
-        Array<Material> materials;
-        Array<Texture2D> textures;
-        Array<Cubemap> cubemaps;
-        Array<ShaderProgram> shader_programs;
+        ArrayMap<AssetHandle, Pair<Mesh, AssetMetadata>>          meshes;
+        ArrayMap<AssetHandle, Pair<Material, AssetMetadata>>      materials;
+        ArrayMap<AssetHandle, Pair<Texture2D, AssetMetadata>>     textures;
+        ArrayMap<AssetHandle, Pair<Cubemap, AssetMetadata>>       cubemaps;
+        ArrayMap<AssetHandle, Pair<ShaderProgram, AssetMetadata>> shader_programs;
 
         StringArena asset_paths;
         StringArena shader_paths;

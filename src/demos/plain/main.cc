@@ -9,6 +9,8 @@
 #include "proto/core/error-handling.hh" 
 #include "proto/core/graphics/primitives.hh" 
 #include "proto/core/entity-system.hh" 
+#include "proto/core/util/Pair.hh" 
+#include "proto/core/containers/ArrayMap.hh" 
 
 struct GLSLMaterialFieldRefl {
     const char * glsl_type = nullptr;
@@ -54,46 +56,48 @@ PROTO_SETUP {
     settings->shader_paths = "src/demos/sokoban/shaders/";
 }
 
+//ArrayMap<AssetHandle, Pair<Mesh, AssetMetadata>> map;
+RenderBatch batch;
+Entity cubes[3];
+
 AssetHandle main_shader_h;
 PROTO_INIT {
     auto& ctx = *context;
 
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &stream);
-
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, stream);
-    glBufferData(GL_ARRAY_BUFFER, bufsize, NULL, GL_STREAM_DRAW);
-
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(struct Vertex),
-                        (void*) (offsetof(struct Vertex, position)) );
-
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(struct Vertex),
-                            (void*) (offsetof(struct Vertex, normal)) );
-
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(struct Vertex),
-                            (void*) (offsetof(struct Vertex, uv)) );
+    batch.init(sizeof(Vertex) * 1024, sizeof(u32) * 1024);
 
 
-    if( auto cube = create_entity("cube1") ) {
+    if( auto cube = cubes[0] = create_entity() ) {
         auto& render_mesh = add_component<RenderMeshComp>(cube);
+        auto& transform = add_component<TransformComp>(cube);
+        render_mesh.mesh_h = ctx.cube_h;
+        render_mesh.color = vec3(1.0,0.0,0.0);
+        transform.position = vec3(0.0,0.0,0.0);
     } else 
         debug_error(debug::category::main, "Failed to create entity");
 
-    void * buffdata = glMapBufferRange(GL_ARRAY_BUFFER,0, sizeof(cube_vertices),
-                                       GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
-    if(buffdata) {
-        memcpy(buffdata, cube_vertices, sizeof(cube_vertices));
-        glUnmapBuffer(GL_ARRAY_BUFFER);
-    } else {
-        debug_error(debug::category::data, "map failed");
-    }
+    if( auto cube = cubes[1] = create_entity() ) {
+        auto& render_mesh = add_component<RenderMeshComp>(cube);
+        auto& transform = add_component<TransformComp>(cube);
+        render_mesh.mesh_h = ctx.cube_h;
+        render_mesh.color = vec3(0.0,1.0,0.0);
+        transform.position = vec3(2.0,0.0,0.0);
+    } else 
+        debug_error(debug::category::main, "Failed to create entity");
+
+    if( auto cube = cubes[2] = create_entity() ) {
+        auto& render_mesh = add_component<RenderMeshComp>(cube);
+        auto& transform = add_component<TransformComp>(cube);
+        render_mesh.mesh_h = ctx.cube_h;
+        render_mesh.color = vec3(0.0,0.0,1.0);
+        transform.position = vec3(-2.0,0.0,0.0);
+    } else 
+        debug_error(debug::category::main, "Failed to create entity");
+
 
     main_shader_h = 
-        create_init_asset_rref<ShaderProgram>("sokoban_main")
+        create_asset_rref<ShaderProgram>("sokoban_main")
+            .$_init()
             .$_attach_shader_file(ShaderType::Vert, "sokoban_main_vert.glsl")
             .$_attach_shader_file(ShaderType::Frag, "sokoban_main_frag.glsl")
             .$_link().handle;
@@ -102,25 +106,28 @@ PROTO_INIT {
         debug_warn(debug::category::main, "Could not find main shader.");
 
     glEnable(GL_DEPTH_TEST);
-    ctx.camera.position = vec3(0.0, 0.0, 2.0);
+    ctx.camera.position = vec3(0.0, 0.0, 5.0);
 }
 
 PROTO_UPDATE {
     auto& ctx = *context;
     auto& time = ctx.clock.elapsed_time;
 
-    mat4 mvp, model, view = ctx.camera.view(), projection = ctx.camera.projection();
+    for(auto& comp : ctx.comp.render_mesh) {
+        if(!comp.flags.check(RenderMeshComp::batched_bit)) batch.add(comp);
+    }
+
+    for(auto cube : cubes) if(cube)
+            get_component<TransformComp>(cube)->rotation = angle_axis(time, glm::normalize(vec3(cos(time), 1.0, sin(time))));
 
     glViewport(0, 0, ctx.window_size.x, ctx.window_size.y);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            
-    model = mat4(1.0);
-    model = translate(model, vec3(0.0)) * glm::toMat4(angle_axis(time, glm::normalize(vec3(cos(time),1.0,sin(time))) ));
-    mvp = projection * view * model;
 
-    auto& main_shader = get_asset_ref<ShaderProgram>(main_shader_h)
-        .$_use()
-        .$_set_mat4  ("u_mvp", &mvp);
+    get_asset_ref<ShaderProgram>(main_shader_h).use();
 
-    glDrawArrays (GL_TRIANGLES, 0, 36);
+    batch.render();
+
+    if(time > 3.0f)
+        ctx.exit_sig = true;
 }
+

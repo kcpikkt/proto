@@ -38,8 +38,8 @@
 #include <X11/XKBlib.h>
 
 // switches
-#define DEFAULT_TEXTURES 1
-#define DEFAULT_SHADERS 1
+#define DEFAULT_TEXTURES 0
+#define DEFAULT_SHADERS 0
 #define DEFAULT_MESHES 1
 
 void breakpoint() {};
@@ -362,7 +362,7 @@ int proto::platform::runtime(int argc, char ** argv){
 
     // INITS
     // OpenGLContext
-    set_debug_marker(_context.meshes, "context.texture_slots",
+    set_debug_marker(_context.textures, "context.texture_slots",
                     "local reflection of OpenGL texture units binding");
     // TODO(kcpikkt): get number of slots from openGL
     _context.texture_slots.init_resize(32, &_context.memory);
@@ -371,32 +371,32 @@ int proto::platform::runtime(int argc, char ** argv){
 
     // AssetContext
     //set_debug_marker(_context.assets, "context.assets", "main asset registry");
-    _context.assets.init(100, &_context.memory);
+    //_context.assets.init(100, &_context.memory);
 
-    set_debug_marker(_context.meshes, "context.meshes", "main mesh array");
+    //set_debug_marker(_context.meshes, "context.meshes", "main mesh array");
     _context.meshes.init(100, &_context.memory);
     _context.meshes.set_autodestruct(); 
 
-    set_debug_marker(_context.materials, "context.materials",
-        "main materials array (deprecate: meshes store their materials)");
+    //set_debug_marker(_context.materials, "context.materials",
+    //    "main materials array (deprecate: meshes store their materials)");
     _context.materials.init(100, &_context.memory);
     _context.materials.set_autodestruct(); 
 
-    set_debug_marker(_context.textures, "context.textures", "main texture array");
+    //set_debug_marker(_context.textures, "context.textures", "main texture array");
     _context.textures.init(100, &_context.memory); 
     _context.textures.set_autodestruct(); 
 
-    set_debug_marker(_context.cubemaps, "context.cubemaps", "main cubemaps array");
+    //set_debug_marker(_context.cubemaps, "context.cubemaps", "main cubemaps array");
     _context.cubemaps.init(10, &_context.memory);
     _context.cubemaps.set_autodestruct(); 
 
-    set_debug_marker(_context.cubemaps, "context.shader_programs",
-                     "main shader_programs array");
+    //set_debug_marker(_context.cubemaps, "context.shader_programs",
+    //                 "main shader_programs array");
     _context.shader_programs.init(10, &_context.memory);
     _context.shader_programs.set_autodestruct();
 
-    set_debug_marker(_context.textures, "context.framebuffers",
-                     "main framebufffer array");
+    //set_debug_marker(_context.textures, "context.framebuffers",
+    //                 "main framebufffer array");
     _context.framebuffers.init(0, &_context.memory);
     _context.framebuffers.set_autodestruct();
 
@@ -432,6 +432,8 @@ int proto::platform::runtime(int argc, char ** argv){
     _context.shader_paths.set_autodestruct();
 
     // DEFAULT TEXTURES
+
+#if DEFAULT_TEXTURES
     struct { u8 ch[4]; } default_checkerboard_texture_data[] =
         {{ 255,   0, 255, 255}, { 255, 255, 255, 255},
          { 255, 255, 255, 255}, { 255,   0, 255, 255}};
@@ -463,37 +465,32 @@ int proto::platform::runtime(int argc, char ** argv){
     default_checkerboard_texture.data = (void*)default_checkerboard_texture_data;
     graphics::gpu_upload(&default_checkerboard_texture);
     _context.default_checkerboard_texture_h = default_checkerboard_texture.handle;
+#endif
 
 
 #if DEFAULT_MESHES
-    Mesh & cube = create_init_asset_rref<Mesh>("default_cube");
-    cube.vertices.resize(36);
-    assert(sizeof(cube_vertices) == sizeof(Vertex) * 36);
-    memcpy(cube.vertices._data, cube_vertices, sizeof(Vertex) * 36);
-
-    cube.indices.resize(36);
-    for(s32 i=0; i<36; i++) cube.indices[i] = i;
-
-    cube.spans.resize(1);
-    cube.spans[0].begin_index = 0;
-    cube.spans[0].index_count = 36;
+    Mesh & cube = create_asset<Mesh, Mesh&>("default_cube");
+    cube.flags = Mesh::cached_bit;
+    cube.cached = cube_vertices;
+    cube.vertex_count = 36;
+    cube.index_count = 0;
 
     _context.cube_h = cube.handle;
-    graphics::gpu_upload(&cube);
+    //graphics::gpu_upload(&cube);
 
-    Mesh & quad = create_init_asset_rref<Mesh>("default_quad");
-    quad.vertices.resize(4);
-    assert(sizeof(quad_vertices) == sizeof(Vertex) * 4);
-    memcpy(quad.vertices._data, quad_vertices, sizeof(Vertex) * 4);
-    graphics::gpu_upload(&quad);
-    _context.quad_h = quad.handle;
+    //Mesh & quad = create_init_asset_rref<Mesh>("default_quad");
+    //quad.vertices.resize(4);
+    //assert(sizeof(quad_vertices) == sizeof(Vertex) * 4);
+    //memcpy(quad.vertices._data, quad_vertices, sizeof(Vertex) * 4);
+    //graphics::gpu_upload(&quad);
+    //_context.quad_h = quad.handle;
 
-    Mesh & std_basis = create_init_asset_rref<Mesh>("default_std_basis");
-    std_basis.vertices.resize(6);
-    assert(sizeof(std_basis_vertices) == sizeof(Vertex) * 6);
-    memcpy(std_basis.vertices._data, std_basis_vertices, sizeof(Vertex) * 6);
-    graphics::gpu_upload(&std_basis);
-    _context.std_basis_h = std_basis.handle;
+    //Mesh & std_basis = create_init_asset_rref<Mesh>("default_std_basis");
+    //std_basis.vertices.resize(6);
+    //assert(sizeof(std_basis_vertices) == sizeof(Vertex) * 6);
+    //memcpy(std_basis.vertices._data, std_basis_vertices, sizeof(Vertex) * 6);
+    //graphics::gpu_upload(&std_basis);
+    //_context.std_basis_h = std_basis.handle;
 #endif
 
 
@@ -528,6 +525,7 @@ int proto::platform::runtime(int argc, char ** argv){
             .$_link().handle;
 #endif
 
+    #if 0
     _context.default_framebuffer = &_context.framebuffers.push_back();
     _context.default_framebuffer->FBO = 0;
     _context.default_framebuffer->size = _context.window_size;
@@ -535,6 +533,7 @@ int proto::platform::runtime(int argc, char ** argv){
 
     _context.current_read_framebuffer = _context.default_framebuffer;
     _context.current_draw_framebuffer = _context.default_framebuffer;
+    #endif
 
     random::seed_mt64(settings.mt64_seed);
 

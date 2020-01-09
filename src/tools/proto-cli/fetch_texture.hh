@@ -9,6 +9,7 @@
 
 using namespace proto;
 
+#if 0 
 AssetHandle fetch_texture(StringView filepath) {
     namespace sys = proto::platform;
 
@@ -74,3 +75,4 @@ AssetHandle fetch_texture(StringView filepath) {
     return handle;
 }
 
+#endif
