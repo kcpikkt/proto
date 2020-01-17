@@ -10,6 +10,8 @@
 namespace proto {
 namespace serialization {
 
+
+    #if 0
     constexpr static u64 asset_file_signature = 0x79677967;
     struct AssetFileHeader {
         u64 signature = asset_file_signature;
@@ -22,6 +24,9 @@ namespace serialization {
 
         u64 data_offset;
     };
+
+
+    
 
     struct AssetDependency {
         u8 name[PROTO_ASSET_MAX_NAME_LEN];
@@ -80,6 +85,7 @@ namespace serialization {
                                AssetContext * context = proto::context);
     AssetHandle load_asset(StringView path,
                            AssetContext * context = proto::context);
+    #endif
 } // namespace serialization    
 } // namespace proto
 

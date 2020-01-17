@@ -4,6 +4,7 @@
 #include "proto/core/debug/logging.hh"
 #include "proto/core/debug/markers.hh"
 #include "proto/core/memory/common.hh"
+#include "proto/core/util/Buffer.hh"
 #include "proto/core/meta.hh"
 
 namespace proto {
@@ -64,6 +65,10 @@ namespace memory {
         void * alloc(size_t requested_size);
         [[nodiscard]]
         void * alloc(size_t requested_size, size_t alignment);
+        [[nodiscard]]
+        inline MemBuffer alloc_buf(size_t requested_size) {
+            return MemBuffer{ { alloc(requested_size) }, requested_size };
+        }
 
         [[nodiscard]]
         void * realloc(void * block, size_t requested_size);

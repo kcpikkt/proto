@@ -34,8 +34,8 @@ namespace proto {
         };
 
 
-        u64 _size;
         const char * _str = nullptr;
+        u64 _size;
 
         inline Iterator begin() {
             return Iterator(*this, 0);
@@ -45,15 +45,15 @@ namespace proto {
             return Iterator(*this, _size);
         }
 
-        const char * str() {
+        constexpr const char * str() {
             return _str;
         }
 
-        u64 size() {
+        constexpr u64 size() {
             return _size;
         }
 
-        u64 length() {
+        constexpr u64 length() {
             return _size;
         }
 
@@ -75,24 +75,15 @@ namespace proto {
             return _str;
         }
 
-        StringView() {}
+        constexpr StringView() : _str(nullptr), _size(0) {}
 
-        StringView(const char * str, u64 size) {
+        constexpr StringView(const char * str, u64 size) : _str(str), _size(size) {
             assert(str);
-            _str = str;
-            _size = size;
         }
 
-        StringView(const char * str) {
-            assert(str);
-            _str = str;
-            _size = strlen(str);
-        }
-        StringView(const unsigned char * str)
-            : StringView((const char*)str)
-        {}
+        StringView(const char * str) : StringView(str, strlen(str)) {}
 
-
+        StringView(const unsigned char * str) : StringView((const char*)str) {}
 
         void remove_suffix(u64 n) {
             assert(n <= _size);

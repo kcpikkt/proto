@@ -5,8 +5,7 @@ int fetch(StringView filepath) {
 
     for(auto& handler : ext_handlers) {
         if( strview_cmp(ext, handler.ext) ) {
-            handler.proc(filepath);
-            return 0;
+            return handler.proc(filepath);
         }
     }
 

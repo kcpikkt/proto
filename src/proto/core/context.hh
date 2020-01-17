@@ -17,6 +17,7 @@
 #include "proto/core/event-system.hh"
 #include "proto/core/asset-system/common.hh"
 #include "proto/core/asset-system/AssetRegistry.hh"
+#include "proto/core/serialization/Archive.hh"
 
 #include "proto/core/graphics/Camera.hh"
 #include "proto/core/graphics/Framebuffer.hh"
@@ -102,10 +103,6 @@ namespace proto {
     struct AssetContext {
         //AssetRegistry assets;
         memory::LinkedListAllocator asset_metadata_allocator;
-        // NOTE(kcpikkt): stages are staging areas for assets loaded from files to be uploaded to gpu
-        //                but we can load directory to gpu mem with glMap so change them to caches
-        memory::LinkedListAllocator texture_cache;
-        memory::LinkedListAllocator mesh_cache;
 
         ArrayMap<AssetHandle, Pair<Mesh, AssetMetadata>>          meshes;
         ArrayMap<AssetHandle, Pair<Material, AssetMetadata>>      materials;
@@ -129,6 +126,8 @@ namespace proto {
         Array<StringView> cmdline;
         char ** argv;
         s32 argc;
+
+        ArrayMap<u32, serialization::Archive> open_archives;
 
         // preservation of client data when hot-swapping
         void ** client_preserved; 

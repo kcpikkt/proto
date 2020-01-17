@@ -3,11 +3,10 @@
 #include "proto/core/context.hh"
 
 namespace proto {
+namespace {
     
     [[nodiscard]]
     Entity create_entity() {
-        auto& ctx = proto::context;
-
         Entity entity{.id = ++context->entity_generator_data._id, .gen = 0};
 
         return context->entities.push_back(entity);
@@ -45,4 +44,6 @@ namespace proto {
         return nullptr;
     }
 
-};
+
+} // namespace (anonymous)
+} // namespace proto

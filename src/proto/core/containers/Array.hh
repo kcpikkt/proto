@@ -90,6 +90,20 @@ struct Array
         resize(init_size);
     }
 
+    // use responsibly 
+    void init_place(void * data, u64 capacity) {
+        State::state_init();
+        State::state_flags.set(State::_moved_bit); // to prevent destruction
+        assert(data);
+        _data = (T*)data;
+        _capacity = capacity;
+    }
+
+    inline void init_place_resize(void * data, u64 capacity) {
+        init_place(data, capacity);
+        resize(capacity);
+    }
+
     u64 size() const {
         return _size;
     }
@@ -230,7 +244,8 @@ struct Array
         assert(_allocator);
         auto err = State::ErrCategory::success;
         if constexpr(has_state) {
-            for(u64 i=0; i<_size; i++) err = _data[i].destroy();
+                // monitor for destruction errors
+            for(u64 i=0; i<_size; i++) _data[i].destroy();
         }
         if(_data)
             _allocator->free(_data);

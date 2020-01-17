@@ -8,7 +8,7 @@
 #include "proto/core/error-handling.hh"
 //NOTE(kacper): State is a class that have potential to hold
 //              external resources - that have pointers to heap.
-//              Should rather not be copied only moved,
+//              Should not allow for implicit compies, only moves
 //              if state was moved from only shallow destructor is called.
 
 namespace proto {
@@ -25,20 +25,27 @@ namespace constant {
 } // namespace constant
 
 struct DefaultStateErrCategoryExt : ErrCategoryCRTP<DefaultStateErrCategoryExt> {
-    constexpr static ErrMessage message(ErrCode) { return "unknown error"; }
+    constexpr static ErrMessage message(ErrCode) { return "Unknown error"; }
 };
 
 template<typename T, typename ErrCategoryExt = DefaultStateErrCategoryExt>
 struct StateCRTP  {
 
+    // this err category is a member cause user can extend this by ErrCategoryExt
+    // Not sure how good/bad of an idea this is
     struct ErrCategory : ErrCategoryCRTP<ErrCategory>, ErrCategoryExt {
-        inline constexpr static ErrCode success = 0;
-        inline constexpr static ErrCode double_deep_destroy = 1;
-        inline constexpr static ErrCode double_shallow_destroy = 2;
-        inline constexpr static ErrCode out_of_scope_leak = 3;
-        inline constexpr static ErrCode destroy_uninitialized = 4;
-        inline constexpr static ErrCode destroy_deep_unimplemented = 5;
-        inline constexpr static ErrCode destroy_failed = 6;
+        enum : ErrCode {
+            success = 0,
+            double_deep_destroy,
+            double_shallow_destroy,
+            out_of_scope_leak,
+            destroy_uninitialized,
+            destroy_deep_unimplemented,
+            destroy_fail,
+            // not actually used by base StateCRTP but useful so there is no need for extensions
+            free_fail,
+            file_close_fail,
+        };
 
         constexpr static ErrMessage message(ErrCode code) {
             switch(code) {
@@ -51,19 +58,26 @@ struct StateCRTP  {
             case destroy_uninitialized:
                 return "Destructor method called on unitialized state object, no destruction performed.";
             case destroy_deep_unimplemented:
-                return "Destructor method called on unitialized state object, no destruction performed.";
-            case destroy_failed:
+                return "Type inheriting StateCRTP does not implement destroy_deep() method.";
+            case destroy_fail:
                 return "Destructon failed due to... some reasons? catchall error, sry for being lazy, fixme";
+            case free_fail:
+                return "Failed to free memory.";
+            case file_close_fail:
+                return "Failed to close file.";
             }
-            return ErrCategoryExt::message(code); // perhaps it is user side error
+            return ErrCategoryExt::message(code); // perhaps it is user side error, from ErrCategoryExt(ension) but idk
         }
     };
 
-    constexpr static u8 _initialized_bit       = BIT(0);
-    constexpr static u8 _moved_bit             = BIT(1);
-    constexpr static u8 _shallow_destroyed_bit = BIT(2);
-    constexpr static u8 _deep_destroyed_bit    = BIT(3);
-    constexpr static u8 _autodestruct_bit      = BIT(4);
+    enum : u8 {
+        _initialized_bit       = BIT(0),
+        _moved_bit             = BIT(1),
+        _shallow_destroyed_bit = BIT(2), 
+        _deep_destroyed_bit    = BIT(3),
+        _autodestruct_bit      = BIT(4),
+    };
+
     Bitfield<u8> state_flags = 0;
 
     using State = StateCRTP<T>;
@@ -94,7 +108,7 @@ struct StateCRTP  {
     Err<ErrCategory> destroy_shallow() { return StateCRTP<T>::ErrCategory::success; }
     Err<ErrCategory> destroy_deep() {
         Err<ErrCategory> err = ErrCategory::destroy_deep_unimplemented;
-        debug_warn(debug::category::data, err.message());
+        debug_error(debug::category::data, err.message());
         return err;
     }
 
@@ -102,6 +116,12 @@ struct StateCRTP  {
 
     ~StateCRTP();
 };
+
+template<typename T, typename Ext = DefaultStateErrCategoryExt>
+using StateErrCategory = typename StateCRTP<T, Ext>::ErrCategory;
+
+template<typename T, typename Ext = DefaultStateErrCategoryExt>
+using StateErr = Err<StateErrCategory<T, Ext>>;
 
 } // namespace proto
 
@@ -122,7 +142,7 @@ void StateCRTP<T, Ext>::state_copy(const T& other) {
     state_flags = other.state_flags;
 }
 
-// call that in every init/constructor/assignment
+// call that in every init/constructor
 template<typename T, typename Ext>
 void StateCRTP<T, Ext>::state_init([[maybe_unused]] bool assignment) {
     assert(!state_flags.check(_initialized_bit) || assignment);
@@ -130,7 +150,7 @@ void StateCRTP<T, Ext>::state_init([[maybe_unused]] bool assignment) {
 }
 
 template<typename T, typename Ext>
-Err<typename StateCRTP<T, Ext>::ErrCategory> StateCRTP<T, Ext>::_destroy_shallow() {
+StateErr<T, Ext> StateCRTP<T, Ext>::_destroy_shallow() {
     assert(!state_flags.check(_shallow_destroyed_bit));
 
     auto err = static_cast<T*>(this)->destroy_shallow();
@@ -142,10 +162,11 @@ Err<typename StateCRTP<T, Ext>::ErrCategory> StateCRTP<T, Ext>::_destroy_shallow
 }
 
 template<typename T, typename Ext>
-Err<typename StateCRTP<T, Ext>::ErrCategory> StateCRTP<T, Ext>::_destroy_deep() {
+StateErr<T, Ext> StateCRTP<T, Ext>::_destroy_deep() {
     assert(!state_flags.check(_deep_destroyed_bit));
 
-    static_assert(meta::is_same_v<decltype(meta::declval<T>().destroy_deep()), Err<ErrCategory> >);
+    static_assert(meta::is_same_v<decltype(meta::declval<T>().destroy_deep()), StateErr<T, Ext> >,
+                  "destory_deep() method has wrong return type.");
     auto err = static_cast<T*>(this)->destroy_deep();
 
     if(err == ErrCategory::success)
@@ -155,10 +176,10 @@ Err<typename StateCRTP<T, Ext>::ErrCategory> StateCRTP<T, Ext>::_destroy_deep() 
 }
 
 template<typename T, typename Ext>
-Err<typename StateCRTP<T, Ext>::ErrCategory> StateCRTP<T, Ext>::destroy() {
+StateErr<T, Ext> StateCRTP<T, Ext>::destroy() {
     using ErrCategory = typename StateCRTP<T, Ext>::ErrCategory;
 
-    Err<ErrCategory> err = ErrCategory::success;
+    StateErr<T, Ext> err = ErrCategory::success;
 
 #if defined(PROTO_DEBUG)
     if(state_flags.check(_deep_destroyed_bit)) {
@@ -188,6 +209,8 @@ Err<typename StateCRTP<T, Ext>::ErrCategory> StateCRTP<T, Ext>::destroy() {
         debug_warn(debug::category::main, ErrCategory::message(ErrCategory::destroy_uninitialized));
         debug::stacktrace();
     }
+
+    if(!err) state_flags.unset(_initialized_bit);
     return err;
 }
 

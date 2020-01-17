@@ -2,6 +2,7 @@
 #include "proto/core/meta.hh"
 #include "proto/core/containers/Array.hh"
 #include "proto/core/memory/common.hh"
+#include "proto/core/math/hash.hh"
 
 // this system do not know what it is yet, excuse it
 
@@ -31,8 +32,9 @@ namespace proto {
     #define PROTO_ASSET_TYPE(TYPE, INDEX)                         \
         template<> struct AssetType<TYPE> {                       \
             using type = TYPE;                                    \
-            constexpr static AssetTypeIndex index = INDEX;       \
+            constexpr static AssetTypeIndex index = INDEX;        \
             constexpr static const char * name = PROTO_STR(TYPE); \
+            constexpr static const u32 hash = hash::crc32( {name, sizeof(PROTO_STR(TYPE)) - 1} ); \
         };
      
     PROTO_ASSET_TYPE(InvalidAsset, 0);
@@ -109,11 +111,11 @@ namespace proto {
     struct AssetMetadata {
         AssetHandle handle;
         char name[PROTO_ASSET_MAX_NAME_LEN];
-        char filepath[PROTO_ASSET_MAX_PATH_LEN];
-        bool is_cached = false;
-        void * cached;
+
+        u32 archive_node_idx_hint;
+        u32 archive_hash;
+
         Array<AssetHandle> deps;
-        //        u32 reference_count;
     };
 
     //DEP
@@ -128,6 +130,7 @@ namespace proto {
 
 namespace serialization {
     template<typename T> struct AssetHeader;
+    template<typename T> inline u64 serialized_size(T&);
 }    
 
 } // namespace proto

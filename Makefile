@@ -197,14 +197,14 @@ $(test): $(test_objs) $(library)
 	$(cxx) $(ldflags) -o $@ $(library) $(test_objs) $(libs)
 
 $(proto_runtime_objs): $(obj_dir)/%.o: $(src_dir)/%.cc
-	@$(call makedir, $(dir $@))
+	mkdir -p $(dir $@)
 	$(cxx) -fPIC $(cxxflags) $(cppflags) -MMD -MP -c $< $(includes) -o $@
 
 $(proto_lib_objs): $(obj_dir)/%.o: $(src_dir)/%.cc
 	mkdir -p $(dir $@)
 	$(cxx) -fPIC $(cxxflags) $(cppflags) -MMD -MP -c $< $(includes) -o $@
 # 	because ar is stupid
-	@$(call makedir, $(ar_obj_dir) )
+	mkdir -p $(ar_obj_dir)
 	$(eval ar_obj_name := $(ar_obj_dir)/$(subst /,_,$(@:$(obj_dir)/%.o=%.o)))
 	cp $@ $(ar_obj_name)
 
@@ -226,7 +226,7 @@ $(test_objs): $(obj_dir)/test/%.o: $(test_src_dir)/proto/%.cc
 #		wget $(GL_EXT_REPO_URL)/$(notdir $@) -O $@)
 
 .PHONY: clean
-clean:
+clean: Makefile
 	$(call remove, $(runtime) $(proto_objs) \
 		$(proto_ar_objs) $(proto_deps) $(TESTOBJS) \
 		$(client_objs) $(client_deps) $(CATCH2GCH) $(OBJDIR)/glfw3.o)

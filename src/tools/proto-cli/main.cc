@@ -1,30 +1,32 @@
 #include "proto/proto.hh"
 #include "proto/core/platform/common.hh" 
-#include "proto/core/graphics/gl.hh" 
-#include "proto/core/graphics/rendering.hh" 
+#include "proto/core/graphics.hh" 
 #include "proto/core/util/namespace-shorthands.hh" 
 #include "proto/core/asset-system/interface.hh" 
 #include "proto/core/asset-system/serialization.hh" 
 #include "proto/core/util/argparse.hh" 
 #include "proto/core/util/String.hh" 
+#include "proto/core/serialization/Archive.hh" 
 
 #include "assimp/Importer.hpp"
 #include "assimp/DefaultLogger.hpp"
 #include "assimp/scene.h"
 #include "assimp/postprocess.h"
 
-#include "cli-common.hh"
 #include "fetch.hh"
-////#include "fetch_mesh.hh"
-//#include "fetch_texture.hh"
-//#include "fetch_cubemap.hh"
-//#include "fetch_model_tree.hh"
+#include "cli-common.hh"
+// extern defs from cli-common.hh
+proto::StringArena search_paths;
+proto::StringArena loaded_texture_paths;
+proto::Array<proto::AssetHandle> loaded_assets;
+
 
 using namespace proto;
 
 PROTO_SETUP {
-    settings->mode = RuntimeSettings::terminal_mode_bit;
+    //settings->mode = RuntimeSettings::terminal_mode_bit;
     settings->asset_paths = "res/";
+    settings->shader_paths = "src/demos/sokoban/shaders/";
 }
 #define LEN(arr) (sizeof(arr)/sizeof(arr[0]))
 
@@ -37,6 +39,8 @@ using Opt = argparse::Option;
 Opt options[] = {
     {"output", 'o', Opt::required_bit | Opt::param_bit},
     {"search", 's', Opt::param_bit},
+    {"preview", 'p', 0 },
+    {"verbose", 'v', 0 },
 };
 
 ArrayMap<u64, StringView> matched_opt;
@@ -45,13 +49,27 @@ void display_help() {
     log_info(debug::category::main, "<HELPTEXT>");
 }
 
+
+void preview_init();
+
+
 PROTO_INIT {
     assert(proto::context);
     auto& ctx = *proto::context;
     search_paths.init_split(".", ':', &ctx.memory);
-    mem_buffers.init(&ctx.memory);
-
+    loaded_texture_paths.init(&ctx.memory);
+    loaded_assets.init(&ctx.memory);
     matched_opt.init(&ctx.memory);
+
+    defer{
+        loaded_texture_paths.destroy();
+        search_paths.destroy();
+        loaded_assets.destroy();
+        matched_opt.destroy();
+    };
+
+
+    ctx.exit_sig = true;
 
     StringView sentence =
         argparse::match_sentence(cmdline_sentences, LEN(cmdline_sentences), 2);
@@ -60,7 +78,7 @@ PROTO_INIT {
 
     if(strview_cmp(sentence, "parse assets")) {
 
-        StringView output_dir;
+        StringView outpath;
 
         Array<StringView> filepaths; filepaths.init(&ctx.memory);
 
@@ -78,14 +96,19 @@ PROTO_INIT {
         }
 
         for(auto [index, val] : matched_opt) {
-            if( !strcmp(options[index].name, "output") ){ output_dir = val; }
+            if( !strcmp(options[index].name, "output") ){ outpath = val; }
             if( !strcmp(options[index].name, "search") ){ search_paths.store(val); }
+            if( !strcmp(options[index].name, "verbose") ){ cli_flags.set( cli_verbose_bit); }
+            if( !strcmp(options[index].name, "preview") ){
+                cli_flags.set( cli_preview_bit );
+                log_warn(debug::category::main, "cli preview is not yet complete feature");
+            }
         }
 
         for(auto path : search_paths)
             if(!sys::is_directory(path)) log_warn(debug::category::main, path, " is not a directory.");
 
-        assert(output_dir);
+        assert(outpath);
 
         Array<String> conf_filepaths; conf_filepaths.init_resize(filepaths.size(), &ctx.memory);
         defer { conf_filepaths.destroy(); };
@@ -105,117 +128,134 @@ PROTO_INIT {
             }
         }
 
+        if(cli_flags.check(cli_verbose_bit)) {
+
+            for(auto h : loaded_assets) {
+                auto asset_type_info = AssetType(h);
+                auto metadata = get_metadata(h);
+                assert(metadata);
+
+                print(asset_type_info.name, ' ', metadata->name);
+                switch(asset_type_info.index) {
+                case(AssetType<Mesh>::index): {
+                    auto& mesh = get_asset_ref<Mesh>(h);
+                    print("\t(", mesh.vertices_count, " vertices, ", mesh.indices_count, " indices)");
+                } break;
+                case(AssetType<Texture2D>::index): {
+                    auto& texture = get_asset_ref<Texture2D>(h);
+                    print("\t( size: ", texture.size, ", ", (u32)texture.channels, " channels)");
+                } break;
+                }
+
+                println();
+            }
+            flush();
+        }
+
+        u32 mesh_count = 0, tex_count = 0, mat_count = 0;
+        for(auto h : loaded_assets) {
+            switch(AssetType(h).index) {
+            case(AssetType<Mesh>::index): mesh_count++; break;
+            case(AssetType<Texture2D>::index): tex_count++; break;
+            case(AssetType<Material>::index): mat_count++; break;
+            }
+        }
+
+
+        ser::Archive archive;
+
+        if(auto ec = archive.create(outpath, loaded_assets.size()))
+            return (void)log_error(debug::category::main, ec.message());
+
+        for(auto asset : loaded_assets) {
+            if(auto ec = archive.store(asset)) {
+                log_error(debug::category::data, "Archiving ", get_metadata(asset)->name, " failed. ", ec); break;
+            }
+        }
+
+        if(auto ec = archive.destroy())
+            return (void)log_error(debug::category::main, ec.message());
+
+        log_info(debug::category::main,
+                 "Parsed ", mesh_count, " meshes, ", tex_count, " textures, ", mat_count, " materials. Written to ", outpath, '.');
+
+        if(cli_flags.check(cli_preview_bit)) {
+            preview_init();
+        } else {
+            ctx.exit_sig = true;
+        }
+
     } else {
         log_error(debug::category::main, "Tell me what to do");
         display_help();
     }
-#if 0
-    if(sentence) {
-        //////////////////////////////////////////////////////////////////////////////////////////////////
-        /*  */ if(strview_cmp(sentence, "parse texture")) {
-            StringView image_file = ctx.argv[4];
-            StringView output_file = ctx.argv[5];
+}
 
-            if(ctx.argc != 6) {
-                log_error(debug::category::main, "parse texture [image file] [output file]");
-                return;
-            }
+RenderBatch batch;
+Array<Entity> prev_ents;
+AssetHandle main_shader_h;
 
-            String final_image_file = sys::search_for_file(image_file, search_paths);
+void preview_init() {
+    auto& ctx = *context;
+    ctx.exit_sig = false;
 
-            if(!final_image_file)
-                FAIL("Could not find ", image_file);
+    prev_ents.init(&ctx.memory);
+    batch.init(sizeof(Vertex) * 5242880, sizeof(u32) * 5242880);
+        
+    for(auto asset : loaded_assets) {
+        switch(asset.type) {
 
-            AssetHandle handle = fetch_texture(final_image_file.view());
+        case(AssetType<Mesh>::index): {
+            if( Entity model = prev_ents.push_back(create_entity()) ) {
+                auto& render_mesh = add_component<RenderMeshComp>(model);
+                auto& transform = add_component<TransformComp>(model);
+                render_mesh.mesh_h = asset;
 
-            if(!handle) {
-                FAIL("Failed to fetch texture ", final_image_file.view())}
+                auto& mesh = get_asset_ref<Mesh>(render_mesh.mesh_h);
+                transform.position = vec3(0.0,0.0,0.0);
+                transform.scale = vec3(1.0 / glm::length(mesh.bounds) );
+            } else 
+                debug_error(debug::category::main, "Failed to create entity");
+        }
 
-            if(sys::is_file(output_file))
-                log_warn(debug::category::main, "overwriting ", output_file);
-
-            if(ser::save_asset(get_asset<Texture2D>(handle), output_file)) {
-                FAIL("Could not save texture to ", output_file);
-            } else {
-                log_info(debug::category::main, "Texture written to file ", output_file);
-            }
-            return;
-
-        //////////////////////////////////////////////////////////////////////////////////////////////////
-        } else if(strview_cmp(sentence, "parse cubemap")) {
-            if(ctx.argc != 11) {
-                log_error(debug::category::main,
-                          "parse cubemap [right] [left] [up] [down] [forward] [back] [output file]");
-                return;
-            }
-
-            StringView output_file = ctx.argv[10];
-
-            String right   = sys::search_for_file(ctx.argv[4], search_paths);
-            String left    = sys::search_for_file(ctx.argv[5], search_paths);
-            String up      = sys::search_for_file(ctx.argv[6], search_paths);
-            String down    = sys::search_for_file(ctx.argv[7], search_paths);
-            String forward = sys::search_for_file(ctx.argv[8], search_paths);
-            String back    = sys::search_for_file(ctx.argv[9], search_paths);
-
-            auto try_fail = [](bool cond, StringView filepath) {
-                                if(!cond) {
-                                    log_error(debug::category::data,
-                                              "Could not find ", filepath);
-                                    return 1;
-                                }else
-                                    return 0;};
-
-            if(try_fail(right   , ctx.argv[4]) ||
-               try_fail(left    , ctx.argv[5]) ||
-               try_fail(up      , ctx.argv[6]) ||
-               try_fail(down    , ctx.argv[7]) ||
-               try_fail(forward , ctx.argv[8]) ||
-               try_fail(back    , ctx.argv[9]) )
-            {
-                log_info(debug::category::data, "Could not create cubemap");
-                return;
-            }
-
-            AssetHandle handle = fetch_cubemap(right, left, up, down, forward, back);
-
-            if(!handle) {
-                FAIL("Failed to fetch cubemap")}
-
-            if(sys::is_file(output_file))
-                log_warn(debug::category::main, "overwriting ", output_file);
-
-            if(ser::save_asset(get_asset<Cubemap>(handle), output_file)) {
-                FAIL("Could not save cubemap to ", output_file);
-            } else {
-                log_info(debug::category::main, "Cubemap written to file ", output_file);
-            }
-            return;
-
-        //////////////////////////////////////////////////////////////////////////////////////////////////
-        } else if(strview_cmp(sentence, "parse model")) {
-        } else {
-            log_error(debug::category::main, "No task specified, exiting.");
-            return;
         }
     }
-#endif
-    //#if 0
-    //if(sentence) {
-    //    /*  */ if(strview_cmp(sentence, "parse mesh")) {
-    //        log_info(debug::category::main, "Mesh parsing");
-    //        if(ctx.argc != 6) {
-    //            log_error(debug::category::main,
-    //                      "parse mesh [mesh file] [out directory]");
-    //        } else {
-    //            dirpath = ctx.argv[5];
-    //            basedir = sys::dirname_view(ctx.argv[4]);
 
-    //                        parse_mesh(ctx.argv[4], ctx.argv[5]);
-    //        }
-    //        return;
-    //    } else if(strview_cmp(sentence, "parse cubemap")) {
-    //}
-    //#endif
+    main_shader_h = 
+        create_asset_rref<ShaderProgram>("sokoban_main")
+            .$_init()
+            .$_attach_shader_file(ShaderType::Vert, "sokoban_main_vert.glsl")
+            .$_attach_shader_file(ShaderType::Frag, "sokoban_main_frag.glsl")
+            .$_link().handle;
+
+    if(!main_shader_h)
+        debug_warn(debug::category::main, "Could not find main shader.");
+
+    glEnable(GL_DEPTH_TEST);
+    ctx.camera.position = vec3(0.0, 0.0, 5.2);
 }
+
+PROTO_UPDATE {
+    auto& ctx = *context;
+    auto& time = ctx.clock.elapsed_time;
+
+    for(auto& comp : ctx.comp.render_mesh) {
+        if(!comp.flags.check(RenderMeshComp::batched_bit)) batch.add(comp);
+    }
+
+    for(auto ent : prev_ents) {
+        //      get_component<TransformComp>(ent)->rotation = angle_axis(time, glm::normalize(vec3(cos(time), 1.0, sin(time))));
+    }
+
+    glViewport(0, 0, ctx.window_size.x, ctx.window_size.y);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    get_asset_ref<ShaderProgram>(main_shader_h).use();
+
+    batch.render();
+
+    //if(time > 1.0f)
+    //    ctx.exit_sig = true;
+}
+
 

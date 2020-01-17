@@ -2,7 +2,7 @@
 namespace proto {
     template<typename T>
     struct Bitfield {
-        T _field = 0;
+        T _field = (T)0;
         void set   (T option) { _field |= option; }
         void unset (T option) { _field &= ~option; }
         void toggle(T option) { _field ^= option; }

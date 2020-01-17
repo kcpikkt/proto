@@ -431,6 +431,8 @@ int proto::platform::runtime(int argc, char ** argv){
     _context.shader_paths.store("src/proto/shaders");
     _context.shader_paths.set_autodestruct();
 
+    _context.open_archives.init(&_context.memory);
+
     // DEFAULT TEXTURES
 
 #if DEFAULT_TEXTURES
@@ -469,14 +471,22 @@ int proto::platform::runtime(int argc, char ** argv){
 
 
 #if DEFAULT_MESHES
-    Mesh & cube = create_asset<Mesh, Mesh&>("default_cube");
-    cube.flags = Mesh::cached_bit;
-    cube.cached = cube_vertices;
-    cube.vertex_count = 36;
-    cube.index_count = 0;
+    Mesh & cube = create_asset_rref<Mesh>("default_cube");
 
+    cube.bounds = vec3(0.5);
+
+    cube.vertices_count = 36;
+    cube.indices_count = 0;
+
+    auto header = serialization::AssetHeader<Mesh>(cube);
+    assert( cube.cached = _context.memory.alloc_buf(header.datasize) );
+    assert( header.vertices_size == 36 * sizeof(Vertex) );
+
+    memcpy(cube.cached.data8                         , &header      , sizeof(header));
+    memcpy(cube.cached.data8 + header.vertices_offset, cube_vertices, sizeof(cube_vertices));
+
+    cube.flags.set(Mesh::cached_bit);
     _context.cube_h = cube.handle;
-    //graphics::gpu_upload(&cube);
 
     //Mesh & quad = create_init_asset_rref<Mesh>("default_quad");
     //quad.vertices.resize(4);
@@ -635,7 +645,7 @@ int proto::platform::runtime(int argc, char ** argv){
 
             assert(clientlib_h);
 
-            void * client_preserve = nullptr;
+            [[maybe_unused]]void * client_preserve = nullptr;
             client_unlink();
             dlclose(clientlib_h);
 

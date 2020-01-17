@@ -14,7 +14,8 @@ struct FileErrCategory : ErrCategoryCRTP<FileErrCategory> {
           wrong_mode,
           desc_retrieve_fail,
           reserve_fail,
-          close_fail
+          close_fail,
+          seek_fail,
     };
     static ErrMessage message(ErrCode code){
         switch(code) {
@@ -28,20 +29,26 @@ struct FileErrCategory : ErrCategoryCRTP<FileErrCategory> {
             return "Failed to retrieve file descriptor of a file.";
         case reserve_fail:
             return "Failed to retrieve file descriptor of a file.";
+        case seek_fail:
+            return "Failed to seek into the file.";
         default:
-            return "no error message";
+            return "Unknown error";
         }
     }
 };
 
-struct File
-{
-    using Mode = u8;
-    constexpr static Mode read_mode   = BIT(0);
-    constexpr static Mode write_mode  = BIT(1);
-    constexpr static Mode trunc_mode  = BIT(2);
-    constexpr static Mode create_mode = BIT(3);
-    constexpr static Mode append_mode = BIT(4);
+using FileErr = Err<FileErrCategory>;
+
+struct File {
+
+    enum Mode : u8 {
+        read_mode   = BIT(0),
+        write_mode  = BIT(1),
+        trunc_mode  = BIT(2),
+        create_mode = BIT(3),
+        append_mode = BIT(4),
+    };
+    //using Mode = u8;
 
     #if defined(PROTO_PLATFORM_WINDOWS)
         #error not implemented
@@ -51,19 +58,24 @@ struct File
         FILE * _file_ptr = nullptr;
     #endif
 
-    u64 _cached_size = 0;
     Bitfield<u8> flags;
-    constexpr static u8 is_open_bit = BIT(0);
+    //constexpr static u8 is_open_bit = BIT(0);
 
-    Err<FileErrCategory> open(StringView filename, Mode mode);
+    FileErr open(StringView filename, Mode mode);
     u64 size();
     u64 write(void const * buf, u64 size); 
+    u64 write(MemBuffer buf);
 
     u64 read(void * mem, u64 size); 
     u64 read(MemBuffer buf); 
 
-    Err<FileErrCategory> reserve(u64 size);
-    Err<FileErrCategory> close();
+    FileErr seek(s64 offset);
+    FileErr seek_end(s64 offset = 0);
+
+    s64 cursor();
+
+    FileErr reserve(u64 size);
+    FileErr close();
 };
 
 } // namespace platform 

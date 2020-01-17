@@ -1,10 +1,12 @@
 #include "proto/core/platform/File.hh"
+#include "proto/core/util/defer.hh"
+#include "proto/core/debug/logging.hh"
 #include <fcntl.h>
 
 namespace proto {
 namespace platform {
 
-    Err<FileErrCategory> File::open(StringView filepath, Mode mode) {
+    FileErr File::open(StringView filepath, Mode mode) {
         const char * mode_str;
         switch(mode) {
             case (read_mode):
@@ -18,23 +20,24 @@ namespace platform {
         }
 
         _file_ptr = fopen(filepath, mode_str);
-        if(!_file_ptr) return FileErrCategory::open_fail;
+        if(!_file_ptr)
+            return FileErrCategory::open_fail;
 
         return FileErrCategory::success;
     }
 
     u64 File::size() {
-        if(_cached_size) return _cached_size;
-
-        fseek (_file_ptr , 0 , SEEK_END);
-        u64 ret = ftell(_file_ptr);
-        rewind (_file_ptr);
-
-        return (_cached_size = ret);
+        auto _cursor = cursor();
+        defer{ seek(_cursor); };
+        return (seek_end(), cursor());
     }
 
     u64 File::write(void const * buf, u64 size) {
         return fwrite(buf, sizeof(u8), size, _file_ptr);
+    }
+
+    u64 File::write(MemBuffer buf) {
+        return write(buf.data, buf.size);
     }
 
     u64 File::read(void * mem, u64 size) {
@@ -45,7 +48,23 @@ namespace platform {
         return read(buf.data, buf.size);
     }
 
-    Err<FileErrCategory> File::reserve(u64 size) {
+    FileErr File::seek(s64 offset) {
+        return fseek(_file_ptr, offset, SEEK_SET)
+            ? FileErrCategory::seek_fail
+            : FileErrCategory::success;
+    }
+
+    FileErr File::seek_end(s64 offset) {
+        return fseek(_file_ptr, offset, SEEK_END)
+            ? FileErrCategory::seek_fail
+            : FileErrCategory::success;
+    }
+
+    s64 File::cursor() {
+        return ftell(_file_ptr);
+    }
+
+    FileErr File::reserve(u64 size) {
         int file_desc = fileno(_file_ptr);
         if(file_desc == -1) return FileErrCategory::desc_retrieve_fail;
 
@@ -55,7 +74,7 @@ namespace platform {
         return FileErrCategory::success;
     }
 
-    Err<FileErrCategory> File::close() {
+    FileErr File::close() {
         assert(_file_ptr);
         return (fclose(_file_ptr)
                 ? FileErrCategory::close_fail

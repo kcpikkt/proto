@@ -1,54 +1,72 @@
 #pragma once
 #include "proto/core/graphics/common.hh"
 #include "proto/core/common/types.hh"
-#include "proto/core/memory/common.hh"
-#include "proto/core/util/algo.hh"
-#include "proto/core/debug/logging.hh"
+#include "proto/core/util/Range.hh"
 #include "proto/core/containers/Array.hh"
 #include "proto/core/util/Bitfield.hh"
 #include "proto/core/asset-system/common.hh"
-#include "proto/core/graphics/Material.hh"
-#include "proto/core/StateCRTP.hh"
 #include "proto/core/graphics/Vertex.hh"
-#include <unistd.h>
+#include "proto/core/math/hash.hh"
 
 namespace proto {
 
 struct Mesh : Asset{
-    void * cached;
+    MemBuffer cached;
 
     constexpr static u8 on_gpu_bit = BIT(0);
     constexpr static u8 cached_bit = BIT(1);
     constexpr static u8 indexed_bit = BIT(2);
     Bitfield<u8> flags = 0;
 
-    u64 vertex_count;
-    u64 index_count;
-    
-    u64 batch_range_begin;
-    u64 batch_range_size;
-    // batch id?
-    // batch start index
-    // batch index count
+    u64 vertices_count;
+    u64 indices_count;
+
+    vec3 bounds;
 };
-
-
-#if 0
-struct Mesh;
 
 template<>
 struct serialization::AssetHeader<Mesh> {
+    constexpr static u32 signature = AssetType<Mesh>::hash;
+    u32 sig = signature;
+    u64 datasize;
+
     u64 vertices_offset;
     u64 vertices_count;
     u64 vertices_size;
+
     u64 indices_offset;
     u64 indices_count;
     u64 indices_size;
-    u64 spans_offset;
-    u64 spans_count;
-    u64 spans_size;
+
+    AssetHeader() {}
+
+    inline AssetHeader(Mesh& mesh);
 };
 
+template<> inline u64 serialization::serialized_size(Mesh& mesh) {
+    return
+        sizeof(AssetHeader<Mesh>) +
+        mesh.vertices_count * sizeof(Vertex) +
+        mesh.indices_count * sizeof(u32);
+}
+
+inline serialization::AssetHeader<Mesh>::AssetHeader(Mesh& mesh) {
+    // 16 alignment?
+    vertices_offset = sizeof(AssetHeader<Mesh>);
+    vertices_count = mesh.vertices_count;
+    vertices_size = vertices_count * sizeof(Vertex);
+
+    indices_offset = vertices_offset + vertices_size;
+    indices_count = mesh.indices_count;
+    indices_size = indices_count * sizeof(u32);
+
+    datasize = indices_offset + indices_size;
+
+    assert(datasize == serialized_size(mesh));
+}
+
+
+#if 0
 struct Mesh : Asset, StateCRTP<Mesh>{
     struct Span {
         u32 begin_index;

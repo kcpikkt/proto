@@ -11,42 +11,23 @@
 #include "proto/core/entity-system.hh" 
 #include "proto/core/util/Pair.hh" 
 #include "proto/core/containers/ArrayMap.hh" 
-
-struct GLSLMaterialFieldRefl {
-    const char * glsl_type = nullptr;
-    const char * glsl_name = nullptr;
-};
+#include "proto/core/util/namespace-shorthands.hh" 
+#include "proto/core/serialization/Archive.hh" 
+#include "proto/core/serialization/interface.hh" 
 
 
 using namespace proto;
 
-u64 glsl_material_struct_def_string(StrBuffer buffer) {
-    u64 written = 0;
-    written += sprint(buffer.data, buffer.size, "layout(std140) uniform Material {\n");
-    for(auto& field : Material::Refl::fields) {
-        written += sprint(buffer.data + written, buffer.size - written,
-                          "    ", field.glsl_type, ' ', field.glsl_name, "; \n");
-    }
-    written += sprint(buffer.data + written, buffer.size - written, "};");
-    return written;
-}
-
-struct StateErrExt : ErrCategoryCRTP<StateErrExt>{
-    inline static ErrCode err4 = 0;
-    inline static ErrCode err5 = 0;
-    static ErrMessage message(ErrCode) {
-        return "StateErrExt";
-    } 
-};
-
-using Ext = StateErrExt;
-struct StateErr : ErrCategoryCRTP<StateErr>, StateErrExt {
-    inline static ErrCode err1 = 0;
-    inline static ErrCode err2 = 0;
-    static ErrMessage message(ErrCode code) {
-        return Ext::message(code);
-    } 
-};
+//u64 glsl_material_struct_def_string(StrBuffer buffer) {
+//    u64 written = 0;
+//    written += sprint(buffer.data, buffer.size, "layout(std140) uniform Material {\n");
+//    for(auto& field : Material::Refl::fields) {
+//        written += sprint(buffer.data + written, buffer.size - written,
+//                          "    ", field.glsl_type, ' ', field.glsl_name, "; \n");
+//    }
+//    written += sprint(buffer.data + written, buffer.size - written, "};");
+//    return written;
+//}
 
 u32 stream = 0;
 u32 VAO = 0;
@@ -63,9 +44,20 @@ Entity cubes[3];
 AssetHandle main_shader_h;
 PROTO_INIT {
     auto& ctx = *context;
+    ctx.exit_sig = true;
+
+
+    StringView archive_path = "outmesh/sponza.pack";
+    if(ser::Archive * archive = ser::open_archive(archive_path)) {
+        for(u32 i=0; i<archive->nodes.size(); ++i) {
+            if(archive->nodes[i].type == ser::Archive::Node::asset) {
+                archive->loat_asset(i);
+            }
+        }
+    } else
+        log_error(debug::category::main, "Failed to open archive ", archive_path);
 
     batch.init(sizeof(Vertex) * 1024, sizeof(u32) * 1024);
-
 
     if( auto cube = cubes[0] = create_entity() ) {
         auto& render_mesh = add_component<RenderMeshComp>(cube);
@@ -107,6 +99,7 @@ PROTO_INIT {
 
     glEnable(GL_DEPTH_TEST);
     ctx.camera.position = vec3(0.0, 0.0, 5.0);
+    ctx.exit_sig = false;
 }
 
 PROTO_UPDATE {

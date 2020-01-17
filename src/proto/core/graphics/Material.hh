@@ -22,60 +22,80 @@
 
 namespace proto{
 
-struct Material;
-
-namespace serialization{
-    //template<>
-    //struct AssetHeader<Material> {
-    //    proto::vec3 ambient_color  = proto::vec3(0.2);
-    //    proto::vec3 diffuse_color  = proto::vec3(0.8);
-    //    proto::vec3 specular_color = proto::vec3(1.0);
-
-    //    AssetHandle specular_map;
-    //    AssetHandle diffuse_map;
-    //    AssetHandle ambient_map;
-    //    AssetHandle bump_map;
-    //};
-} // namespace serialization
 struct GLSLMaterialFieldRefl {
     const char * glsl_type;
     const char * glsl_name;
 };
 
 struct Material : Asset {;
+    Material() {}
 
-    //serialization::AssetHeader<Material> serialization_header_map() {
-    //    serialization::AssetHeader<Material> ret;
-    //    ret.ambient_color = ambient_color;
-    //    ret.diffuse_color = diffuse_color;
-    //    ret.specular_color = specular_color;
+    constexpr static u8 pbr_material = 0;
+    constexpr static u8 trad_material = 1;
 
-    //    ret.ambient_map = ambient_map;
-    //    ret.diffuse_map = diffuse_map;
-    //    ret.specular_map = specular_map;
-    //    ret.bump_map = bump_map;
-    //    return ret;
-    //}
-    //u64 serialized_size() {
-    //    return sizeof();
-    //}
+    u8 type = pbr_material;
 
-    //tmp, use bitfield
-    bool transparency = false;
+    struct PBR {
+        REFL_FIELDS(Material, GLSLMaterialFieldRefl)
+        (
+        (AssetHandle) (albedo_map)    ({"sampler2D", "albedo_map"}),
+        (AssetHandle) (metallic_map)  ({"sampler2D", "metallic_map"}),
+        (AssetHandle) (roughness_map) ({"sampler2D", "roughness_map"}),
+        (AssetHandle) (normal_map)    ({"sampler2D", "normal_map"}),
+        (AssetHandle) (height_map)    ({"sampler2D", "height_map"}),
+        (AssetHandle) (ao_map)        ({"sampler2D", "ao_map"})
+        );
+    };
 
-    REFL_FIELDS(Material, GLSLMaterialFieldRefl)
-    (
-     (vec3) (ambient_color) ({"vec3", "ambient_color"}),
-     (vec3) (diffuse_color) ({"vec3", "diffuse_color"}),
-     (vec3) (specular_color) ({"vec3", "specular_color"})
-    );
-    float alpha = 1.0;
-    float shininess = 0.0;
-
-    AssetHandle specular_map;
-    AssetHandle diffuse_map;
-    AssetHandle ambient_map;
-    AssetHandle bump_map;
-    AssetHandle opacity_map;
+    struct Trad {
+        REFL_FIELDS(Material, GLSLMaterialFieldRefl)
+        (
+        (float) (shininess)  ({"float", "shininess"}),
+        (vec3) (diffuse)  ({"vec3", "diffuse"}),
+        (vec3) (specular) ({"vec3", "specular"}),
+        (vec3) (ambient)  ({"vec3", "ambient"}),
+        (AssetHandle) (diffuse_map)  ({"sampler2D", "diffuse_map"}),
+        (AssetHandle) (specular_map) ({"sampler2D", "specular_map"}),
+        (AssetHandle) (normal_map)   ({"sampler2D", "normal_map"}),
+        (AssetHandle) (height_map)   ({"sampler2D", "height_map"})
+        );
+    };
+    union {
+        PBR pbr;
+        Trad trad;
+    };
 };
+
+template<>
+struct serialization::AssetHeader<Material> {
+    constexpr static u32 signature = AssetType<Material>::hash;
+    u32 sig = signature;
+    u64 datasize;
+
+    union {
+        Material::PBR pbr;
+        Material::Trad trad;
+    };
+
+    AssetHeader() {}
+
+    inline AssetHeader(Material& material);
+};
+
+template<> inline u64 serialization::serialized_size(Material&) {
+    return sizeof(AssetHeader<Material>);
+}
+
+inline serialization::AssetHeader<Material>::AssetHeader(Material& material){
+    datasize = serialized_size(material);
+    /**/ if(material.type == Material::pbr_material) 
+        pbr = material.pbr;
+    else if(material.type == Material::trad_material) 
+        trad = material.trad;
+    else
+        assert(0);
+}
+
+
+
 } //namespace proto 

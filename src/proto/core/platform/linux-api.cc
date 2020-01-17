@@ -13,6 +13,7 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 namespace proto {
 namespace platform { 

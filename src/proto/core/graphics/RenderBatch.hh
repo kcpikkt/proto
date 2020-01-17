@@ -1,5 +1,6 @@
 #pragma once
 #include "proto/core/common.hh"
+#include "proto/core/util/Range.hh"
 #include "proto/core/context.hh"
 #include "proto/core/common/types.hh"
 #include "proto/core/graphics/Mesh.hh"
@@ -11,12 +12,8 @@
 namespace proto {
 
 struct RenderBatch {
-    struct Range {
-        u64 begin;
-        u64 size;
-    };
 
-    u32 vertex_buffer, vertex_attrib, index_pointer;
+    u32 vertex_buffer, index_buffer, vertex_attrib, index_pointer; // sry, what is index pointer?
     u64 vertex_buffer_size;
     u64 index_buffer_size;
 
@@ -24,7 +21,18 @@ struct RenderBatch {
     //    u64 index_buffer_largest_range_idx;
 
     Array<RenderMeshComp> render_mesh_comps;
-    Array<Mesh> meshes;
+
+    struct RenderBatchMesh : Mesh {
+        // batch identification
+        Range batch_index_range;
+        Range batch_vertex_range;
+
+        u32 ref_count = 0;
+
+        RenderBatchMesh(const Mesh& mesh) : Mesh::Mesh(mesh) {}
+    };
+
+    Array<RenderBatchMesh> meshes;
 
     Array<Range> free_vertex_ranges;
     Array<Range> free_index_ranges;
@@ -35,22 +43,31 @@ struct RenderBatch {
 
         glGenVertexArrays(1, &vertex_attrib);
         glGenBuffers(1, &vertex_buffer);
+        glGenBuffers(1, &index_buffer);
 
         glBindVertexArray(vertex_attrib);
+
         glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
         glBufferData(GL_ARRAY_BUFFER, vertex_buffer_size, NULL, GL_STREAM_DRAW);
 
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, index_buffer_size, NULL, GL_STREAM_DRAW);
+
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(struct Vertex),
-                            (void*) (offsetof(struct Vertex, position)) );
+                              (void*) (offsetof(struct Vertex, position)) );
 
         glEnableVertexAttribArray(1);
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(struct Vertex),
-                                (void*) (offsetof(struct Vertex, normal)) );
+                              (void*) (offsetof(struct Vertex, normal)) );
 
-        glEnableVertexAttribArray(2);
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(struct Vertex),
-                                (void*) (offsetof(struct Vertex, uv)) );
+        //glEnableVertexAttribArray(2);
+        //glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(struct Vertex),
+        //                      (void*) (offsetof(struct Vertex, tangent)) );
+
+        glEnableVertexAttribArray(3);
+        glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(struct Vertex),
+                              (void*) (offsetof(struct Vertex, uv)) );
 
         free_vertex_ranges.init(1, &context->memory);
         free_index_ranges.init(1, &context->memory);
@@ -76,79 +93,102 @@ struct RenderBatch {
         if(auto mesh_idx_opt = meshes.contains(*mesh_ptr)) {
             // given mesh is already in our batch buffer, no need for data duplicate
             // handle stays the same except for index hint
-            render_mesh_comps.push_back(render_mesh).mesh_h.idx_hint = meshes.size();
+            meshes[mesh_idx_opt.value].ref_count++;
+
+            render_mesh_comps.push_back(render_mesh).mesh_h.idx_hint = mesh_idx_opt.value;
             render_mesh.flags.set(RenderMeshComp::batched_bit);
             return;
         }
 
         if(!mesh_ptr->flags.check(Mesh::cached_bit)) {
-            // if is not cached, fetch data from disk
+            // if is not cached, fetch data from disk and proceed
             debug_warn(debug::category::data, "Implement me");
             return;
         }
 
-        proto_assert(mesh_ptr->cached);
+        proto_assert(mesh_ptr->cached.data);
+        auto& header = *((serialization::AssetHeader<Mesh>*)(mesh_ptr->cached.data));
 
-        u64 vertex_mem = mesh_ptr->vertex_count * sizeof(Vertex);
-        proto_assert(vertex_mem);
-        //if(vertex_mem < free_vertex_ranges[vertex_buffer_largest_range_idx].size) {
-        //    debug_warn(debug::category::data, "Not enough space in batch vertex mem");
-        //    return;
-        //}
+        if(header.sig != serialization::AssetHeader<Mesh>::signature) {
+            log_error(debug::category::data, "Cached mesh data header signature was corrupted, aborting.");
+            return;
+        }
 
-        u64 index_mem = mesh_ptr->index_count * sizeof(u32);
-        //if(index_mem < free_index_ranges[index_buffer_largest_range_idx].size) {
-        //    debug_warn(debug::category::data, "Not enough space in batch index mem");
-        //    return;
-        //}
+        proto_assert(header.vertices_size);
 
         // hinting our handle
         render_mesh_comps.push_back(render_mesh).mesh_h.idx_hint = meshes.size();
         render_mesh.flags.set(RenderMeshComp::batched_bit);
 
         auto& mesh = meshes.push_back(*mesh_ptr);
-        mesh.batch_range_size = 0;
 
-        for(u64 i=0; i<free_vertex_ranges.size(); ++i) {
+        auto alloc_range =
+            [](u64 size, Array<Range>& ranges) -> Optional<Range> {
 
-            if(free_vertex_ranges[i].size >= vertex_mem) {
-                mesh.batch_range_begin = free_vertex_ranges[i].begin;
-                mesh.batch_range_size = vertex_mem;
+                for(u64 i=0; i<ranges.size(); ++i) {
+                    if(ranges[i].size >= size) {
+                        defer {
+                            if(ranges[i].size == size)
+                                ranges.erase(i);
+                            else
+                                (ranges[i].begin += size, ranges[i].size -= size);
+                        };
 
-                if(free_vertex_ranges[i].size == vertex_mem) {
-                    free_vertex_ranges.erase(i);
-                } else {
-                    free_vertex_ranges[i].begin += vertex_mem;
-                    free_vertex_ranges[i].size -= vertex_mem;
-                }
-            }
+                        return Range{ ranges[i].begin, size };
+                    }
+                }       
+                return {};
+            };
+
+
+        // WE ASSUME THAT OUR BUFFERS ARE ALREADY BOUND
+        glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer);
+
+        auto map_flags = GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT;
+
+        if(header.vertices_size) {
+            if( auto range_opt = alloc_range(header.vertices_size, free_vertex_ranges) )
+                mesh.batch_vertex_range = range_opt.value;
+            else
+                return (void)debug_warn(debug::category::data, "Could not fit mesh into RenderBatch buffer");
+
+            auto& [r_begin, r_size] = mesh.batch_vertex_range;
+
+            if(void * mapped_range = glMapBufferRange(GL_ARRAY_BUFFER, r_begin, r_size, map_flags) )
+                memcpy(mapped_range, (u8*)&header + header.vertices_offset, r_size);
+            else
+                return (void)debug_warn(debug::category::data, "glMapBufferRange failed");
         }
 
-        if(!mesh.batch_range_size){
-            debug_warn(debug::category::data, "Could not fit mesh into RenderBatch buffer");
-            return;
-        }
+        if(header.indices_size) {
+            if( auto range_opt = alloc_range(header.indices_size, free_index_ranges) )
+                mesh.batch_index_range = range_opt.value;
+            else
+                return (void)debug_warn(debug::category::data, "Could not fit mesh into RenderBatch buffer");
 
-        void * range_ptr =
-            glMapBufferRange(GL_ARRAY_BUFFER, mesh.batch_range_begin, mesh.batch_range_size,
-                             GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
-        if(!range_ptr) {
-            debug_warn(debug::category::data, "glMapBufferRange failed");
-            return;
-        }
+            auto& [r_begin, r_size] = mesh.batch_index_range;
 
-        memcpy(range_ptr, mesh.cached, mesh.batch_range_size);
+            if(void * mapped_range = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, r_begin, r_size, map_flags) )
+                memcpy(mapped_range, (u8*)&header + header.indices_offset, r_size);
+            else
+                return (void)debug_warn(debug::category::data, "glMapBufferRange failed");
+
+        }
 
         // FIXME(kcpiktk): do that once after buffer is ready to render?
-        if(glUnmapBuffer(GL_ARRAY_BUFFER) != GL_TRUE) {
-            debug_warn(debug::category::data, "glUnmapBuffer failed");
-            return;
-        }
+        if(glUnmapBuffer(GL_ARRAY_BUFFER) != GL_TRUE)
+            return (void)debug_warn(debug::category::data, "glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER) failed");
+
+        if(glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER) != GL_TRUE)
+            return (void)debug_warn(debug::category::data, "glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER) failed");
     }
 
     void render() {
+        glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer);
         auto& ctx = *context;
-        auto& time = ctx.clock.elapsed_time;
+        //auto& time = ctx.clock.elapsed_time;
 
         mat4 mvp, model, view = ctx.camera.view(), projection = ctx.camera.projection();
 
@@ -163,8 +203,7 @@ struct RenderBatch {
             auto* transform = get_component<TransformComp>(render_mesh.entity);
             assert(transform);
 
-            model = mat4(1.0);
-            model = translate(model, transform->position) * glm::toMat4(transform->rotation);
+            model = translate(scale(mat4(1.0), transform->scale), transform->position) * glm::toMat4(transform->rotation);
 
             mvp = projection * view * model;
 
@@ -175,9 +214,12 @@ struct RenderBatch {
                 .$_set_vec3  ("u_color", &render_mesh.color);
 
             if(mesh.flags.check(Mesh::indexed_bit)){
-                debug_warn(debug::category::data, "Implement me");
+                auto& [r_begin, r_size] = mesh.batch_index_range;
+                u32 offset = mesh.batch_vertex_range.begin / sizeof(Vertex);
+                glDrawElementsBaseVertex (GL_TRIANGLES, r_size / sizeof(u32), GL_UNSIGNED_INT, (void*)r_begin, offset);   
             } else {
-                glDrawArrays (GL_TRIANGLES, mesh.batch_range_begin, mesh.batch_range_size / sizeof(Vertex));   
+                auto& [r_begin, r_size] = mesh.batch_vertex_range;
+                glDrawArrays (GL_TRIANGLES, r_begin, r_size / sizeof(Vertex));   
             }
         }
     }

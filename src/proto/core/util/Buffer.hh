@@ -6,13 +6,17 @@ namespace proto {
 template<typename T>
 struct Buffer {
     union {
-        T * data;
+        T * data = nullptr;
         u8   * data8;
         u16  * data16;
         u32  * data32;
         u64  * data64;
     };
-    size_t size;
+    size_t size = 0;
+
+    operator bool() {
+        return (bool)data;
+    }
 };
 
 using MemBuffer = Buffer<void>;

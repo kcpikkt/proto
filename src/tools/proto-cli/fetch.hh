@@ -12,7 +12,7 @@ using namespace proto;
 
 struct {
     StringView ext;
-    void (*proc)(StringView);
+    int (*proc)(StringView);
 } ext_handlers[] = {
                  {"obj",  fetch_model_tree},
                  //                 {".png",  fetch_image},

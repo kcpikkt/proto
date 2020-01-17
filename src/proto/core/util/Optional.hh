@@ -18,6 +18,11 @@ namespace proto
         Optional<T>& operator=(const T& val) {
             value = val; has_value = true; return *this;
         }
+
+        //operator T&() {
+        //    assert(has_value);
+        //    return value;
+        //}
     };
 }
 

@@ -6,28 +6,15 @@
 #include "proto/core/asset-system/common.hh"
 
 namespace proto {
-    //    struct Texture2D;
-    //namespace serialization {
-    //
-    //    template<>
-    //    struct AssetHeader<Texture2D> {
-    //        ivec2 size;
-    //        u8 channels;
-    //        u64 data_offset;
-    //        u64 data_size;
-    //        u32 gpu_format;
-    //        u32 format;
-    //    };
-    //}
 
 struct Texture2D : Asset{
     u8 channels; 
 
-    u32 datatype = GL_UNSIGNED_BYTE;
+    u32 gl_datatype = GL_UNSIGNED_BYTE;
     u32 format;
     u32 gpu_format;
 
-    void * cached;
+    MemBuffer cached;
 
     u32 gl_id;
     s32 bound_unit = -1;
@@ -44,6 +31,68 @@ struct Texture2D : Asset{
     // batch index count
 };
 
+template<>
+struct serialization::AssetHeader<Texture2D> {
+    constexpr static u32 signature = AssetType<Texture2D>::hash;
+    u32 sig = signature;
+    u64 datasize;
+
+    u8 channels; 
+    u32 gl_datatype = GL_UNSIGNED_BYTE;
+    u32 format;
+    u32 gpu_format;
+    ivec2 size;
+
+    u64 pixeldata_offset;
+    u64 pixeldata_size;
+
+    AssetHeader() {}
+    inline AssetHeader(Texture2D& texture);
+};
+
+template<> inline u64 serialization::serialized_size(Texture2D& texture) {
+    u32 pix_sz;
+    switch(texture.gl_datatype) {
+    case(GL_UNSIGNED_BYTE):
+        pix_sz = sizeof(u8); break;
+    case(GL_UNSIGNED_INT):
+        pix_sz = sizeof(u32); break;
+    case(GL_FLOAT):
+        pix_sz = sizeof(float); break;
+    default:
+        assert(0);
+    }
+    return sizeof(AssetHeader<Texture2D>) +
+           texture.size.x * texture.size.y * pix_sz;
+}
+
+inline serialization::AssetHeader<Texture2D>::AssetHeader(Texture2D& texture)  :
+    channels(texture.channels),
+    gl_datatype(texture.gl_datatype),
+    format(texture.format),
+    gpu_format(texture.gpu_format),
+    size(texture.size)
+{
+    pixeldata_offset = sizeof(AssetHeader<Texture2D>);
+    u32 pix_sz;
+    switch(gl_datatype) {
+    case(GL_UNSIGNED_BYTE):
+        pix_sz = sizeof(u8); break;
+    case(GL_UNSIGNED_INT):
+        pix_sz = sizeof(u32); break;
+    case(GL_FLOAT):
+        pix_sz = sizeof(float); break;
+    default:
+        assert(0);
+    }
+    pixeldata_size = size.x * size.y * pix_sz;
+    datasize = pixeldata_offset + pixeldata_size;
+
+    assert(datasize == serialized_size(texture));
+}
+ 
+
+} // namespace proto
 
 
 
@@ -109,4 +158,3 @@ struct Texture2D :
 
 };
     #endif
-} // namespace proto

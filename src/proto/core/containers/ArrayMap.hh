@@ -255,7 +255,7 @@ struct ArrayMap
         if(!keys.destroy() && !values.destroy())
             return State::ErrCategory::success;
         else
-            return State::ErrCategory::destroy_failed;
+            return State::ErrCategory::destroy_fail;
     }
 };
 

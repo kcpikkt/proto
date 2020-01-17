@@ -95,7 +95,7 @@ int match_options(const Option options[],
         if(!opt_match) rest.push_back(arg);
     }
 
-    for(u64 i=0; i<options_count; ++i) {
+    for(s64 i=0; i<options_count; ++i) {
         if( options[i].flags.check(Option::required_bit) && !matched.contains_key(i) )
         {
             log_error(debug::category::main, "Option --", options[i].name, " is required.");
