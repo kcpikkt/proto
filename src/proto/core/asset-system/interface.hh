@@ -41,8 +41,8 @@ namespace proto {
                      AssetContext * asset_context = proto::context);
 
     template<typename T>
-    T& create_asset_rref(StringView name,
-                          AssetContext * asset_context = proto::context)
+    inline T& create_asset_rref(StringView name,
+                                AssetContext * asset_context = proto::context)
     {
         return create_asset<T, T&>(name, asset_context);
     }
@@ -50,6 +50,36 @@ namespace proto {
     AssetHandle create_asset(StringView name, AssetTypeIndex type,
                              AssetContext * asset_context = proto::context);
 
+
+
+    #define INVOKE_FTEMPL_WITH_ASSET(ftempl, accessor, handle)          \
+    [&](){                                                                          \
+        switch(handle.type) {                                                       \
+        case AssetType<Mesh>::index:      return ftempl(accessor<Mesh>(handle)); \
+        case AssetType<Texture2D>::index: return ftempl(accessor<Texture2D>(handle)); \
+        case AssetType<Material>::index:  return ftempl(accessor<Material>(handle)); \
+        default: assert(0);                                                         \
+        }                                                                           \
+    }()
+
+    #define INVOKE_FTEMPL_WITH_ASSET_REF(ftempl, handle) \
+        INVOKE_FTEMPL_WITH_ASSET(ftempl, get_asset_ref, handle)
+
+    #define INVOKE_FTEMPL_WITH_ASSET_PTR(ftempl, handle) \
+        INVOKE_FTEMPL_WITH_ASSET(ftempl, get_asset, handle)
+
+
+
+
+     //#define INVOKE_FTEMPL_WITH_ASSET_H(function_templ, handle)       \
+    //[&](){                                                                          \
+    //    switch(handle.type) {                                                       \
+    //    case AssetType<Mesh>::index:      return function_templ<Mesh>(handle);      \
+    //    case AssetType<Texture2D>::index: return function_templ<Texture2D>(handle); \
+     //    case AssetType<Material>::index:  return function_templ<Material>(handle); \
+    //    default: assert(0);                                                         \
+    //    }                                                                           \
+    //}()
     //void destroy_asset(AssetHandle handle); 
     //void destroy_asset(AssetContext * asset_context,
     //                   AssetHandle handle); 

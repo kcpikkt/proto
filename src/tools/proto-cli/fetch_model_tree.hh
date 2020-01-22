@@ -81,6 +81,7 @@ static int fetch_model_tree(StringView filepath) {
 
         MemBuffer buffer = mesh.cached = ctx.memory.alloc_buf(mesh_header.datasize);
         assert(buffer.data);
+        allocated_buffers.push_back(buffer);
 
         mesh.flags.set(Mesh::cached_bit | Mesh::indexed_bit);
 

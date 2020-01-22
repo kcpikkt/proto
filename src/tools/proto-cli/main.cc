@@ -5,8 +5,10 @@
 #include "proto/core/asset-system/interface.hh" 
 #include "proto/core/asset-system/serialization.hh" 
 #include "proto/core/util/argparse.hh" 
+#include "proto/core/format.hh" 
 #include "proto/core/util/String.hh" 
 #include "proto/core/serialization/Archive.hh" 
+#include "proto/core/serialization/interface.hh" 
 
 #include "assimp/Importer.hpp"
 #include "assimp/DefaultLogger.hpp"
@@ -19,6 +21,7 @@
 proto::StringArena search_paths;
 proto::StringArena loaded_texture_paths;
 proto::Array<proto::AssetHandle> loaded_assets;
+proto::Array<proto::MemBuffer> allocated_buffers;
 
 
 using namespace proto;
@@ -52,17 +55,20 @@ void display_help() {
 
 void preview_init();
 
-
 PROTO_INIT {
     assert(proto::context);
     auto& ctx = *proto::context;
     search_paths.init_split(".", ':', &ctx.memory);
     loaded_texture_paths.init(&ctx.memory);
     loaded_assets.init(&ctx.memory);
+    allocated_buffers.init(&ctx.memory);
     matched_opt.init(&ctx.memory);
 
     defer{
+        for(auto buf : allocated_buffers)
+            ctx.memory.free(buf.data);
         loaded_texture_paths.destroy();
+        allocated_buffers.destroy();
         search_paths.destroy();
         loaded_assets.destroy();
         matched_opt.destroy();
@@ -161,23 +167,49 @@ PROTO_INIT {
             }
         }
 
-
         ser::Archive archive;
 
-        if(auto ec = archive.create(outpath, loaded_assets.size()))
+        u64 ar_data_size_acc = 0;
+        for(auto asset : loaded_assets)
+            ar_data_size_acc += INVOKE_FTEMPL_WITH_ASSET_REF(ser::serialized_size, asset);
+
+        if(auto ec = archive.create(outpath, loaded_assets.size(), ar_data_size_acc))
             return (void)log_error(debug::category::main, ec.message());
+
+        defer {
+            if(auto ec = archive.destroy())
+                return (void)log_error(debug::category::main, ec.message());
+        };
 
         for(auto asset : loaded_assets) {
             if(auto ec = archive.store(asset)) {
-                log_error(debug::category::data, "Archiving ", get_metadata(asset)->name, " failed. ", ec); break;
+                log_error(debug::category::data, "Archiving ", get_metadata(asset)->name, " failed. ", ec.message()); break;
             }
         }
 
-        if(auto ec = archive.destroy())
-            return (void)log_error(debug::category::main, ec.message());
+        for(auto& [mesh, metadata] : ctx.meshes.values) {
+            // make them look like they are not in memory, we want to load them from just written archive for test
+            mesh.flags.unset(Mesh::cached_bit);
+            metadata.archive_hash = archive.superblock->hash;
+        }
 
-        log_info(debug::category::main,
-                 "Parsed ", mesh_count, " meshes, ", tex_count, " textures, ", mat_count, " materials. Written to ", outpath, '.');
+        u64 ar_size = archive.superblock->archive_size;
+        const char * ar_size_unit;
+        //
+        u64 kb = 1024, mb = 1024 * 1024, gb = 1024 * 1024 * 1024;
+
+        if(ar_size < kb) {
+            ar_size_unit = "bytes";
+        } else if(ar_size < 1024 * 1024) {
+            ar_size_unit = "kilobytes";
+            ar_size /= kb;
+        } else if(ar_size < gb) {
+            ar_size_unit = "megabytes";
+            ar_size /= mb;
+        }
+
+        println_fmt("Parsed % meshes, % textures and % materials. Written to % (% %).",
+                    mesh_count, tex_count, mat_count, outpath, ar_size, ar_size_unit);
 
         if(cli_flags.check(cli_preview_bit)) {
             preview_init();
@@ -231,6 +263,9 @@ void preview_init() {
     if(!main_shader_h)
         debug_warn(debug::category::main, "Could not find main shader.");
 
+    if(ser::open_archive("outmesh/sponza.pack"));
+    else println("FAILED"); 
+
     glEnable(GL_DEPTH_TEST);
     ctx.camera.position = vec3(0.0, 0.0, 5.2);
 }
@@ -243,9 +278,9 @@ PROTO_UPDATE {
         if(!comp.flags.check(RenderMeshComp::batched_bit)) batch.add(comp);
     }
 
-    for(auto ent : prev_ents) {
-        //      get_component<TransformComp>(ent)->rotation = angle_axis(time, glm::normalize(vec3(cos(time), 1.0, sin(time))));
-    }
+    //for(auto ent : prev_ents) {
+    //    //      get_component<TransformComp>(ent)->rotation = angle_axis(time, glm::normalize(vec3(cos(time), 1.0, sin(time))));
+    //}
 
     glViewport(0, 0, ctx.window_size.x, ctx.window_size.y);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

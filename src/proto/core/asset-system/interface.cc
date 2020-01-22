@@ -136,6 +136,9 @@ AssetHandle create_asset(StringView name, AssetTypeIndex type, AssetContext * as
     return invalid_asset_handle;
 }
 
+
+
+
 //void destroy_asset(AssetContext * asset_context,
 //                          AssetHandle handle)
 //{

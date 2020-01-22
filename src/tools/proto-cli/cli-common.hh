@@ -8,8 +8,8 @@
 
 extern proto::StringArena search_paths;
 extern proto::StringArena loaded_texture_paths;
-//extern proto::ArrayMap<proto::AssetHandle, proto::MemBuffer> loaded_assets;
 extern proto::Array<proto::AssetHandle> loaded_assets;
+extern proto::Array<proto::MemBuffer> allocated_buffers;
 
 constexpr static proto::u8 cli_preview_bit = BIT(0);
 constexpr static proto::u8 cli_verbose_bit = BIT(1);

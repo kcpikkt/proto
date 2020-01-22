@@ -1,5 +1,6 @@
 #pragma once
 #include "proto/core/common.hh"
+#include "proto/core/debug.hh"
 #include "proto/core/util/Range.hh"
 #include "proto/core/context.hh"
 #include "proto/core/common/types.hh"
@@ -36,6 +37,7 @@ struct RenderBatch {
 
     Array<Range> free_vertex_ranges;
     Array<Range> free_index_ranges;
+
 
     void init(u64 _vertex_buffer_size, u64 _index_buffer_size) {
         vertex_buffer_size = _vertex_buffer_size;
@@ -83,7 +85,9 @@ struct RenderBatch {
 
     //TODO(kcpikkt): check if we are bound
     void add(RenderMeshComp& render_mesh) {
+        auto& ctx = *context;
         Mesh * mesh_ptr = get_asset<Mesh>(render_mesh.mesh_h);
+
         if(!mesh_ptr) {
             debug_warn(debug::category::data,
                        "Render Mesh Component passed to ", __PRETTY_FUNCTION__, " does not refer to any loaded mesh.");
@@ -100,29 +104,7 @@ struct RenderBatch {
             return;
         }
 
-        if(!mesh_ptr->flags.check(Mesh::cached_bit)) {
-            // if is not cached, fetch data from disk and proceed
-            debug_warn(debug::category::data, "Implement me");
-            return;
-        }
-
-        proto_assert(mesh_ptr->cached.data);
-        auto& header = *((serialization::AssetHeader<Mesh>*)(mesh_ptr->cached.data));
-
-        if(header.sig != serialization::AssetHeader<Mesh>::signature) {
-            log_error(debug::category::data, "Cached mesh data header signature was corrupted, aborting.");
-            return;
-        }
-
-        proto_assert(header.vertices_size);
-
-        // hinting our handle
-        render_mesh_comps.push_back(render_mesh).mesh_h.idx_hint = meshes.size();
-        render_mesh.flags.set(RenderMeshComp::batched_bit);
-
-        auto& mesh = meshes.push_back(*mesh_ptr);
-
-        auto alloc_range =
+        static auto alloc_range =
             [](u64 size, Array<Range>& ranges) -> Optional<Range> {
 
                 for(u64 i=0; i<ranges.size(); ++i) {
@@ -141,6 +123,53 @@ struct RenderBatch {
             };
 
 
+        MemBuffer cached;
+        if(mesh_ptr->flags.check(Mesh::cached_bit)) {
+            cached = mesh_ptr->cached;
+            proto_assert(cached);
+            
+        } else {
+            //if(!mesh_ptr->flags.check(Mesh::archived_bit)) {
+            //    log_error(debug::cateogory::data, "No way to obtain mesh data.");
+            //    return;
+            //}
+            // if is not cached, fetch data from disk and proceed
+            //debug_warn(debug::category::data, "Implement me");
+            auto h = render_mesh.mesh_h;
+            AssetMetadata* metadata = get_metadata(h);
+
+            auto archive_idx =
+                ctx.open_archives.keys.find_if( [&](u32 hash){ return hash == metadata->archive_hash; } );
+
+            if(archive_idx == ctx.open_archives.size())
+                { log_error(debug::category::data, "Mesh refers to an archive that is not open."); return;}
+
+            auto& archive = ctx.open_archives.at_idx(archive_idx);
+
+            auto idx = metadata->archive_node_idx_hint =
+                archive.nodes.find_if( [&](ser::Archive::Node& node){ return node.handle.hash == h.hash; },
+                                    metadata->archive_node_idx_hint );
+
+            if(idx == archive.nodes.size())
+                { log_error(debug::category::data, "Mesh is not preset in archive it refers to."); return;}
+
+            cached = archive.get_node_memory(idx);
+            // the great thing about it though is that we memcpy from mapped file right to mapped gpu memory!
+        }
+
+        auto& header = *((serialization::AssetHeader<Mesh>*)(cached.data));
+
+        if(header.sig != serialization::AssetHeader<Mesh>::signature) {
+            log_error(debug::category::data, "Cached mesh data header signature was corrupted, aborting."); return; }
+
+        proto_assert(header.vertices_size);
+
+        // hinting our handle
+        render_mesh_comps.push_back(render_mesh).mesh_h.idx_hint = meshes.size();
+        render_mesh.flags.set(RenderMeshComp::batched_bit);
+
+        auto& mesh = meshes.push_back(*mesh_ptr);
+
         // WE ASSUME THAT OUR BUFFERS ARE ALREADY BOUND
         glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer);
@@ -153,7 +182,10 @@ struct RenderBatch {
             else
                 return (void)debug_warn(debug::category::data, "Could not fit mesh into RenderBatch buffer");
 
+
             auto& [r_begin, r_size] = mesh.batch_vertex_range;
+
+            println_fmt("[%,%)", r_begin, r_begin + r_size);
 
             if(void * mapped_range = glMapBufferRange(GL_ARRAY_BUFFER, r_begin, r_size, map_flags) )
                 memcpy(mapped_range, (u8*)&header + header.vertices_offset, r_size);
@@ -162,6 +194,7 @@ struct RenderBatch {
         }
 
         if(header.indices_size) {
+            mesh.flags.set(Mesh::indexed_bit);
             if( auto range_opt = alloc_range(header.indices_size, free_index_ranges) )
                 mesh.batch_index_range = range_opt.value;
             else
@@ -216,10 +249,11 @@ struct RenderBatch {
             if(mesh.flags.check(Mesh::indexed_bit)){
                 auto& [r_begin, r_size] = mesh.batch_index_range;
                 u32 offset = mesh.batch_vertex_range.begin / sizeof(Vertex);
-                glDrawElementsBaseVertex (GL_TRIANGLES, r_size / sizeof(u32), GL_UNSIGNED_INT, (void*)r_begin, offset);   
+                glDrawElementsBaseVertex (GL_TRIANGLES, r_size / sizeof(u32), GL_UNSIGNED_INT,
+                                          (void*)(r_begin), offset);   
             } else {
                 auto& [r_begin, r_size] = mesh.batch_vertex_range;
-                glDrawArrays (GL_TRIANGLES, r_begin, r_size / sizeof(Vertex));   
+                glDrawArrays (GL_TRIANGLES, r_begin / sizeof(Vertex), r_size / sizeof(Vertex));   
             }
         }
     }

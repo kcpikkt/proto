@@ -18,11 +18,13 @@ u64 calc_flat_asset_archive_size(Array<AssetHandle>& assets);
 
 struct ArchiveErrCategory : ErrCategoryCRTP<ArchiveErrCategory> {
     enum : u32 { success = 0,
-                 buffer_too_small,
+                 out_of_memory,
                  invalid_archive,
                  file_open_fail,
                  file_write_fail,
                  file_read_fail,
+                 file_resize_fail,
+                 file_mapping_fail,
                  header_alloc_fail,
                  no_free_nodes,
                  asset_not_cached,
@@ -32,14 +34,18 @@ struct ArchiveErrCategory : ErrCategoryCRTP<ArchiveErrCategory> {
         switch(code) {
         case success:
             return "Success";
-        case buffer_too_small:
-            return "Provided buffer was too small for a given operation.";
+        case out_of_memory:
+            return "Implement archive resize";
         case invalid_archive:
             return "The archive is corrupted.";
         case file_write_fail:
             return "Failed to write to archive file.";
         case file_read_fail:
             return "Failed to read archive file.";
+        case file_resize_fail:
+            return "Failed to resize archive file.";
+        case file_mapping_fail:
+            return "Failed to map archive file to memory.";
         case file_open_fail:
             return "Failed to open archive file.";
         case header_alloc_fail:
@@ -82,6 +88,7 @@ struct Archive : StateCRTP<Archive> {
         u32 hash;
         char name[255];
 
+        AssetHandle handle;
         enum Type : u8 { free = 0,
                          directory,
                          asset
@@ -92,18 +99,22 @@ struct Archive : StateCRTP<Archive> {
 
         u64 parent_index;
 
+        inline bool is_free() {return type == free;}
+
         Node() {}
     };
 
-    MemBuffer cached_header;
+    // MemBuffer cached_header;
     Superblock * superblock;
     Array<Node> nodes;
 
     sys::File file;
+    MemBuffer mapping;
+    u64 cursor;
 
-    u8 * _data_offset2addr(u64 offset);
+    u8 * _data_off2addr(u64 offset);
 
-    u64 _addr2data_offset(void * addr);
+    u64 _addr2data_off(void * addr);
 
     inline u64 size() const {
         return superblock->archive_size; }
@@ -118,11 +129,11 @@ struct Archive : StateCRTP<Archive> {
 
     void _move(Archive&& other) {
         State::state_move(meta::forward<Archive>(other));
-        cached_header = other.cached_header;
+        mapping = other.mapping;
         superblock = other.superblock;
         nodes = meta::move(other.nodes);
         file = other.file;
-        destroy(); // this is going to be just shallow destory
+        //destroy(); // this is going to be just shallow destory
     }
 
     Archive() {} // noop, uninitialized state
@@ -174,9 +185,11 @@ struct Archive : StateCRTP<Archive> {
 
     StateErr<Archive> destroy_deep();
 
-    ArchiveErr create(StringView filepath, u32 node_count /* u64 prealloc_data_size = 0 */ );
+    ArchiveErr create(StringView filepath, u32 node_count, u64 data_size);
     ArchiveErr open(StringView filepath /* , sys::File::Mode filemode = sys::File::read_mode */ );
     ArchiveErr store(AssetHandle handle);
+
+    MemBuffer get_node_memory(u64 node_idx);
     AssetHandle load_asset(u32 index);
 
 };

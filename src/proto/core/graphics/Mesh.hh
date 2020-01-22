@@ -15,7 +15,8 @@ struct Mesh : Asset{
 
     constexpr static u8 on_gpu_bit = BIT(0);
     constexpr static u8 cached_bit = BIT(1);
-    constexpr static u8 indexed_bit = BIT(2);
+    constexpr static u8 archived_bit = BIT(2);
+    constexpr static u8 indexed_bit = BIT(3);
     Bitfield<u8> flags = 0;
 
     u64 vertices_count;

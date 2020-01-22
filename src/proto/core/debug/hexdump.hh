@@ -4,17 +4,35 @@
 namespace proto { 
 namespace debug { 
 
-void hexdump(void * buffer, u32 lines) {
-    for(s32 j=0; j<lines; ++j) {
-        printf("+%08x:", j * 16);
-        for(int i=0; i<8; ++i) {
-            u16 hex = *((u16*)buffer + j * 8 + i);
-            printf(" %04x", hex);
+static void hexdump(void * buffer, s32 lines) {
+    auto is_printable = [](char c) {return (c >= 21 && c <= 126);};
+
+    if(lines > 0) {
+        for(s32 j=0; j<lines; ++j) {
+            printf("+%08x: ", j * 16);
+
+            for(int i=0; i<8; ++i)
+                printf(" %04x", *((u16*)buffer + j * 8 + i));
+
+            printf("  ");
+            for(int i=0; i<16; ++i) {
+                char c = *((u8*)buffer + j * 16 + i);
+                printf("%c", is_printable(c) ? c : '.');
+            }
+
+            printf("\n");
         }
-        printf("\n");
+    } else {
+        for(s32 j=0; j>lines; --j) {
+            printf("-%08x:", -j * 16);
+
+            for(int i=0; i<8; ++i)
+                printf(" %04x", *((u16*)buffer + j * 8 + i));
+
+            printf("\n");
+        }
     }
 }
-
 
 } // namespace debug 
 } // namespace proto 

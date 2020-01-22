@@ -2,29 +2,30 @@
 #include "proto/core/math/hash.hh"
 #include "proto/core/context.hh"
 #include "proto/core/asset-system/interface.hh"
+#include "proto/core/debug.hh"
 
 namespace proto {
 namespace serialization {
 
-    u64 calc_flat_asset_archive_size(Array<AssetHandle>& assets) {
-        u64 acc = sizeof(Archive::Superblock) + (assets.size()+1) * sizeof(Archive::Node);
-        for(auto asset : assets) {
-            switch(asset.type) {
-            case(AssetType<Mesh>::index): acc += ser::serialized_size(get_asset_ref<Mesh>(asset)); break;
-            case(AssetType<Texture2D>::index): acc += ser::serialized_size(get_asset_ref<Texture2D>(asset)); break;
-            case(AssetType<Material>::index): acc += ser::serialized_size(get_asset_ref<Material>(asset)); break;
-            default: assert(0);
-            }
-        }
-        return acc;
-    }
+    //u64 (Array<AssetHandle>& assets) {
+    //    u64 acc = sizeof(Archive::Superblock) + (assets.size()+1) * sizeof(Archive::jjjjjjjjjjjjjjjNode);
+    //    for(auto asset : assets) {
+    //        switch(asset.type) {
+    //        case(AssetType<Mesh>::index): acc += ser::serialized_size(get_asset_ref<Mesh>(asset)); break;
+    //        case(AssetType<Texture2D>::index): acc += ser::serialized_size(get_asset_ref<Texture2D>(asset)); break;
+    //        case(AssetType<Material>::index): acc += ser::serialized_size(get_asset_ref<Material>(asset)); break;
+    //        default: assert(0);
+    //        }
+    //    }
+    //    return acc;
+    //}
 
-    u8 * Archive::_data_offset2addr(u64 offset) {
-        assert(offset < superblock->data_size);
+    u8 * Archive::_data_off2addr(u64 offset) {
+        //assert(offset < superblock->data_size);
         return (u8*)superblock + superblock->data_offset + offset;
     }
 
-    u64 Archive::_addr2data_offset(void * addr) {
+    u64 Archive::_addr2data_off(void * addr) {
         assert(addr >= (u8*)superblock + superblock->data_offset);
         return ((u8*)addr - ((u8*)superblock + superblock->data_offset));
     }
@@ -34,6 +35,8 @@ namespace serialization {
 
         strview_copy(superblock->name, name);
     }
+
+    #if 0 
 
     // perhaps you can just map file to memory, right?
     ArchiveErr Archive::_commit_cached_header() {
@@ -48,14 +51,18 @@ namespace serialization {
         if(superblock->node_table_size != file.write(nodes._data, superblock->node_table_size))
             return ArchiveErrCategory::file_write_fail;
 
+        file.seek(_cursor);
         return ArchiveErrCategory::success;
     }
+    #endif
 
     StateErr<Archive> Archive::destroy_deep() {
         StateErr<Archive> err = StateErrCategory<Archive>::success;
 
-        if(auto ec = _commit_cached_header())
-            return StateErrCategory<Archive>::destroy_fail;
+        //if(auto ec = _commit_cached_header())
+        //    return StateErrCategory<Archive>::destroy_fail;
+
+        file.unmap(mapping);
 
         if(file.close())
             return StateErrCategory<Archive>::file_close_fail;
@@ -64,34 +71,44 @@ namespace serialization {
             return StateErrCategory<Archive>::destroy_fail;
 
         // double free just crash
-        context->memory.free(cached_header.data);
         return err;
     }
 
-    ArchiveErr Archive::create(StringView filepath, u32 node_count /* u64 prealloc_data_size = 0 */ ) {
-        if(file.open(filepath, sys::File::write_mode)) return ArchiveErrCategory::file_open_fail;
+    ArchiveErr Archive::create(StringView filepath, u32 node_count, u64 data_size) {
+        if(file.open(filepath, sys::File::read_overwrite_mode ))
+            return ArchiveErrCategory::file_open_fail;
 
-        node_count += 1; // root
+        node_count += 1; // root //NOTE(kacper): node_count=max_u32 is a bug then
 
-        auto header_size = sizeof(Superblock) + node_count * sizeof(Node);
+        auto data_offset = sizeof(Superblock) + node_count * sizeof(Node);
+        auto size = data_offset + data_size;
 
-        cached_header = context->memory.alloc_buf(header_size);
-        if(!cached_header) return ArchiveErrCategory::header_alloc_fail;
 
-        superblock = (Superblock*)cached_header.data;
+        if(file.size() < size)
+            if(file.resize(size))
+                return ArchiveErrCategory::file_resize_fail;
+
+        mapping = file.map(sys::File::read_write_mode, Range{0, size});
+        if(!mapping) return ArchiveErrCategory::file_mapping_fail;
+
+        assert(mapping.size == size);
+
+        superblock = (Superblock*)mapping.data;
 
         superblock->sig = Superblock::signature;
         strview_copy(superblock->name, filepath);
         superblock->hash = hash::crc32(superblock->name);
 
-        superblock->archive_size = header_size;
+        superblock->archive_size = size;
         superblock->node_count = superblock->free_node_count = node_count;
 
         superblock->node_table_size = node_count * sizeof(Node);
         superblock->node_table_offset = sizeof(Superblock);
 
         superblock->data_size = 0;
-        superblock->data_offset = header_size; 
+        superblock->data_offset = data_offset; 
+
+        cursor = 0;
 
         nodes.init_place((u8*)superblock + superblock->node_table_offset, superblock->node_count);
         nodes.zero();
@@ -103,40 +120,58 @@ namespace serialization {
         root.hash = hash::crc32(root.name);
         superblock->free_node_count--;
 
-        if(cached_header.size != file.write(cached_header)) 
-            return ArchiveErrCategory::file_write_fail;
-
         State::state_init();
         return ArchiveErrCategory::success;
     }
     
     ArchiveErr Archive::open(StringView filepath /* , sys::File::Mode filemode = sys::File::read_mode */ ) {
-        if(file.open(filepath, sys::File::read_mode)) return ArchiveErrCategory::file_open_fail;
+        if(file.open(filepath, sys::File::read_mode))
+            return ArchiveErrCategory::file_open_fail;
 
-        Superblock test_superblock;
-        if(sizeof(Superblock) != file.read(&test_superblock, sizeof(Superblock)))
-            return ArchiveErrCategory::file_read_fail;
+        mapping = file.map(sys::File::read_mode, Range{0, file.size()});
+        if(!mapping) return ArchiveErrCategory::file_mapping_fail;
+
+        superblock = (Superblock*)mapping.data;
 
         auto file_sz = file.size();
-        if(test_superblock.sig != Superblock::signature ||
-           test_superblock.archive_size > file_sz ||
-           test_superblock.node_table_offset > file_sz ||
-           test_superblock.node_table_offset + test_superblock.node_table_size > file_sz ||
-           //// in theory this dont have to hold but whatever
-           test_superblock.node_table_offset != sizeof(Superblock) ||
-           test_superblock.data_offset > file_sz
-           ) return ArchiveErrCategory::invalid_archive;
+        if(superblock->sig != Superblock::signature) {
+            debug_error(debug::category::data, filepath, " archive signature is corrupted");
+            return ArchiveErrCategory::invalid_archive;}
 
-        auto header_size = sizeof(Superblock) + test_superblock.node_table_size;
+        if(superblock->archive_size > file_sz) {
+            debug_error_fmt(debug::category::data, "Sanity check failed, "
+                            "archive claims to be % while its file size is %.",
+                            superblock->archive_size, file_sz);
 
-        cached_header = context->memory.alloc_buf(header_size);
-        if(!cached_header) return ArchiveErrCategory::header_alloc_fail;
+            return ArchiveErrCategory::invalid_archive;}
 
-        file.seek(0);
-        if(cached_header.size != file.read(cached_header))
-            return ArchiveErrCategory::file_read_fail;
+        if(superblock->node_table_size > superblock->archive_size) {
+            debug_error_fmt(debug::category::data, "Sanity check failed, "
+                            "archve node_table_offset is % which is greater than the size of the file itself - %" ,
+                            superblock->node_table_offset , superblock->archive_size);
 
-        superblock = (Superblock*)cached_header.data;
+            return ArchiveErrCategory::invalid_archive;}
+
+        auto tmp = superblock->node_table_offset + superblock->node_table_size;
+        if(tmp > superblock->archive_size) {
+            debug_error(debug::category::data, "Sanity check failed, "
+                        "archve node_table_offset + node_table_size is ", tmp,
+                        ", which is greater than the size of the file itself - ", superblock->archive_size );
+            return ArchiveErrCategory::invalid_archive;}
+
+        // in theory this dont have to hold but whatever
+        if(superblock->node_table_offset != sizeof(Superblock)) {
+            debug_error(debug::category::data, "Sanity check failed, "
+                        "node_table_offset (", superblock->node_table_offset, ") is not equal to sizeof(Superblock) (",
+                        sizeof(Superblock), "). (This does not have to hold, delete me after you start maybe 16-align or something)");
+            return ArchiveErrCategory::invalid_archive;}
+
+        if(superblock->data_offset > superblock->archive_size) {
+            debug_error(debug::category::data, "Sanity check failed, "
+                        "archve data_offset ", superblock->data_offset,
+                        ", which is greater than the size of the file itself - ", superblock->archive_size );
+            return ArchiveErrCategory::invalid_archive;}
+
         nodes.init_place_resize((u8*)superblock + superblock->node_table_offset, superblock->node_count);
 
         State::state_init();
@@ -145,30 +180,26 @@ namespace serialization {
 
     template<typename T> static MemBuffer _get_asset_cached_mem(T*);
 
-    template<> static MemBuffer _get_asset_cached_mem(Mesh * mesh) {
+    template<> MemBuffer _get_asset_cached_mem(Mesh * mesh) {
         return mesh && mesh->flags.check(Mesh::cached_bit) ? mesh->cached : MemBuffer{};}
 
-    template<> static MemBuffer _get_asset_cached_mem(Texture2D * texture) {
+    template<> MemBuffer _get_asset_cached_mem(Texture2D * texture) {
         return texture && texture->flags.check(Texture2D::cached_bit) ? texture->cached : MemBuffer{}; }
 
-    template<> static MemBuffer _get_asset_cached_mem(Material * material) {
+    template<> MemBuffer _get_asset_cached_mem(Material * material) {
         return material ? MemBuffer{ {material}, sizeof(Material) } : MemBuffer{}; }
 
-    static MemBuffer _get_asset_cached_mem(AssetHandle h) {
-        switch(h.type) {
-            case AssetType<Mesh>::index:      return _get_asset_cached_mem(get_asset<Mesh>     (h));
-            case AssetType<Texture2D>::index: return _get_asset_cached_mem(get_asset<Texture2D>(h));
-            case AssetType<Material>::index:  return _get_asset_cached_mem(get_asset<Material> (h));
-            default: return {};
-        }
+
+    MemBuffer Archive::get_node_memory(u64 node_idx) {
+        return { {_data_off2addr(nodes[node_idx].block_offset)}, nodes[node_idx].block_size };
     }
 
     ArchiveErr Archive::store(AssetHandle handle) {
-        static auto find_free_node = [](Node& node){ return node.type == Node::free; };
+        static auto free_node_predecate = [](Node& node){ return node.type == Node::free; };
 
-        auto idx = nodes.find(find_free_node);
+        auto idx = nodes.find_if(free_node_predecate);
 
-        assert(idx != 0); // 0 has to be root
+        assert(idx != 0); // 0 has to be root, never free
         if(idx == nodes.size())
             return ArchiveErrCategory::no_free_nodes;
 
@@ -176,21 +207,33 @@ namespace serialization {
         node.parent_index = 0;
         node.hash = handle.hash;
 
-        MemBuffer cached_mem = _get_asset_cached_mem(handle);
+        MemBuffer cached_mem =
+            INVOKE_FTEMPL_WITH_ASSET_PTR(_get_asset_cached_mem, handle);
+
+        if(!cached_mem)
+            return ArchiveErrCategory::asset_not_cached;
+
         // this should be now O(1) now as handle should be already hinted
         AssetMetadata* metadata = get_metadata(handle);
         assert(metadata);
         strview_copy(node.name, metadata->name);
 
-        if(!cached_mem)
-            return ArchiveErrCategory::asset_not_cached;
+        u8 * new_block = _data_off2addr(superblock->data_size);
+        u8 * new_block_end = new_block + cached_mem.size;
+        u8 * mapping_end = mapping.data8 + mapping.size;
 
-        node.block_offset = file.cursor();
+        if(  !belongs(new_block, mapping) ||
+            (!belongs(new_block_end, mapping) && mapping_end != new_block_end) ) {
+
+            return ArchiveErrCategory::out_of_memory;
+        }
+
+        memcpy(new_block, cached_mem.data, cached_mem.size);
+
+        node.block_offset = cursor;
+        cursor += cached_mem.size;
         node.block_size = cached_mem.size;
-
-        file.seek_end();
-        if(cached_mem.size != file.write(cached_mem))
-            return ArchiveErrCategory::file_write_fail;
+        node.handle = handle;
 
         superblock->data_size += cached_mem.size;
 
@@ -201,9 +244,18 @@ namespace serialization {
         return ArchiveErrCategory::success;
     }
 
-    AssetHandle load_asset(u32 index) {
-        auto h = create_asset<>();
+    AssetHandle Archive::load_asset(u32 index) {
         assert(index < nodes.size());
+        auto& node = nodes[index];
+
+        auto h = create_asset(node.name, node.handle.type);
+        if(h != node.handle) return {};
+
+        AssetMetadata * metadata = get_metadata(h); assert(metadata);
+
+        metadata->archive_hash = superblock->hash;
+        
+        return metadata->handle;
     }
 
 } // namespace serialization

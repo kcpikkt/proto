@@ -2,6 +2,7 @@
 #include "proto/core/error-handling.hh"
 #include "proto/core/util/Bitfield.hh"
 #include "proto/core/util/Buffer.hh"
+#include "proto/core/util/Range.hh" 
 
 namespace proto {
 namespace platform {
@@ -13,6 +14,7 @@ struct FileErrCategory : ErrCategoryCRTP<FileErrCategory> {
           desc_retrieve,
           wrong_mode,
           desc_retrieve_fail,
+          resize_fail,
           reserve_fail,
           close_fail,
           seek_fail,
@@ -27,6 +29,8 @@ struct FileErrCategory : ErrCategoryCRTP<FileErrCategory> {
             return "Wrong or unsupported file open mode bitflags.";
         case desc_retrieve_fail:
             return "Failed to retrieve file descriptor of a file.";
+        case resize_fail:
+            return "Failed to resize file descriptor of a file.";
         case reserve_fail:
             return "Failed to retrieve file descriptor of a file.";
         case seek_fail:
@@ -44,9 +48,13 @@ struct File {
     enum Mode : u8 {
         read_mode   = BIT(0),
         write_mode  = BIT(1),
-        trunc_mode  = BIT(2),
-        create_mode = BIT(3),
-        append_mode = BIT(4),
+        overwrite_mode  = BIT(2),
+
+        read_write_mode  = BIT(0) | BIT(1),
+        read_overwrite_mode  = BIT(0) | BIT(2),
+        //trunc_mode  = BIT(2),
+        //create_mode = BIT(3),
+        //append_mode = BIT(4),
     };
     //using Mode = u8;
 
@@ -57,7 +65,9 @@ struct File {
     #else 
         FILE * _file_ptr = nullptr;
     #endif
-
+    enum : u8 {
+               mapped_bit = BIT(0),
+    };
     Bitfield<u8> flags;
     //constexpr static u8 is_open_bit = BIT(0);
 
@@ -68,12 +78,17 @@ struct File {
 
     u64 read(void * mem, u64 size); 
     u64 read(MemBuffer buf); 
+    void flush();
 
     FileErr seek(s64 offset);
     FileErr seek_end(s64 offset = 0);
 
     s64 cursor();
 
+    MemBuffer map(Mode mode, Range range = {0,0});
+    void unmap(MemBuffer mem);
+
+    FileErr resize(u64 size);
     FileErr reserve(u64 size);
     FileErr close();
 };

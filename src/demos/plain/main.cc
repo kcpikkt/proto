@@ -15,77 +15,78 @@
 #include "proto/core/serialization/Archive.hh" 
 #include "proto/core/serialization/interface.hh" 
 
+#include "proto/core/util/FunctionView.hh"
+#include "proto/core/debug.hh"
+#include "proto/core/format.hh"
+
 
 using namespace proto;
-
-//u64 glsl_material_struct_def_string(StrBuffer buffer) {
-//    u64 written = 0;
-//    written += sprint(buffer.data, buffer.size, "layout(std140) uniform Material {\n");
-//    for(auto& field : Material::Refl::fields) {
-//        written += sprint(buffer.data + written, buffer.size - written,
-//                          "    ", field.glsl_type, ' ', field.glsl_name, "; \n");
-//    }
-//    written += sprint(buffer.data + written, buffer.size - written, "};");
-//    return written;
-//}
-
-u32 stream = 0;
-u32 VAO = 0;
-u32 bufsize = 1024 * 1024 * 50;
 
 PROTO_SETUP {
     settings->shader_paths = "src/demos/sokoban/shaders/";
 }
 
-//ArrayMap<AssetHandle, Pair<Mesh, AssetMetadata>> map;
 RenderBatch batch;
-Entity cubes[3];
+Array<Entity> ents;
 
 AssetHandle main_shader_h;
+
+using namespace proto;
+
 PROTO_INIT {
     auto& ctx = *context;
     ctx.exit_sig = true;
+    ents.init(500, &ctx.memory);
 
-
+    //ser::Archive
     StringView archive_path = "outmesh/sponza.pack";
     if(ser::Archive * archive = ser::open_archive(archive_path)) {
-        for(u32 i=0; i<archive->nodes.size(); ++i) {
+
+        for(u32 i=6; i<archive->nodes.size(); ++i) {
+            //break;
+
             if(archive->nodes[i].type == ser::Archive::Node::asset) {
-                archive->loat_asset(i);
+
+                Entity e; AssetHandle h;
+                /**/ if( !(h = archive->load_asset(i)) )
+                    debug_error(debug::category::main, "Failed to load_asset ");   
+
+                else if( !(e = create_entity()) )
+                    debug_error(debug::category::main, "Failed to load ");   
+
+                else {
+                    if(h.type != AssetType<Mesh>::index) continue;
+
+                    ents.push_back(e);
+                    auto& render_mesh = add_component<RenderMeshComp>(e);
+                    auto& transform = add_component<TransformComp>(e);
+                    render_mesh.mesh_h = h;
+                    render_mesh.color = vec3(1.0,0.0,0.0);
+
+                    transform.position = vec3(0.0,-10.0,0.0);
+                    transform.rotation = angle_axis(M_PI/2.0, vec3(0.0, 1.0, 0.0));
+                    transform.scale = vec3(0.1);
+                } 
             }
         }
     } else
         log_error(debug::category::main, "Failed to open archive ", archive_path);
 
-    batch.init(sizeof(Vertex) * 1024, sizeof(u32) * 1024);
+    //batch.init(sizeof(Vertex) * 1024 * 1024 * 50, sizeof(u32) * 1024 * 1024 * 50);
+    batch.init(sizeof(Vertex) * 5242880, sizeof(u32) * 5242880);
 
-    if( auto cube = cubes[0] = create_entity() ) {
-        auto& render_mesh = add_component<RenderMeshComp>(cube);
-        auto& transform = add_component<TransformComp>(cube);
-        render_mesh.mesh_h = ctx.cube_h;
-        render_mesh.color = vec3(1.0,0.0,0.0);
-        transform.position = vec3(0.0,0.0,0.0);
-    } else 
-        debug_error(debug::category::main, "Failed to create entity");
+    for(int i=0; i<3; ++i) {
+        if( auto cube = create_entity() ) {
+            auto& render_mesh = add_component<RenderMeshComp>(cube);
+            auto& transform = add_component<TransformComp>(cube);
+            render_mesh.mesh_h = ctx.cube_h;
+            render_mesh.color = vec3(1.0,0.0,0.0);
+            transform.position = vec3(i * 2.0f - 2.0f,0.0,0.0);
 
-    if( auto cube = cubes[1] = create_entity() ) {
-        auto& render_mesh = add_component<RenderMeshComp>(cube);
-        auto& transform = add_component<TransformComp>(cube);
-        render_mesh.mesh_h = ctx.cube_h;
-        render_mesh.color = vec3(0.0,1.0,0.0);
-        transform.position = vec3(2.0,0.0,0.0);
-    } else 
-        debug_error(debug::category::main, "Failed to create entity");
-
-    if( auto cube = cubes[2] = create_entity() ) {
-        auto& render_mesh = add_component<RenderMeshComp>(cube);
-        auto& transform = add_component<TransformComp>(cube);
-        render_mesh.mesh_h = ctx.cube_h;
-        render_mesh.color = vec3(0.0,0.0,1.0);
-        transform.position = vec3(-2.0,0.0,0.0);
-    } else 
-        debug_error(debug::category::main, "Failed to create entity");
-
+            ents.push_back(cube);
+        } else 
+            debug_error(debug::category::main, "Failed to create entity");
+    }
 
     main_shader_h = 
         create_asset_rref<ShaderProgram>("sokoban_main")
@@ -98,8 +99,9 @@ PROTO_INIT {
         debug_warn(debug::category::main, "Could not find main shader.");
 
     glEnable(GL_DEPTH_TEST);
-    ctx.camera.position = vec3(0.0, 0.0, 5.0);
+    ctx.camera.position = vec3(0.0, 0.0, 30.0);
     ctx.exit_sig = false;
+    //vardump(ctx.comp.render_mesh.size());
 }
 
 PROTO_UPDATE {
@@ -110,17 +112,20 @@ PROTO_UPDATE {
         if(!comp.flags.check(RenderMeshComp::batched_bit)) batch.add(comp);
     }
 
-    for(auto cube : cubes) if(cube)
-            get_component<TransformComp>(cube)->rotation = angle_axis(time, glm::normalize(vec3(cos(time), 1.0, sin(time))));
+    //for(auto e : ents) if(e)
+    //        get_component<TransformComp>(e)->rotation = angle_axis(time, glm::normalize(vec3(cos(time * 2.0), 1.0, sin(time))));
 
+    // ctx.camera.position = vec3(0.0, 0.0, 50.0 * (cos(time) * 0.5 + 0.5) + 5.0);
     glViewport(0, 0, ctx.window_size.x, ctx.window_size.y);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     get_asset_ref<ShaderProgram>(main_shader_h).use();
 
+    //    vardump(batch.meshes.size());
+                                      
     batch.render();
 
-    if(time > 3.0f)
-        ctx.exit_sig = true;
+    //if(time > 3.0f)
+    //    ctx.exit_sig = true;
 }
 

@@ -1,4 +1,6 @@
 #pragma once
+#include "proto/core/util/Buffer.hh"
+#include "proto/core/meta.hh"
 namespace proto {
 //TODO(kcaper): proper declval in SFINAE decltypes?
 
@@ -36,9 +38,13 @@ template<typename A, typename B,
          // SFINAE: same as above
          typename = decltype(A() <  B()),
          typename = decltype(A() >= B())> 
-bool belongs(A value, B lower, B upper) {
+inline bool belongs(A value, B lower, B upper) {
     return ((HigherPrecType)value >= (HigherPrecType)lower &&
             (HigherPrecType)value <  (HigherPrecType)upper);
+}
+
+inline bool belongs(void * ptr, MemBuffer buffer) {
+    return (ptr >= buffer.data && ptr < (void*)(buffer.data8 + buffer.size));
 }
 
 } // namespace proto

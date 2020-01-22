@@ -1,8 +1,6 @@
 #pragma once
-#include <tuple>
-#include <utility>
-#include <type_traits>
-#include <stdint.h>
+#include "proto/core/common/types.hh"
+//#include <type_traits>
 
 namespace proto {
 namespace meta {
@@ -66,6 +64,47 @@ namespace meta {
     struct conditional_value<T, false, true_val, false_val>
         : constant<T, false_val> {};
 
+
+    // remove_cv
+    
+    namespace internal {
+        template<typename T> struct remove_const          : identity<T> {};
+        template<typename T> struct remove_const<const T> : identity<T> {};
+
+        template<typename T> struct remove_volatile             : identity<T> {};
+        template<typename T> struct remove_volatile<volatile T> : identity<T> {};
+    }
+    
+    template<typename T>
+    struct remove_cv :
+        identity<typename internal::remove_volatile<typename internal::remove_const<T>::type>::type> {};
+
+    //is_const
+
+    template<typename T> struct is_const          : false_t {};
+    template<typename T> struct is_const<const T> : true_t {};
+    
+    // is_reference
+    template <typename T> struct is_reference      : false_t {};
+    template <typename T> struct is_reference<T&>  : true_t {};
+    template <typename T> struct is_reference<T&&> : true_t {};
+
+    // is_function
+    // NOTE(kacper): wait, it is a function if it is not a refernce and prefixed with const is not const? bizzare
+    // implementation is of course stolen form cpprference
+    template<typename T>
+    struct is_function : constant<bool, !is_const<const T>::value && !is_reference<T>::value> {};
+
+
+    // is_array
+    template<typename T> struct is_array : false_t {};
+    template<typename T> struct is_array<T[]> : true_t {};
+    template<typename T, u64 N> struct is_array<T[N]> : true_t {};
+
+    // remove_extent
+    template<typename T> struct remove_extent              : identity<T> {};  
+    template<typename T> struct remove_extent<T[]>         : identity<T> {}; 
+    template<typename T, u64 N> struct remove_extent<T[N]> : identity<T> {};
 
     // typelist
     struct typelist_void;
@@ -459,8 +498,7 @@ namespace meta {
         template<typename T> struct remove_ref<T&&> : identity<T> {};
     }
 
-    template<typename T>
-    using remove_ref = internal::remove_ref<T>;
+    template<typename T> using remove_ref = internal::remove_ref<T>;
 
     template<typename T>
     using remove_ref_t = typename remove_ref<T>::type;
@@ -474,6 +512,32 @@ namespace meta {
     inline T&& forward(remove_ref_t<T>& arg) {
         return static_cast<T&&>(arg);
     }
+
+    namespace internal {
+        // NOTE(kacper): hmmm...
+        template <typename T> auto try_add_pointer(int) -> identity<typename remove_ref<T>::type*>;
+        template <typename T> auto try_add_pointer(...) -> identity<T>;
+
+    } 
+    template <typename T> struct add_pointer : decltype(internal::try_add_pointer<T>(0)) {};
+    template <typename T> using add_pointer_t = typename add_pointer<T>::type;
+
+    //decay
+    template<typename T>
+    struct decay {
+        using U = remove_ref_t<T>;
+
+        using type = conditional_t< 
+            is_array<U>::value, typename remove_extent<U>::type*,
+            conditional_t< 
+                is_function<U>::value,
+                typename add_pointer<U>::type,
+                typename remove_cv<U>::type
+            >
+        >;
+    };
+    template<typename T>
+    using decay_t = typename decay<T>::type;
 
 } // namespace meta
 } // namespace proto

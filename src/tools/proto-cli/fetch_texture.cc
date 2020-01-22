@@ -1,4 +1,5 @@
 #include "fetch_texture.hh"
+#include "cli-common.hh"
 
 #include "stb_image.hh"
 
@@ -53,6 +54,7 @@ AssetHandle fetch_texture(StringView filepath) {
     auto header = serialization::AssetHeader<Texture2D>(texture);
     
     texture.cached = context->memory.alloc_buf(header.datasize);
+    allocated_buffers.push_back(texture.cached);
     assert(texture.cached);
 
     memcpy(texture.cached.data8                          , &header, sizeof(header));

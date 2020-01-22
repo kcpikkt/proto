@@ -85,9 +85,26 @@ namespace proto {
 
         StringView(const unsigned char * str) : StringView((const char*)str) {}
 
-        void remove_suffix(u64 n) {
+        inline StringView trim_prefix(u64 n) {
+            assert(n <= _size);
+            _size -= n; _str += n;
+            return StringView(_str - n, n);
+        }
+
+        inline StringView trim_suffix(u64 n) {
             assert(n <= _size);
             _size -= n;
+            return StringView(_str + _size, n);
+        }
+
+        inline StringView prefix(u64 n) {
+            assert(n <= _size);
+            return StringView(_str, n);
+        }
+
+        inline StringView suffix(u64 n) {
+            assert(n <= _size);
+            return StringView(_str + _size - n, n);
         }
 
     };

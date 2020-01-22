@@ -4,6 +4,7 @@
 #include "proto/core/platform/api.hh"
 #include "proto/core/util/StringView.hh"
 #include "proto/core/string.hh"
+#include "proto/core/format.hh"
 #include <stdio.h>
 #include <tgmath.h>
 #include <assert.h>
@@ -30,6 +31,16 @@ void print(Ts... args) {
 template<typename ...Ts>
 void println(Ts... args) {
     print(args..., '\n');
+}
+
+template<typename ...Ts>
+inline void println_fmt(StringView fmt, Ts... ts) {
+    println(format(fmt, ts...));
+}
+
+template<typename ...Ts>
+inline void print_fmt(StringView fmt, Ts... ts) {
+    print(format(fmt, ts...));
 }
  
 void flush() {

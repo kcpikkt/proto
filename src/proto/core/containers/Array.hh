@@ -5,6 +5,7 @@
 #include "proto/core/debug/markers.hh"
 #include "proto/core/memory/common.hh"
 #include "proto/core/util/Optional.hh"
+#include "proto/core/util/FunctionView.hh"
 
 namespace proto{
 
@@ -198,11 +199,27 @@ struct Array
         _size--;
     }
 
-    u64 find( bool (*predecate)(T&)) {
+    u64 find_if(FunctionView<bool(T&)> predecate, u64 hint = 0) {
+        if(hint && hint < _size && predecate(at(hint))) return hint;
+
         u64 i=0;
         for(; i<_size; i++) if(predecate(at(i))) break;
         return i;
     }
+
+    u64 count_if(FunctionView<bool(T&)> predecate) {
+        u64 acc = 0;
+        for(auto e : *this) acc += predecate(e) ? 1 : 0;
+        return acc;
+    }
+
+    void for_each(FunctionView<void(T&)> proc) {
+        for(u64 i=0; i<_size; ++i) proc(_data[i]);
+    }
+
+    //void for_each(FunctionView<void(T&, u64)> proc) {
+    //    for(u64 i=0; i<_size; ++i) proc(_data[i], i);
+    //}
 
 
     void resize(u64 new_size) {
@@ -210,14 +227,19 @@ struct Array
         if(new_size < _size) {
             if constexpr(has_state) {
                 for(size_t i=new_size; i<_size; i++)
-                    (_data + i)->~T();
+                    (_data + i)->destroy();
             }
         } else {
             if(new_size > _capacity)
                 reserve(new_size);
 
-            for(size_t i=_size; i<new_size; i++)
-                  new ((void*)(_data + i)) T(); //FIXME(kacper):
+            //for(size_t i=_size; i<new_size; i++)
+            //      new ((void*)(_data + i)) T();
+            // NOTE(kacper): ok the thing is that i want to default contruct them by deafult
+            // in case when I init_place default values can wipe my data
+            // say AssetHandle is constructed as invalid_asset_handle by default to prevent mistakes
+            // And I do like that behaviour but when I obtain data from archive and init_place array
+            // as Archive.nodes default construction would then wipe my data
         }
         _size = new_size;
     }

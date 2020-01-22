@@ -120,16 +120,21 @@ namespace debug {
         proto::debug::level::info, CATEGORY,      \
         __FILE__, __LINE__, __VA_ARGS__))
 
+#define debug_info_fmt(CATEGORY, ...) debug_info(CATEGORY, format(__VA_ARGS__));
 
 #define debug_warn(CATEGORY, ...) (        \
     proto::debug::logging::_debug_log(          \
         proto::debug::level::warning, CATEGORY,   \
         __FILE__, __LINE__, __VA_ARGS__))
 
+#define debug_warn_fmt(CATEGORY, ...) debug_warn(CATEGORY, format(__VA_ARGS__));
+
 #define debug_error(CATEGORY, ...) (       \
     proto::debug::logging::_debug_log(          \
         proto::debug::level::error, CATEGORY,     \
         __FILE__, __LINE__, __VA_ARGS__))
+
+#define debug_error_fmt(CATEGORY, ...) debug_error(CATEGORY, format(__VA_ARGS__));
 
 #define cond_debug_info(COND, CATEGORY, ...) {                 \
     static_assert(std::is_same<bool, decltype(COND)>::value); \

@@ -92,6 +92,7 @@ u64 to_string(char * buffer, u64 max_len, T arg)
     }
 }
 
+// TODO(kacper): incorporate it into to_string
 template<typename T>
 u64 sprint(char * buffer, u64 max_len, T arg) {
     u64 len = to_string(buffer, max_len, arg);
@@ -100,6 +101,7 @@ u64 sprint(char * buffer, u64 max_len, T arg) {
 }
 
 
+// NOTE(kacper): can you make meta::typelist of types and explicity instantiate based on it??
 template u64 sprint<char> (char*,u64,char );
 
 template u64 sprint<u8> (char*, u64, u8 );
