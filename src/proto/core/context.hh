@@ -92,12 +92,17 @@ namespace proto {
 
         Array<Entity> entities;
 
-        // TODO(kacper): get yourself some hashmaps
-        struct {
-            Array<RenderMeshComp> render_mesh;
-            Array<TransformComp> transform;
-            Array<PointlightComp> pointlights;
-        } comp;
+
+        // This array store pointers to Arrays of components cast to void*, dodgy but 
+        // We cannot be more explicit since we avoid runtime polymorphism and any user code as well as
+        // majority of proto code don't interact with it directly.
+        // When it comes to speed, indices of arrays of default components are resolved statically anyway,
+        // however this allows client to define their own game specific components, and this is crutial.
+        // TODO(kacper): it may be just elegant to use some kind of owning pointer when it comes to those arrays
+        //               but it is not vital atm - components shall not hold any data/state to cleanup
+        //               and destruction of this array and Context in general means more or less termination
+        //               of the program and it may be unwise to delay exit with unnecessary computation.
+        Array<void*> comp_arrs;
     };
 
     struct AssetContext {

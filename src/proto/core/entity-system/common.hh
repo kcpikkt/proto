@@ -52,6 +52,7 @@ PROTO_COMPONENT_TYPE(TransformComp, 1);
 PROTO_COMPONENT_TYPE(RenderMeshComp, 2);
 PROTO_COMPONENT_TYPE(PointlightComp, 3);
 
+using comp_tlist = meta::typelist<TransformComp, RenderMeshComp, PointlightComp>;
 // default for runtime typeinfo
 template<typename T>
 struct ComponentType {

@@ -30,6 +30,7 @@ struct serialization::AssetHeader<Mesh> {
     constexpr static u32 signature = AssetType<Mesh>::hash;
     u32 sig = signature;
     u64 datasize;
+    vec3 bounds;
 
     u64 vertices_offset;
     u64 vertices_count;
@@ -53,6 +54,7 @@ template<> inline u64 serialization::serialized_size(Mesh& mesh) {
 
 inline serialization::AssetHeader<Mesh>::AssetHeader(Mesh& mesh) {
     // 16 alignment?
+    bounds = mesh.bounds;
     vertices_offset = sizeof(AssetHeader<Mesh>);
     vertices_count = mesh.vertices_count;
     vertices_size = vertices_count * sizeof(Vertex);
@@ -65,6 +67,8 @@ inline serialization::AssetHeader<Mesh>::AssetHeader(Mesh& mesh) {
 
     assert(datasize == serialized_size(mesh));
 }
+
+
 
 
 #if 0

@@ -131,6 +131,9 @@ namespace proto {
 namespace serialization {
     template<typename T> struct AssetHeader;
     template<typename T> inline u64 serialized_size(T&);
+
+    template<typename T> inline void serialize(AssetHeader<T>&, T&);
+    template<typename T> inline void deserialize(T&, AssetHeader<T>&);
 }    
 
 } // namespace proto

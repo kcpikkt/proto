@@ -33,7 +33,14 @@ struct RenderBatch {
         RenderBatchMesh(const Mesh& mesh) : Mesh::Mesh(mesh) {}
     };
 
+    struct RenderBatchMaterial : Material {
+
+        RenderBatchMaterial(const Material& material) : Material::Material(material) {}
+    };
+
+
     Array<RenderBatchMesh> meshes;
+    Array<RenderBatchMaterial> materials;
 
     Array<Range> free_vertex_ranges;
     Array<Range> free_index_ranges;
@@ -122,7 +129,6 @@ struct RenderBatch {
                 return {};
             };
 
-
         MemBuffer cached;
         if(mesh_ptr->flags.check(Mesh::cached_bit)) {
             cached = mesh_ptr->cached;
@@ -182,10 +188,7 @@ struct RenderBatch {
             else
                 return (void)debug_warn(debug::category::data, "Could not fit mesh into RenderBatch buffer");
 
-
             auto& [r_begin, r_size] = mesh.batch_vertex_range;
-
-            println_fmt("[%,%)", r_begin, r_begin + r_size);
 
             if(void * mapped_range = glMapBufferRange(GL_ARRAY_BUFFER, r_begin, r_size, map_flags) )
                 memcpy(mapped_range, (u8*)&header + header.vertices_offset, r_size);
@@ -215,26 +218,40 @@ struct RenderBatch {
 
         if(glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER) != GL_TRUE)
             return (void)debug_warn(debug::category::data, "glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER) failed");
+
+        // we have mesh in, now its time for our material
+
+        Material * material = get_asset<Material>(render_mesh.material_h);
+        if(material) {
+        } else
+            debug_warn(debug::category::data, "RenderMesh is not assigned any material.");
     }
 
     void render() {
         glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer);
         auto& ctx = *context;
-        //auto& time = ctx.clock.elapsed_time;
+
+        static float next_frame_far = 1000.0; // default init value, tweak to avoid black/slow frame
+        ctx.camera.far = next_frame_far;
+        printf("%f\r", next_frame_far); flush();
+        next_frame_far = 0.0;
 
         mat4 mvp, model, view = ctx.camera.view(), projection = ctx.camera.projection();
 
         for(auto& render_mesh : render_mesh_comps) {
-            u64 i=0;
-            for(; i<meshes.size(); ++i) 
-                if(meshes[i].handle == render_mesh.mesh_h) break;
+            auto i = meshes.find_if( [&](auto mesh){ return mesh.handle == render_mesh.mesh_h; } );
 
             assert(i != meshes.size());
             auto& mesh = meshes[i];
 
-            auto* transform = get_component<TransformComp>(render_mesh.entity);
+            auto* transform = get_comp<TransformComp>(render_mesh.entity);
             assert(transform);
+
+            float cam2farvert_dist =
+                glm::distance(transform->position, ctx.camera.position)+ glm::length(mesh.bounds);
+
+            next_frame_far = max(next_frame_far, cam2farvert_dist);
 
             model = translate(scale(mat4(1.0), transform->scale), transform->position) * glm::toMat4(transform->rotation);
 

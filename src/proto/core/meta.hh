@@ -1,14 +1,15 @@
 #pragma once
 #include "proto/core/common/types.hh"
-//#include <type_traits>
+
+#include <type_traits>
 
 namespace proto {
 namespace meta {
      /**********************************************************
-     Sequence
+     sequence
      */
 
-    template <size_t ...Ns> struct Sequence{};
+    template <size_t ...Ns> struct sequence{};
     template <size_t ...Ns> struct sequence_generator;
 
     template<size_t B, size_t N, size_t ...Ns>
@@ -17,7 +18,7 @@ namespace meta {
     };
     template<size_t B, size_t ...Ns>
     struct sequence_generator<B, B, Ns...> {
-        using type = Sequence<Ns...>;
+        using type = sequence<Ns...>;
     };
 
     template <size_t B, size_t E>
@@ -106,6 +107,27 @@ namespace meta {
     template<typename T> struct remove_extent<T[]>         : identity<T> {}; 
     template<typename T, u64 N> struct remove_extent<T[N]> : identity<T> {};
 
+
+    template<typename...> using void_t = void;
+
+
+    namespace internal {
+        template<bool, typename T = void>
+        struct enable_if {};
+
+        template<typename T>
+        struct enable_if<true,T> {
+            using type = T;
+        };
+    }
+
+    template<bool B, typename T = void>
+    using enable_if = internal::enable_if<B, T>;
+
+    template<bool B, typename T = void>
+    using enable_if_t = typename enable_if<B, T>::type;
+
+
     // typelist
     struct typelist_void;
 
@@ -139,7 +161,7 @@ namespace meta {
         template<typename...> struct sub;
 
         template<size_t ...Is>
-        struct sub<Sequence<Is...>> {
+        struct sub<sequence<Is...>> {
             using type = typelist<typename at<Is>::type...>;
         };
 
@@ -207,7 +229,7 @@ namespace meta {
         // template <typename... Ts>
         // using prepend_t = typename append<Ts...>::type;
 
-
+        // it won't compile if type you of index you are after is not in the typelist
         template<typename...> struct index_of;
 
         template<typename L, typename...Sub_Ts>
@@ -217,23 +239,34 @@ namespace meta {
 
         template<typename L, typename T, typename...Sub_Ts>
         struct index_of<L, T, Sub_Ts...> {
+            static_assert( sizeof...(Sub_Ts) > 0, "Type is not present in the typelist"); // no match, no left - not present
             constexpr static size_t value = index_of<L, Sub_Ts...>::value;
         };
-
+        
         template<typename T>
         struct index_of<T> {
             constexpr static auto value = index_of<T, Ts...>::value;
         };
-
+        
         template <typename T>
         constexpr static auto index_of_v = index_of<T>::value;
 
 
+        template<typename...> struct contains;
+
+        template<typename L, typename...Sub_Ts>
+        struct contains<L, L, Sub_Ts...> : true_t {};
+
+        template<typename L, typename T, typename...Sub_Ts>
+        struct contains<L, T, Sub_Ts...> :
+            conditional_t<(sizeof...(Sub_Ts) > 0), contains<L, Sub_Ts...>, false_t> {};
+        
+        template<typename T>
+        struct contains<T> : contains<T, Ts...> {};
+        
+        template <typename T>
+        constexpr static auto contains_v = contains<T>::value;
     };
-
-    // what a shame that and is a keyword
-
-    template<typename...> using void_t = void;
 
 
     // negation
@@ -337,22 +370,6 @@ namespace meta {
 
     template<typename T>
     inline static constexpr auto is_integer_v = is_integer<T>::value;
-
-    namespace internal {
-        template<bool, typename T = void>
-        struct enable_if {};
-
-        template<typename T>
-        struct enable_if<true,T> {
-            using type = T;
-        };
-    }
-
-    template<bool B, typename T = void>
-    using enable_if = internal::enable_if<B, T>;
-
-    template<bool B, typename T = void>
-    using enable_if_t = typename enable_if<B, T>::type;
 
     //hmmm
     template<typename T>

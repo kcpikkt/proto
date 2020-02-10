@@ -39,4 +39,5 @@ struct RenderMeshComp : Component {
     constexpr static u8 batched_bit = BIT(0);
 };
 
+//template<typename T> inline void deserialize(T&, AssetHeader<T>&);
 } // namespace proto

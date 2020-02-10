@@ -60,6 +60,7 @@ struct Material : Asset {;
         (AssetHandle) (height_map)   ({"sampler2D", "height_map"})
         );
     };
+
     union {
         PBR pbr;
         Trad trad;
@@ -67,34 +68,29 @@ struct Material : Asset {;
 };
 
 template<>
-struct serialization::AssetHeader<Material> {
+struct serialization::AssetHeader<Material> : Material{
     constexpr static u32 signature = AssetType<Material>::hash;
     u32 sig = signature;
     u64 datasize;
 
-    union {
-        Material::PBR pbr;
-        Material::Trad trad;
-    };
-
     AssetHeader() {}
 
-    inline AssetHeader(Material& material);
+    inline AssetHeader(const Material& material) : Material::Material(material) {}
 };
 
 template<> inline u64 serialization::serialized_size(Material&) {
     return sizeof(AssetHeader<Material>);
 }
 
-inline serialization::AssetHeader<Material>::AssetHeader(Material& material){
-    datasize = serialized_size(material);
-    /**/ if(material.type == Material::pbr_material) 
-        pbr = material.pbr;
-    else if(material.type == Material::trad_material) 
-        trad = material.trad;
-    else
-        assert(0);
-}
+    //inline serialization::AssetHeader<Material>::AssetHeader(Material& material){
+    //    datasize = serialized_size(material);
+    //    /**/ if(material.type == Material::pbr_material) 
+    //        pbr = material.pbr;
+    //    else if(material.type == Material::trad_material) 
+    //        trad = material.trad;
+    //    else
+    //        assert(0);
+    //}
 
 
 

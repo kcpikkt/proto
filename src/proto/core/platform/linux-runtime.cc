@@ -142,8 +142,8 @@ typedef GLXFBConfig (*glXChooseFBConfigProc)
 RuntimeSettings settings;
 void * clientlib_h;
 
-int proto::platform::runtime(int argc, char ** argv){
 
+int proto::platform::runtime(int argc, char ** argv){
 
     proto::context = &_context;
     auto& ctx = _context;
@@ -403,16 +403,7 @@ int proto::platform::runtime(int argc, char ** argv){
     _context.entities.init(10, &_context.memory);
     _context.entities.set_autodestruct();
 
-    _context.comp.transform.init(10, &_context.memory);
-    _context.comp.transform.set_autodestruct();
-
-    _context.comp.render_mesh.init(10, &_context.memory);
-    _context.comp.render_mesh.set_autodestruct();
-
-    _context.comp.pointlights.init(10, &_context.memory);
-    _context.comp.pointlights.set_autodestruct();
-
-    // Context
+    create_comp_arrays<comp_tlist>();
 
     if(settings.asset_paths && settings.asset_paths.length()) {
         _context.asset_paths

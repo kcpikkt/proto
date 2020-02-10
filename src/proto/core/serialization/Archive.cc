@@ -248,7 +248,21 @@ namespace serialization {
         assert(index < nodes.size());
         auto& node = nodes[index];
 
+
         auto h = create_asset(node.name, node.handle.type);
+
+        if(h.type == AssetType<Mesh>::index) {
+            //nofail
+            auto& mesh = get_asset_ref<Mesh>(h);
+            auto& header = *((AssetHeader<Mesh>*)(get_node_memory(index).data));
+
+            mesh.bounds = header.bounds;
+            mesh.vertices_count = header.vertices_count;
+            mesh.indices_count = header.indices_count;
+            if(mesh.indices_count)
+                mesh.flags.set(Mesh::indexed_bit);
+        }
+
         if(h != node.handle) return {};
 
         AssetMetadata * metadata = get_metadata(h); assert(metadata);
