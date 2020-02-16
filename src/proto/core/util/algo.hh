@@ -10,7 +10,7 @@ template<typename A, typename B,
          // SFINAE: allow if there exists comparison operator between types
          //         used so there is no need for cast to one type when calling
          typename = decltype(A() < B())> 
-inline HigherPrecType max(A a, B b) {
+constexpr inline HigherPrecType max(A a, B b) {
     return ((HigherPrecType)a < (HigherPrecType)b ? b : a);
 }
 
@@ -18,7 +18,7 @@ template<typename A, typename B,
          typename HigherPrecType = decltype(A() + B()),
          // SFINAE: same as above
          typename = decltype(A() < B())> 
-inline HigherPrecType min(A a, B b) {
+constexpr inline HigherPrecType min(A a, B b) {
     return ((HigherPrecType)a < (HigherPrecType)b ? a : b);
 }
 

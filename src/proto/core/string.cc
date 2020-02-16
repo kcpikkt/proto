@@ -1,5 +1,6 @@
 #include "proto/core/string.hh"
 #include "proto/core/util/algo.hh"
+#include "proto/core/util/Bitset.hh"
 #include "proto/core/io.hh"
 
 namespace proto {
@@ -77,6 +78,7 @@ u64 to_string_specific<ivec4>(char * buffer, u64 max_len, ivec4 arg) {
                   '(', arg.x, ',', arg.y, ',', arg.z, ',', arg.w, ')');
 }
 
+
 template<typename T>
 u64 to_string(char * buffer, u64 max_len, T arg)
 {
@@ -141,6 +143,7 @@ char * strview_cat(char * dest, StringView src) {
 // this function returns number of elements such that ch[i] != op(ch[i])
 //NOTE(kacper): just add caputring lambdas, they are super useful
 //TODO(kacper): implement std::function
+//TODO(kacper): you have FunctionView now, don't you?
 int str_transform(char * str, char(*op)(char)) {
     int count = 0; char prev;
 
@@ -174,6 +177,7 @@ bool strview_cmp(StringView fst, StringView snd) {
     while( *(fst.str() + index) == *(snd.str() + index) && index < len) index++;
     return (index == len);
 }
+
 bool strview_cmp_i(StringView fst, StringView snd) {
     if(fst.length() != snd.length()) return false;
     char ch1, ch2;

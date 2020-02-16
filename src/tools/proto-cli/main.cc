@@ -243,8 +243,8 @@ void preview_init() {
 
         case(AssetType<Mesh>::index): {
             if( Entity model = prev_ents.push_back(create_entity()) ) {
-                auto& render_mesh = add_component<RenderMeshComp>(model);
-                auto& transform = add_component<TransformComp>(model);
+                auto& render_mesh = *add_comp<RenderMeshComp>(model);
+                auto& transform = *add_comp<TransformComp>(model);
                 render_mesh.mesh_h = asset;
 
                 auto& mesh = get_asset_ref<Mesh>(render_mesh.mesh_h);
@@ -275,23 +275,23 @@ void preview_init() {
 }
 
 PROTO_UPDATE {
-    auto& ctx = *context;
-    auto& time = ctx.clock.elapsed_time;
-
-    for(auto& comp : ctx.comp.render_mesh) {
-        if(!comp.flags.check(RenderMeshComp::batched_bit)) batch.add(comp);
-    }
-
-    //for(auto ent : prev_ents) {
-    //    //      get_component<TransformComp>(ent)->rotation = angle_axis(time, glm::normalize(vec3(cos(time), 1.0, sin(time))));
-    //}
-
-    glViewport(0, 0, ctx.window_size.x, ctx.window_size.y);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    get_asset_ref<ShaderProgram>(main_shader_h).use();
-
-    batch.render();
+    //    auto& ctx = *context;
+    //    auto& time = ctx.clock.elapsed_time;
+    //
+    //    for(auto& comp : ctx.comp.render_mesh) {
+    //        if(!comp.flags.check(RenderMeshComp::batched_bit)) batch.add(comp);
+    //    }
+    //
+    //    //for(auto ent : prev_ents) {
+    //    //    //      get_component<TransformComp>(ent)->rotation = angle_axis(time, glm::normalize(vec3(cos(time), 1.0, sin(time))));
+    //    //}
+    //
+    //    glViewport(0, 0, ctx.window_size.x, ctx.window_size.y);
+    //    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    //
+    //    get_asset_ref<ShaderProgram>(main_shader_h).use();
+    //
+    //    batch.render();
 
     //if(time > 1.0f)
     //    ctx.exit_sig = true;

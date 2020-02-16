@@ -10,8 +10,7 @@ namespace {
     [[nodiscard]]
     Entity create_entity() {
         Entity entity{.id = ++context->entity_generator_data._id, .gen = 0};
-
-        context->ents_mdata.push_back({entity, {} });
+        context->ents_mdata.push_back(entity, {});
         return context->ents.push_back(entity);
     }
 
@@ -20,10 +19,10 @@ namespace {
         return *((Array<T>*)context->comp_arrs[CompTList::index_of<T>::value]);
     }
 
-    EntityMetadata * _get_ent_mdata(Entity entity) {
-        if(!entity) return nullptr;
+    EntityMetadata * get_mdata(Entity entity) {
+        proto_assert((bool)entity);
 
-        auto idx = context->ents_mdata.idx_of(entity);
+        u64 idx = context->ents_mdata.idx_of(entity);
         if(idx != context->ents_mdata.size())
             return &context->ents_mdata.at_idx(idx);
 
@@ -36,7 +35,7 @@ namespace {
 
         if(!entity) return false;
 
-        if(auto mdata = _get_ent_mdata(entity))
+        if(auto mdata = get_mdata(entity))
             return mdata->has_comp<T>();
 
         return false;
@@ -45,7 +44,12 @@ namespace {
     template<typename T>
     T * add_comp(Entity entity) {
 
-        if(auto mdata = _get_ent_mdata(entity)) {
+        if(!entity){
+            debug_error(debug::category::main, "Attempt to add component to invalid entity.");
+            return nullptr;
+        }
+
+        if(auto mdata = get_mdata(entity)) {
             if(!mdata->has_comp<T>()) {
                 mdata->set_comp<T>();
 
@@ -54,8 +58,11 @@ namespace {
                 T comp; comp.entity = entity;
                 return &arr.push_back(comp);
             }
+            // what to do here? return previous?
+            debug_error(debug::category::main, "Double adding component to metadata.");
         }
 
+        debug_error(debug::category::main, "Valid entity has no associated metadata.");
         return nullptr;
     }
 

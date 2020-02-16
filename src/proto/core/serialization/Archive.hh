@@ -29,6 +29,7 @@ struct ArchiveErrCategory : ErrCategoryCRTP<ArchiveErrCategory> {
                  header_alloc_fail,
                  no_free_nodes,
                  asset_not_cached,
+                 invalid_argument,
     };
 
     static ErrMessage message(ErrCode code) {
@@ -58,6 +59,8 @@ struct ArchiveErrCategory : ErrCategoryCRTP<ArchiveErrCategory> {
             // though it would be more tidious to implement
         case asset_not_cached:
             return "Could not obtain cached memory of an asset.";
+        case invalid_argument:
+            return "Argument passed to a function was invalid.";
         default:
             return "Unknown error.";
         }

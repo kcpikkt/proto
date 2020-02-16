@@ -76,22 +76,25 @@ struct Entity {
 };
 static Entity invalid_entity = Entity{.id = 0, .gen = 0};
 
+using CompBitset = Bitset<CompTList::size>;
+
 struct EntityMetadata {
     Entity entity;
-    Bitset<CompTList::size> comps;
+    CompBitset comps;
 
     template<typename T>
     bool has_comp() {
         static_assert(meta::is_base_of_v<Component, T>);
-        return comps.at(CompTList::index_of_v<T>);
+        return comps.at((u64)CompTList::index_of<T>::value);
     }
 
     template<typename T>
-    bool set_comp() {
+    void set_comp() {
         static_assert(meta::is_base_of_v<Component, T>);
-        return comps.set(CompTList::index_of_v<T>);
+        comps.set((u64)CompTList::index_of<T>::value);
     }
 
+    u64 sum_comps_size();
 };
 
 

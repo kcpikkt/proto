@@ -4,6 +4,7 @@
 #include "proto/core/asset-system/interface.hh"
 #include "proto/core/entity-system/serialization.hh"
 #include "proto/core/debug.hh"
+#include "proto/core/entity-system/interface.hh"
 
 namespace proto {
 namespace serialization {
@@ -205,7 +206,8 @@ namespace serialization {
     }
     
     ArchiveErr Archive::store(Array<Entity>& ents) {
-       u32 idx;
+        assert(ents.size());
+        u32 idx;
 
         if( !(idx = _find_free_node()) )
             return ArchiveErrCategory::no_free_nodes;
@@ -213,6 +215,25 @@ namespace serialization {
         Node node; node.type = Node::ecs_tree;
         node.parent_index = 0;
         //node.hash = handle.hash;
+        CompBitset joint_comps_bitset;
+        u64 comps_size = 0;
+
+        for(auto e : ents) {
+            if(auto mdata = get_mdata(e)) {
+                joint_comps_bitset |= mdata->comps;
+
+                comps_size += mdata->sum_comps_size();
+            } else
+                return ArchiveErrCategory::invalid_argument;
+        }
+        u64 size = 0;
+        size += sizeof(Entity) * ents.size();
+        size += joint_comps_bitset.bitcount(); // * sizeof(ArrayHeader)
+        size += comps_size;
+
+        println("Total size: ", size);
+        println("ents: ", sizeof(Entity) * ents.size());
+        println("comp: ", comps_size);
 
         return ArchiveErrCategory::success;
     }

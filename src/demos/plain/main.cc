@@ -59,8 +59,8 @@ PROTO_INIT {
                     if(h.type != AssetType<Mesh>::index) continue;
 
                     ents.push_back(e);
-                    auto& render_mesh = add_comp<RenderMeshComp>(e);
-                    auto& transform = add_comp<TransformComp>(e);
+                    auto& render_mesh = *add_comp<RenderMeshComp>(e);
+                    auto& transform = *add_comp<TransformComp>(e);
                     render_mesh.mesh_h = h;
                     render_mesh.color = vec3(1.0,0.0,0.0);
 
@@ -78,8 +78,8 @@ PROTO_INIT {
 
     for(int i=0; i<3; ++i) {
         if( auto cube = create_entity() ) {
-            auto& render_mesh = add_comp<RenderMeshComp>(cube);
-            auto& transform = add_comp<TransformComp>(cube);
+            auto& render_mesh = *add_comp<RenderMeshComp>(cube);
+            auto& transform = *add_comp<TransformComp>(cube);
             render_mesh.mesh_h = ctx.cube_h;
             render_mesh.color = vec3(1.0,0.0,0.0);
             transform.position = vec3(i * 2.0f - 2.0f,0.0,0.0);
