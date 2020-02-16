@@ -2,6 +2,7 @@
 #include "proto/core/math/hash.hh"
 #include "proto/core/context.hh"
 #include "proto/core/asset-system/interface.hh"
+#include "proto/core/entity-system/serialization.hh"
 #include "proto/core/debug.hh"
 
 namespace proto {
@@ -194,13 +195,32 @@ namespace serialization {
         return { {_data_off2addr(nodes[node_idx].block_offset)}, nodes[node_idx].block_size };
     }
 
-    ArchiveErr Archive::store(AssetHandle handle) {
+    // zero if not found, zero is root node
+    u64 Archive::_find_free_node() {
         static auto free_node_predecate = [](Node& node){ return node.type == Node::free; };
+        u64 idx = nodes.find_if(free_node_predecate);
+        assert(idx != 0); // 0 has to be root, can't be free
 
-        auto idx = nodes.find_if(free_node_predecate);
+        return (idx != nodes.size()) ? idx : 0;
+    }
+    
+    ArchiveErr Archive::store(Array<Entity>& ents) {
+       u32 idx;
 
-        assert(idx != 0); // 0 has to be root, never free
-        if(idx == nodes.size())
+        if( !(idx = _find_free_node()) )
+            return ArchiveErrCategory::no_free_nodes;
+
+        Node node; node.type = Node::ecs_tree;
+        node.parent_index = 0;
+        //node.hash = handle.hash;
+
+        return ArchiveErrCategory::success;
+    }
+ 
+    ArchiveErr Archive::store(AssetHandle handle) {
+        u32 idx;
+
+        if( !(idx = _find_free_node()) )
             return ArchiveErrCategory::no_free_nodes;
 
         Node node; node.type = Node::asset;

@@ -400,10 +400,13 @@ int proto::platform::runtime(int argc, char ** argv){
     _context.framebuffers.init(0, &_context.memory);
     _context.framebuffers.set_autodestruct();
 
-    _context.entities.init(10, &_context.memory);
-    _context.entities.set_autodestruct();
+    _context.ents.init(10, &_context.memory);
+    _context.ents.set_autodestruct();
 
-    create_comp_arrays<comp_tlist>();
+    _context.ents_mdata.init(10, &_context.memory);
+    _context.ents_mdata.set_autodestruct();
+
+    create_comp_arrays<CompTList>();
 
     if(settings.asset_paths && settings.asset_paths.length()) {
         _context.asset_paths

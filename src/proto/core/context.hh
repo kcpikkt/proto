@@ -90,8 +90,8 @@ namespace proto {
             EntityId _id = 0;
         } entity_generator_data;
 
-        Array<Entity> entities;
-
+        Array<Entity> ents;
+        ArrayMap<Entity, EntityMetadata> ents_mdata;
 
         // This array store pointers to Arrays of components cast to void*, dodgy but 
         // We cannot be more explicit since we avoid runtime polymorphism and any user code as well as
@@ -109,6 +109,7 @@ namespace proto {
         //AssetRegistry assets;
         memory::LinkedListAllocator asset_metadata_allocator;
 
+        // NOTE(kacper): should you do the same thing as with comp_arrs here?
         ArrayMap<AssetHandle, Pair<Mesh, AssetMetadata>>          meshes;
         ArrayMap<AssetHandle, Pair<Material, AssetMetadata>>      materials;
         ArrayMap<AssetHandle, Pair<Texture2D, AssetMetadata>>     textures;
@@ -138,7 +139,7 @@ namespace proto {
         void ** client_preserved; 
         u64 client_preserved_size; 
 
-        proto::ivec2 window_size;
+        ivec2 window_size;
 
         StringView clientlib_path;
         char * cwd_path = nullptr;

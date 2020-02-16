@@ -7,6 +7,7 @@
 #include "proto/core/asset-system/common.hh"
 #include "proto/core/containers/Array.hh"
 #include "proto/core/meta.hh"
+#include "proto/core/entity-system/common.hh"
 
 namespace proto {
 namespace serialization {
@@ -91,7 +92,8 @@ struct Archive : StateCRTP<Archive> {
         AssetHandle handle;
         enum Type : u8 { free = 0,
                          directory,
-                         asset
+                         asset,
+                         ecs_tree
         } type;
 
         u64 block_size;
@@ -181,6 +183,7 @@ struct Archive : StateCRTP<Archive> {
     //}
 
     // perhaps you can just map file to memory, right?
+
     ArchiveErr _commit_cached_header();
 
     StateErr<Archive> destroy_deep();
@@ -188,10 +191,12 @@ struct Archive : StateCRTP<Archive> {
     ArchiveErr create(StringView filepath, u32 node_count, u64 data_size);
     ArchiveErr open(StringView filepath /* , sys::File::Mode filemode = sys::File::read_mode */ );
     ArchiveErr store(AssetHandle handle);
+    ArchiveErr store(Array<Entity>&);
 
     MemBuffer get_node_memory(u64 node_idx);
     AssetHandle load_asset(u32 index);
 
+    u64 _find_free_node();
 };
 
 } // namespace serialization

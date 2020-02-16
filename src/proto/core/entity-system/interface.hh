@@ -11,19 +11,52 @@ namespace {
     Entity create_entity() {
         Entity entity{.id = ++context->entity_generator_data._id, .gen = 0};
 
-        return context->entities.push_back(entity);
+        context->ents_mdata.push_back({entity, {} });
+        return context->ents.push_back(entity);
     }
 
     template<typename T> Array<T>& get_comp_arr() {
-        static_assert(comp_tlist::contains<T>::value); // or custom ext
-        return *((Array<T>*)context->comp_arrs[comp_tlist::index_of<T>::value]);
+        static_assert(CompTList::contains<T>::value); // or custom ext
+        return *((Array<T>*)context->comp_arrs[CompTList::index_of<T>::value]);
     }
 
-    template<typename T> T& add_comp(Entity entity) {
-        auto& arr = get_comp_arr<T>();
+    EntityMetadata * _get_ent_mdata(Entity entity) {
+        if(!entity) return nullptr;
 
-        T comp; comp.entity = entity;
-        return arr.push_back(comp);
+        auto idx = context->ents_mdata.idx_of(entity);
+        if(idx != context->ents_mdata.size())
+            return &context->ents_mdata.at_idx(idx);
+
+        return nullptr;
+    }
+
+    template<typename T>
+    bool has_comp(Entity entity) {
+        static_assert(meta::is_base_of_v<Component, T>);
+
+        if(!entity) return false;
+
+        if(auto mdata = _get_ent_mdata(entity))
+            return mdata->has_comp<T>();
+
+        return false;
+    }
+
+    template<typename T>
+    T * add_comp(Entity entity) {
+
+        if(auto mdata = _get_ent_mdata(entity)) {
+            if(!mdata->has_comp<T>()) {
+                mdata->set_comp<T>();
+
+                auto& arr = get_comp_arr<T>();
+
+                T comp; comp.entity = entity;
+                return &arr.push_back(comp);
+            }
+        }
+
+        return nullptr;
     }
 
     template<typename T> T * get_comp(Entity entity) {
@@ -35,28 +68,49 @@ namespace {
         return nullptr;
     }
 
+    // CURSED CODE DISCLAIMER: only for people with strong somach!
+    // create_comp_array 
+    // Snake case since it is basically a function, name is subject to change, it is called only once anyway.
+    // It takes Typelist as a parameter, then
     template<typename TList> struct create_comp_arrays {
+        // size of array of any type should be the same
+        // TODO(kacper): go and static_asset it somewhere
         constexpr static auto _arr_sz = sizeof(Array<int>);
-        constexpr static auto _init_cap = sizeof(Array<int>);
+        
+        // initial cap for each of our components array
+        // TODO(kacper): we may to be able to easily specify this one for each component
+        //               separately with some more template wizardry.
+        constexpr static auto _init_cap = 0;
 
-        template<typename...> struct iterate;
-        template<size_t...Is> struct iterate<meta::sequence<Is...>> {
+        template<typename...> struct init_arrs;
 
-            iterate(MemBuffer buf) {
-                // Go thorugh memory in _arr_sz steps, cast to Array<Given Component> *, and init array
-                ( ((Array<typename TList::template at<Is>::type> *)
-                   (buf.data8 + _arr_sz * Is))->init(_init_cap, &context->memory), ...);
+        // we use this secondary template as it proves to be difficult to
+        // expand Is... from meta::sequence without passing it to specialized template
+        template<size_t...Is> struct init_arrs<meta::sequence<Is...>> {
 
-                // Then push approprate poiters to our array
+            // array of Ith component type in TList
+            template<size_t I>
+            using CompArr = Array<typename TList::template at<I>::type>;
+
+            init_arrs(MemBuffer buf) {
+                // looks very lispy
+                // cast each _arr_sz segment of the buffer to array of each component type in TList and init it
+                ( ((CompArr<Is> *) (buf.data8 + _arr_sz * Is))->init(_init_cap, &context->memory), ...);
+
+                // Then cast Ith array to void* and push it to our comp_arrs
                 ( (context->comp_arrs[Is] = buf.data8 + _arr_sz * Is), ...);
             }
         };
 
         create_comp_arrays() {
-            MemBuffer buf = context->memory.alloc_buf(comp_tlist::size * _arr_sz);
-            context->comp_arrs.init_resize(comp_tlist::size, &context->memory);
+            // NOTE(kacper): This buffer is never freed and does not have to be as currently components
+            //               arrays are spawned at the start of the program and persist until its termination.
+            //               Alternatively, since this is a struct, we may inherit StateCRTP and add destructor.
+            MemBuffer buf = context->memory.alloc_buf(TList::size * _arr_sz);
+            context->comp_arrs.init_resize(TList::size, &context->memory);
 
-            (void) iterate<meta::make_sequence<0, TList::size>>(buf);
+            // here is where cursed things happen
+            (void) init_arrs<meta::make_sequence<0, TList::size>>(buf);
         }
     };
 

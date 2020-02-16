@@ -33,7 +33,9 @@ AssetHandle main_shader_h;
 
 using namespace proto;
 
+
 PROTO_INIT {
+
     auto& ctx = *context;
     ctx.exit_sig = true;
     ents.init(500, &ctx.memory);
@@ -42,8 +44,7 @@ PROTO_INIT {
     StringView archive_path = "outmesh/sponza.pack";
     if(ser::Archive * archive = ser::open_archive(archive_path)) {
 
-        for(u32 i=6; i<archive->nodes.size(); ++i) {
-            //break;
+        for(u32 i=0; i<archive->nodes.size(); ++i) {
 
             if(archive->nodes[i].type == ser::Archive::Node::asset) {
 
@@ -58,8 +59,8 @@ PROTO_INIT {
                     if(h.type != AssetType<Mesh>::index) continue;
 
                     ents.push_back(e);
-                    auto& render_mesh = add_component<RenderMeshComp>(e);
-                    auto& transform = add_component<TransformComp>(e);
+                    auto& render_mesh = add_comp<RenderMeshComp>(e);
+                    auto& transform = add_comp<TransformComp>(e);
                     render_mesh.mesh_h = h;
                     render_mesh.color = vec3(1.0,0.0,0.0);
 
@@ -77,8 +78,8 @@ PROTO_INIT {
 
     for(int i=0; i<3; ++i) {
         if( auto cube = create_entity() ) {
-            auto& render_mesh = add_component<RenderMeshComp>(cube);
-            auto& transform = add_component<TransformComp>(cube);
+            auto& render_mesh = add_comp<RenderMeshComp>(cube);
+            auto& transform = add_comp<TransformComp>(cube);
             render_mesh.mesh_h = ctx.cube_h;
             render_mesh.color = vec3(1.0,0.0,0.0);
             transform.position = vec3(i * 2.0f - 2.0f,0.0,0.0);
@@ -108,14 +109,14 @@ PROTO_UPDATE {
     auto& ctx = *context;
     auto& time = ctx.clock.elapsed_time;
 
-    for(auto& comp : ctx.comp.render_mesh) {
+    for(auto& comp : get_comp_arr<RenderMeshComp>()) {
         if(!comp.flags.check(RenderMeshComp::batched_bit)) batch.add(comp);
     }
 
     //for(auto e : ents) if(e)
     //        get_component<TransformComp>(e)->rotation = angle_axis(time, glm::normalize(vec3(cos(time * 2.0), 1.0, sin(time))));
 
-    // ctx.camera.position = vec3(0.0, 0.0, 50.0 * (cos(time) * 0.5 + 0.5) + 5.0);
+    ctx.camera.position = vec3(0.0, 0.0, 50.0 * (cos(time) * 0.5 + 0.5) + 5.0);
     glViewport(0, 0, ctx.window_size.x, ctx.window_size.y);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -125,7 +126,7 @@ PROTO_UPDATE {
                                       
     batch.render();
 
-    //if(time > 3.0f)
-    //    ctx.exit_sig = true;
+    if(time > 1.0f)
+        ctx.exit_sig = true;
 }
 

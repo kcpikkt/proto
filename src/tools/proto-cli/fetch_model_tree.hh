@@ -91,7 +91,6 @@ static int fetch_model_tree(StringView filepath) {
         Array<u32> indices;
         indices.init_place_resize(buffer.data8 + mesh_header.indices_offset, mesh_header.indices_count);
 
-        memcpy(buffer.data, &mesh_header, sizeof(mesh_header));
 
         for(u32 v=0; v<ai_mesh.mNumVertices; v++) {
             auto& vert = vertices[v];
@@ -108,8 +107,13 @@ static int fetch_model_tree(StringView filepath) {
             mesh.bounds = {max(mesh.bounds.x, vert.position.x),
                            max(mesh.bounds.y, vert.position.y),
                            max(mesh.bounds.z, vert.position.z)};
+
         }
         assert(vertices.size() == mesh_header.vertices_count); 
+        //tmp
+        mesh_header.bounds = mesh.bounds;
+
+        memcpy(buffer.data, &mesh_header, sizeof(mesh_header));
 
         for(u32 f=0; f<ai_mesh.mNumFaces; f++) {
             auto& ai_face = ai_mesh.mFaces[f];

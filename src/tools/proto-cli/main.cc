@@ -55,7 +55,11 @@ void display_help() {
 
 void preview_init();
 
+
+
 PROTO_INIT {
+
+    
     assert(proto::context);
     auto& ctx = *proto::context;
     search_paths.init_split(".", ':', &ctx.memory);

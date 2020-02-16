@@ -1,6 +1,7 @@
 #pragma once
 #include "proto/core/util/Buffer.hh"
 #include "proto/core/meta.hh"
+
 namespace proto {
 //TODO(kcaper): proper declval in SFINAE decltypes?
 
@@ -46,5 +47,11 @@ inline bool belongs(A value, B lower, B upper) {
 inline bool belongs(void * ptr, MemBuffer buffer) {
     return (ptr >= buffer.data && ptr < (void*)(buffer.data8 + buffer.size));
 }
+
+    //template<typename T, typename Arr>
+    //inline T sum(const Arr& arr, T init = 0) {
+    //    for(auto x : arr) init += x;
+    //    return init;
+    //}
 
 } // namespace proto
