@@ -138,7 +138,7 @@ struct Archive : StateCRTP<Archive> {
         superblock = other.superblock;
         nodes = meta::move(other.nodes);
         file = other.file;
-        //destroy(); // this is going to be just shallow destory
+        //dtor(); // this is going to be just shallow destory
     }
 
     Archive() {} // noop, uninitialized state
@@ -189,7 +189,7 @@ struct Archive : StateCRTP<Archive> {
 
     ArchiveErr _commit_cached_header();
 
-    StateErr<Archive> destroy_deep();
+    StateErr<Archive> dtor_deep();
 
     ArchiveErr create(StringView filepath, u32 node_count, u64 data_size);
     ArchiveErr open(StringView filepath /* , sys::File::Mode filemode = sys::File::read_mode */ );

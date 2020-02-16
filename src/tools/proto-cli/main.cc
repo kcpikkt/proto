@@ -71,11 +71,11 @@ PROTO_INIT {
     defer{
         for(auto buf : allocated_buffers)
             ctx.memory.free(buf.data);
-        loaded_texture_paths.destroy();
-        allocated_buffers.destroy();
-        search_paths.destroy();
-        loaded_assets.destroy();
-        matched_opt.destroy();
+        loaded_texture_paths.dtor();
+        allocated_buffers.dtor();
+        search_paths.dtor();
+        loaded_assets.dtor();
+        matched_opt.dtor();
     };
 
 
@@ -121,7 +121,7 @@ PROTO_INIT {
         assert(outpath);
 
         Array<String> conf_filepaths; conf_filepaths.init_resize(filepaths.size(), &ctx.memory);
-        defer { conf_filepaths.destroy(); };
+        defer { conf_filepaths.dtor(); };
 
 
         for(u64 i=0; i<filepaths.size(); ++i) {
@@ -181,7 +181,7 @@ PROTO_INIT {
             return (void)log_error(debug::category::main, ec.message());
 
         defer {
-            if(auto ec = archive.destroy())
+            if(auto ec = archive.dtor())
                 return (void)log_error(debug::category::main, ec.message());
         };
 

@@ -227,7 +227,7 @@ struct Array
         if(new_size < _size) {
             if constexpr(has_state) {
                 for(size_t i=new_size; i<_size; i++)
-                    (_data + i)->destroy();
+                    (_data + i)->dtor();
             }
         } else {
             if(new_size > _capacity)
@@ -260,14 +260,14 @@ struct Array
         _capacity = new_capacity;
     }
 
-    //Err<typename State::ErrCategory> destroy_shallow() {}
+    //Err<typename State::ErrCategory> dtor_shallow() {}
 
-    Err<typename State::ErrCategory> destroy_deep() {
+    Err<typename State::ErrCategory> dtor_deep() {
         assert(_allocator);
         auto err = State::ErrCategory::success;
         if constexpr(has_state) {
                 // monitor for destruction errors
-            for(u64 i=0; i<_size; i++) _data[i].destroy();
+            for(u64 i=0; i<_size; i++) _data[i].dtor();
         }
         if(_data)
             _allocator->free(_data);

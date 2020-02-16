@@ -192,7 +192,7 @@ static int fetch_model_tree(StringView filepath) {
                     ai_material.GetTexture(ai_texture_type, 0, &ai_texture_path);
 
                     String conf_texture_path = sys::search_for_file(ai_texture_path.C_Str(), search_paths);
-                    defer { conf_texture_path.destroy(); };
+                    defer { conf_texture_path.dtor(); };
 
                     if(!conf_texture_path) {
                         texture_find_fail(ai_texture_path.C_Str());

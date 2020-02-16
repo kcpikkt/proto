@@ -58,19 +58,19 @@ namespace serialization {
     }
     #endif
 
-    StateErr<Archive> Archive::destroy_deep() {
+    StateErr<Archive> Archive::dtor_deep() {
         StateErr<Archive> err = StateErrCategory<Archive>::success;
 
         //if(auto ec = _commit_cached_header())
-        //    return StateErrCategory<Archive>::destroy_fail;
+        //    return StateErrCategory<Archive>::dtor_fail;
 
         file.unmap(mapping);
 
         if(file.close())
             return StateErrCategory<Archive>::file_close_fail;
 
-        if(nodes.destroy())
-            return StateErrCategory<Archive>::destroy_fail;
+        if(nodes.dtor())
+            return StateErrCategory<Archive>::dtor_fail;
 
         // double free just crash
         return err;

@@ -10,14 +10,14 @@ void AssetRegistry::init(size_t init_capacity,
     assert(allocator);
     _allocator = allocator;
     meshes.init(init_capacity, allocator);
-    meshes.set_autodestruct();
+    meshes.defer_dtor();
     materials.init(init_capacity, allocator);
-    materials.set_autodestruct();
+    materials.defer_dtor();
     textures.init(init_capacity, allocator);
-    textures.set_autodestruct();
+    textures.defer_dtor();
     cubemaps.init(init_capacity, allocator);
-    cubemaps.set_autodestruct();
+    cubemaps.defer_dtor();
     shader_programs.init(init_capacity, allocator);
-    shader_programs.set_autodestruct();
+    shader_programs.defer_dtor();
 }
 

@@ -46,7 +46,7 @@ struct Channel {
         assert(allocator);
         _allocator = allocator;
         sinks.init(init_sink_cap, _allocator);
-        sinks.set_autodestruct();
+        sinks.defer_dtor();
     }
     
     void attach(Sink<EventType> * sink) {

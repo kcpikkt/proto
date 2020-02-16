@@ -367,7 +367,7 @@ int proto::platform::runtime(int argc, char ** argv){
     // TODO(kcpikkt): get number of slots from openGL
     _context.texture_slots.init_resize(32, &_context.memory);
     _context.texture_slots_index.init(32);
-    _context.texture_slots.set_autodestruct();
+    _context.texture_slots.defer_dtor();
 
     // AssetContext
     //set_debug_marker(_context.assets, "context.assets", "main asset registry");
@@ -375,36 +375,36 @@ int proto::platform::runtime(int argc, char ** argv){
 
     //set_debug_marker(_context.meshes, "context.meshes", "main mesh array");
     _context.meshes.init(100, &_context.memory);
-    _context.meshes.set_autodestruct(); 
+    _context.meshes.defer_dtor(); 
 
     //set_debug_marker(_context.materials, "context.materials",
     //    "main materials array (deprecate: meshes store their materials)");
     _context.materials.init(100, &_context.memory);
-    _context.materials.set_autodestruct(); 
+    _context.materials.defer_dtor(); 
 
     //set_debug_marker(_context.textures, "context.textures", "main texture array");
     _context.textures.init(100, &_context.memory); 
-    _context.textures.set_autodestruct(); 
+    _context.textures.defer_dtor(); 
 
     //set_debug_marker(_context.cubemaps, "context.cubemaps", "main cubemaps array");
     _context.cubemaps.init(10, &_context.memory);
-    _context.cubemaps.set_autodestruct(); 
+    _context.cubemaps.defer_dtor(); 
 
     //set_debug_marker(_context.cubemaps, "context.shader_programs",
     //                 "main shader_programs array");
     _context.shader_programs.init(10, &_context.memory);
-    _context.shader_programs.set_autodestruct();
+    _context.shader_programs.defer_dtor();
 
     //set_debug_marker(_context.textures, "context.framebuffers",
     //                 "main framebufffer array");
     _context.framebuffers.init(0, &_context.memory);
-    _context.framebuffers.set_autodestruct();
+    _context.framebuffers.defer_dtor();
 
     _context.ents.init(10, &_context.memory);
-    _context.ents.set_autodestruct();
+    _context.ents.defer_dtor();
 
     _context.ents_mdata.init(10, &_context.memory);
-    _context.ents_mdata.set_autodestruct();
+    _context.ents_mdata.defer_dtor();
 
     create_comp_arrays<CompTList>();
 
@@ -414,7 +414,7 @@ int proto::platform::runtime(int argc, char ** argv){
     } else
         _context.asset_paths.init(&_context.memory);
 
-    _context.asset_paths.set_autodestruct();
+    _context.asset_paths.defer_dtor();
 
     if(settings.shader_paths && settings.shader_paths.length())
         _context.shader_paths
@@ -423,7 +423,7 @@ int proto::platform::runtime(int argc, char ** argv){
         _context.shader_paths.init(&_context.memory);
 
     _context.shader_paths.store("src/proto/shaders");
-    _context.shader_paths.set_autodestruct();
+    _context.shader_paths.defer_dtor();
 
     _context.open_archives.init(&_context.memory);
 
