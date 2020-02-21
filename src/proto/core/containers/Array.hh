@@ -46,7 +46,7 @@ struct Array
 
     constexpr static u64 default_init_capacity = 0;
     T * _data = nullptr;
-    u64 _size = 0;
+    u64 _count = 0;
     u64 _capacity = 0;
     memory::Allocator * _allocator = nullptr;
 
@@ -54,7 +54,7 @@ struct Array
         State::state_move(meta::forward<Array<T>>(other));
         _data = other._data; other._data = nullptr;
         _allocator = other._allocator; other._allocator = 0;
-        _size = other._size; other._size = 0;
+        _count = other._count; other._count = 0;
         _capacity = other._capacity; other._capacity = 0;
     }
 
@@ -86,9 +86,9 @@ struct Array
         init(default_init_capacity, allocator);
     }
 
-    void init_resize(u64 init_size, memory::Allocator * allocator) {
-        init(init_size, allocator);
-        resize(init_size);
+    void init_resize(u64 init_count, memory::Allocator * allocator) {
+        init(init_count, allocator);
+        resize(init_count);
     }
 
     // use responsibly 
@@ -100,14 +100,21 @@ struct Array
         _capacity = capacity;
     }
 
-    inline void init_place_resize(void * data, u64 capacity) {
-        init_place(data, capacity);
-        resize(capacity);
+    inline void init_place_resize(void * data, u64 count) {
+        init_place(data, count);
+        resize(count);
     }
 
+    // it is being a bit unconsistent to call it size
+    // where it is rather count, change it perhaps
     u64 size() const {
-        return _size;
+        return _count;
     }
+    // ok, lets have count for now and see how it goes
+    u64 count() const {
+        return _count;
+    }
+
     u64 capacity() const {
         return _capacity;
     }
@@ -117,15 +124,15 @@ struct Array
     }
 
     inline Iterator end() {
-        return Iterator(*this, _size);
+        return Iterator(*this, _count);
     }
 
     T& back() {
-        return at(_size - 1);
+        return at(_count - 1);
     }
 
     const T& back() const {
-        return at(_size - 1);
+        return at(_count - 1);
     }
 
     inline T& operator[](u64 index){
@@ -133,12 +140,12 @@ struct Array
     }
 
     inline T& at(u64 index) {
-        proto_assert(index < _size);
+        proto_assert(index < _count);
         return _data[index];
     }
 
     inline const T& at(u64 index) const {
-        assert(index < _size);
+        assert(index < _count);
         return _data[index];
     }
 
@@ -152,16 +159,16 @@ struct Array
     template<typename U = T,
              typename = decltype((T)meta::declval<U>())>
     T& push_back(U&& element = T()) { // universal ref btw
-        if(_size == _capacity) grow();
-        assert(_size < _capacity);
-        new (&at(_size++)) T(meta::forward<U>(element));
+        if(_count == _capacity) grow();
+        assert(_count < _capacity);
+        new (&at(_count++)) T(meta::forward<U>(element));
         return back();
     }
 
     inline void zero() {
         assert(_data);
         // TODO(kacper): dont warn if T is trivially descructible
-        if(_size != 0)
+        if(_count != 0)
             debug_warn(proto::debug::category::memory,
                         "zeroing non-empty array");
         memset(_data, 0, _capacity * sizeof(T));
@@ -175,7 +182,7 @@ struct Array
     inline auto contains(const U& element)
         -> meta::enable_if_t<meta::has_operator_eq_v<U>, Optional<u64>> const
     {
-        for(u64 i=0; i<_size; i++)
+        for(u64 i=0; i<_count; i++)
             if(_data[i] == element) return i;
 
         return {};
@@ -187,23 +194,23 @@ struct Array
     //}
     
     void grow() {
-        reserve(proto::max(1, (2 * _size) ));
+        reserve(proto::max(1, (2 * _count) ));
     }
 
     void erase(u64 index) {
         //at(index).~T();
         u64 i = index;
-        for(; i<_size - 1; i++) {
+        for(; i<_count - 1; i++) {
             at(i) = meta::move(at(i + 1));
         } //at(i).~T();
-        _size--;
+        _count--;
     }
 
     u64 find_if(FunctionView<bool(T&)> predecate, u64 hint = 0) {
-        if(hint && hint < _size && predecate(at(hint))) return hint;
+        if(hint && hint < _count && predecate(at(hint))) return hint;
 
         u64 i=0;
-        for(; i<_size; i++) if(predecate(at(i))) break;
+        for(; i<_count; i++) if(predecate(at(i))) break;
         return i;
     }
 
@@ -214,26 +221,26 @@ struct Array
     }
 
     void for_each(FunctionView<void(T&)> proc) {
-        for(u64 i=0; i<_size; ++i) proc(_data[i]);
+        for(u64 i=0; i<_count; ++i) proc(_data[i]);
     }
 
     //void for_each(FunctionView<void(T&, u64)> proc) {
-    //    for(u64 i=0; i<_size; ++i) proc(_data[i], i);
+    //    for(u64 i=0; i<_count; ++i) proc(_data[i], i);
     //}
 
 
-    void resize(u64 new_size) {
-        if(new_size == _size) return;
-        if(new_size < _size) {
+    void resize(u64 new_count) {
+        if(new_count == _count) return;
+        if(new_count < _count) {
             if constexpr(has_state) {
-                for(size_t i=new_size; i<_size; i++)
+                for(size_t i=new_count; i<_count; i++)
                     (_data + i)->dtor();
             }
         } else {
-            if(new_size > _capacity)
-                reserve(new_size);
+            if(new_count > _capacity)
+                reserve(new_count);
 
-            //for(size_t i=_size; i<new_size; i++)
+            //for(size_t i=_count; i<new_count; i++)
             //      new ((void*)(_data + i)) T();
             // NOTE(kacper): ok the thing is that i want to default contruct them by deafult
             // in case when I init_place default values can wipe my data
@@ -241,7 +248,7 @@ struct Array
             // And I do like that behaviour but when I obtain data from archive and init_place array
             // as Archive.nodes default construction would then wipe my data
         }
-        _size = new_size;
+        _count = new_count;
     }
 
     void reserve(u64 new_capacity) {
@@ -267,11 +274,11 @@ struct Array
         auto err = State::ErrCategory::success;
         if constexpr(has_state) {
                 // monitor for destruction errors
-            for(u64 i=0; i<_size; i++) _data[i].dtor();
+            for(u64 i=0; i<_count; i++) _data[i].dtor();
         }
         if(_data)
             _allocator->free(_data);
-        _size = 0;
+        _count = 0;
         _capacity = 0;
         return err;
     }

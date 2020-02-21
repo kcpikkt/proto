@@ -3,6 +3,8 @@
 #include "proto/core/common/types.hh"
 #include "proto/core/util/defer.hh"
 
+template<typename T, size_t N>
+constexpr static inline size_t count_of(T (&)[N]) { return N; }
 
 #if defined(NDEBUG)
 # define PROTO_RELEASE

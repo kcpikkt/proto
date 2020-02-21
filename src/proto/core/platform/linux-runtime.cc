@@ -74,6 +74,7 @@ namespace platform {
 
 proto::ivec2 mouse_lock_pos = proto::ivec2(200,200);
 static void X_event_callback(XEvent& X_event) {
+
     static MouseMoveEvent prev_mouse_move_event{};
 
     if(X_event.type == KeyPress || X_event.type == KeyRelease) {
@@ -163,8 +164,6 @@ int proto::platform::runtime(int argc, char ** argv){
 
     //_context.cmdline.init(argc, &tmp_presetup_memory);
     //debug_info(1, ctx.cmdline.size());
-
-    //for(s32 i=0; i<argc; i++) _context.cmdline.store(argv[i]);
 
     // NOTE(kacper): here runtime first time opens dl to pass RuntimeSettings
     //               struct pointer to client_setup function, where client lib
@@ -341,6 +340,12 @@ int proto::platform::runtime(int argc, char ** argv){
     void * _mem = malloc(_mem_size);
     assert(!_context.memory.init(_mem, _mem_size));
 
+    _context.cmdline.init_resize(argc, &_context.memory);
+    defer { _context.cmdline.dtor(); };
+
+    for(s32 i=0; i<argc; i++)
+        _context.cmdline[i] = argv[i];
+
     //_context.gp_string_allocator
     //    .init(&_context.memory, mem::megabytes(5));
 
@@ -357,8 +362,13 @@ int proto::platform::runtime(int argc, char ** argv){
         .init(&_context.memory, mem::megabytes(50));
 
     _context.key_input_channel.init(10, &_context.memory);
+    defer { _context.key_input_channel.dtor(); };
+
     _context.mouse_move_input_channel.init(10, &_context.memory);
+    defer { _context.mouse_move_input_channel.dtor(); };
+
     _context.mouse_button_input_channel.init(10, &_context.memory);
+    defer { _context.mouse_button_input_channel.dtor(); };
 
     // INITS
     // OpenGLContext
@@ -366,8 +376,10 @@ int proto::platform::runtime(int argc, char ** argv){
                     "local reflection of OpenGL texture units binding");
     // TODO(kcpikkt): get number of slots from openGL
     _context.texture_slots.init_resize(32, &_context.memory);
+    defer { _context.texture_slots.dtor(); };
+
     _context.texture_slots_index.init(32);
-    _context.texture_slots.defer_dtor();
+
 
     // AssetContext
     //set_debug_marker(_context.assets, "context.assets", "main asset registry");
@@ -375,38 +387,39 @@ int proto::platform::runtime(int argc, char ** argv){
 
     //set_debug_marker(_context.meshes, "context.meshes", "main mesh array");
     _context.meshes.init(100, &_context.memory);
-    _context.meshes.defer_dtor(); 
+    defer { _context.meshes.dtor(); }; 
 
     //set_debug_marker(_context.materials, "context.materials",
     //    "main materials array (deprecate: meshes store their materials)");
     _context.materials.init(100, &_context.memory);
-    _context.materials.defer_dtor(); 
+    defer { _context.materials.dtor(); }; 
 
     //set_debug_marker(_context.textures, "context.textures", "main texture array");
     _context.textures.init(100, &_context.memory); 
-    _context.textures.defer_dtor(); 
+    defer { _context.textures.dtor(); }; 
 
     //set_debug_marker(_context.cubemaps, "context.cubemaps", "main cubemaps array");
     _context.cubemaps.init(10, &_context.memory);
-    _context.cubemaps.defer_dtor(); 
+    defer { _context.cubemaps.dtor(); }; 
 
     //set_debug_marker(_context.cubemaps, "context.shader_programs",
     //                 "main shader_programs array");
     _context.shader_programs.init(10, &_context.memory);
-    _context.shader_programs.defer_dtor();
+    defer { _context.shader_programs.dtor(); }; 
 
     //set_debug_marker(_context.textures, "context.framebuffers",
     //                 "main framebufffer array");
     _context.framebuffers.init(0, &_context.memory);
-    _context.framebuffers.defer_dtor();
+    defer { _context.framebuffers.dtor(); };
 
     _context.ents.init(10, &_context.memory);
-    _context.ents.defer_dtor();
+    defer { _context.ents.dtor(); };
 
     _context.ents_mdata.init(10, &_context.memory);
-    _context.ents_mdata.defer_dtor();
+    defer { _context.ents_mdata.dtor(); }; 
 
     create_comp_arrays<CompTList>();
+    defer { _context.comp_arrs.dtor(); };
 
     if(settings.asset_paths && settings.asset_paths.length()) {
         _context.asset_paths
@@ -414,7 +427,7 @@ int proto::platform::runtime(int argc, char ** argv){
     } else
         _context.asset_paths.init(&_context.memory);
 
-    _context.asset_paths.defer_dtor();
+    defer { _context.asset_paths.dtor(); };
 
     if(settings.shader_paths && settings.shader_paths.length())
         _context.shader_paths
@@ -422,10 +435,13 @@ int proto::platform::runtime(int argc, char ** argv){
     else 
         _context.shader_paths.init(&_context.memory);
 
+    defer { _context.shader_paths.dtor(); };
+
     _context.shader_paths.store("src/proto/shaders");
-    _context.shader_paths.defer_dtor();
 
     _context.open_archives.init(&_context.memory);
+    defer { _context.open_archives.dtor(); };
+
 
     // DEFAULT TEXTURES
 
@@ -618,6 +634,7 @@ int proto::platform::runtime(int argc, char ** argv){
 
     clientlib_bind_procs();
 
+    // set context pointer varialbe in dll space
     client_set_context(&_context);
 
     struct timespec time_res;

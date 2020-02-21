@@ -32,15 +32,50 @@ Array<Entity> ents;
 AssetHandle main_shader_h;
 
 using namespace proto;
+struct Option {
+    StringView name, alt_name;
 
+    enum : u32 {
+        required_bit = BIT(0), // this option is absolutely requiered
+        no_args_bit  = BIT(1), // this option takes arguments
+        many_args_bit = BIT(2), // this option takes many arguments
+        multiple_bit  = BIT(3), // this option can appear multiple times
+        // positional
+        pos_1 = BIT(4), pos_2 = BIT(5), pos_3 = BIT(6), pos_4 = BIT(7)
+    } flags;
+};
+using Opt = Option;
+Opt opts_desc[] = {
+    {"-size", "", Opt::required_bit},
+    {"-size", "", Opt::required_bit},
+};
+ArrayMap<StringView, Array<StringView>> opts;
+
+void test() {
+    opts.init(&context->memory);
+
+    for(u64 i=0; i<count_of(opts_desc); ++i) {
+        for(u64 j=0; j<count_of(opts_desc); ++j) {
+            if(opts_desc[i].name && opts_desc[i].name.lenth()) {
+            }
+
+            if(opts_desc && opts_desc.lenth()) {
+            }
+        }
+    }
+}
 
 PROTO_INIT {
-
     auto& ctx = *context;
     ctx.exit_sig = true;
+
+    for(auto arg : ctx.cmdline) {
+        println(arg);
+    }
+
+    return;
     ents.init(500, &ctx.memory);
 
-    //ser::Archive
     StringView archive_path = "outmesh/sponza.pack";
     if(ser::Archive * archive = ser::open_archive(archive_path)) {
 
@@ -72,6 +107,7 @@ PROTO_INIT {
         }
     } else
         log_error(debug::category::main, "Failed to open archive ", archive_path);
+
 
     //batch.init(sizeof(Vertex) * 1024 * 1024 * 50, sizeof(u32) * 1024 * 1024 * 50);
     batch.init(sizeof(Vertex) * 5242880, sizeof(u32) * 5242880);
@@ -126,7 +162,19 @@ PROTO_UPDATE {
                                       
     batch.render();
 
-    if(time > 1.0f)
+    if(time > 10.0f)
         ctx.exit_sig = true;
+}
+
+PROTO_CLOSE {
+    return;
+    // for now
+    batch.meshes.dtor();
+    //batch.materials.dtor();
+
+    batch.free_vertex_ranges.dtor();
+    batch.free_index_ranges.dtor();
+    batch.render_mesh_comps.dtor();
+    ents.dtor();
 }
 

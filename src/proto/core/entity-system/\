@@ -1,0 +1,60 @@
+#include "proto/core/entity-system/interface.hh"
+
+namespace proto {
+
+    // for doing things, that are usually done compile time, runtime
+    // read: type erasure at its best 
+    struct _Runtime {
+        template<size_t I>
+        using CompAt = typename CompTList::template at_t<I>;
+
+        template<typename...> struct _switch;
+        template<size_t...Is> struct _switch<meta::sequence<Is...>> {
+            Entity _ent;
+            size_t _idx;
+            void * _ret = nullptr;
+
+            template<size_t I> bool _case() {
+                // ok this is where the magic happens!
+                // we compare runtime index with static I
+                // if they are the same we assign component of the given type
+                if(I == _idx) {
+                    auto comp = get_comp<CompAt<I>>(_ent);
+                    return (bool)(_ret = (void*)comp)
+                }
+            }
+
+            // go through all the cases
+            _switch(Entity ent, size_t idx) : _ent(ent), _idx(idx) {
+                    //(( _ret ? _case<Is>() : return ; ),...);
+            }
+
+            // pseudo constructor return value
+            operator void*() {
+                return _ret;
+            }
+        };
+
+        static void * get_comp_at(Entity ent, size_t idx) {
+            if(idx >= CompTList::size) {
+                debug_warn(debug::category::main, "WHAT AR YOU DOING DUDE");
+                return nullptr;
+            }
+
+            return (void*)_switch< meta::make_sequence<0, CompTList::size> >(ent, idx);
+        }
+    };
+
+
+    void * get_comp(Entity entity, u64 comp_idx) {
+        return _Runtime::get_comp_at(entity, comp_idx);
+
+        //auto& arr = get_comp_arr<T>();
+
+        //for(auto& comp : arr)
+        //    if(comp.entity == entity) return &comp;
+
+        //return nullptr;
+    }
+
+} //namespace proto 

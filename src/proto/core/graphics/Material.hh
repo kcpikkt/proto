@@ -30,8 +30,10 @@ struct GLSLMaterialFieldRefl {
 struct Material : Asset {;
     Material() {}
 
-    constexpr static u8 pbr_material = 0;
-    constexpr static u8 trad_material = 1;
+    enum Type : u8 {
+        pbr_material = 0,
+        trad_material = 1,
+    };
 
     u8 type = pbr_material;
 

@@ -1,10 +1,11 @@
 #pragma once
-#include "proto/core/util/Bitfield.hh"
+#include "proto/core/util/Bitset.hh"
 #include "proto/core/common/types.hh"
 #include "proto/core/debug/markers.hh"
 #include "proto/core/debug/logging.hh"
 #include "proto/core/debug/stacktrace.hh"
 #include "proto/core/common.hh"
+#include "proto/core/debug/common.hh"
 #include "proto/core/error-handling.hh"
 //NOTE(kacper): State is a class that have potential to hold
 //              external resources - that have pointers to heap.
@@ -50,9 +51,9 @@ struct StateCRTP  {
         constexpr static ErrMessage message(ErrCode code) {
             switch(code) {
             case double_deep_dtor:
-                return "Double dtoring stateful object (after it was deep-dtored), no destruction performed.";
+                return "Double dtoring stateful object (after it was deep-dtor), no destruction performed.";
             case double_shallow_dtor:
-                return "Double dtoring stateful object (after it was shallow-dtored), no destruction performed.";
+                return "Double dtoring stateful object (after it was shallow-dtor), no destruction performed.";
             case out_of_scope_leak:
                 return "No destruction performed on initialized object going out of scope, possible leak.";
             case dtor_uninitialized:
@@ -71,26 +72,35 @@ struct StateCRTP  {
     };
 
     enum : u8 {
-        _initialized_bit       = BIT(0),
-        _moved_bit             = BIT(1),
-        _shallow_dtored_bit = BIT(2), 
-        _deep_dtored_bit    = BIT(3),
-        _autodestruct_bit      = BIT(4),
+        _initialized_bit = 0,
+        _moved_bit,
+        _shallow_dtor_bit,
+        _deep_dtor_bit,
+        _defer_dtor_bit,
+        _no_dtor_bit,
+
+        ////////////////////
+        _bitset_size
     };
 
-    Bitfield<u8> state_flags = 0;
+    Bitset<_bitset_size> state_flags;
 
     using State = StateCRTP<T>;
     using _StateTestingProbe = void;
 
     inline bool is_moved() {
-        return state_flags.check(_moved_bit); }
+        return state_flags.at(_moved_bit); }
 
     inline bool is_initialized() {
-        return state_flags.check(_initialized_bit); }
+        return state_flags.at(_initialized_bit); }
+
+    inline void no_dtor() {
+        state_flags.set(_no_dtor_bit); }
 
     inline void defer_dtor() {
-        state_flags.set(_autodestruct_bit);}
+        PROTO_DEPRECATED;
+        state_flags.set(_defer_dtor_bit);
+    }
 
     //NOTE(kacper): remember to forward;
     void state_move(T&& other);
@@ -108,7 +118,7 @@ struct StateCRTP  {
     Err<ErrCategory> dtor_shallow() { return StateCRTP<T>::ErrCategory::success; }
     Err<ErrCategory> dtor_deep() {
         Err<ErrCategory> err = ErrCategory::dtor_deep_unimplemented;
-        debug_error(debug::category::data, err.message());
+        debug_error(debug::category::data, err.message(), ' ', typeid(T).name());
         return err;
     }
 
@@ -145,32 +155,32 @@ void StateCRTP<T, Ext>::state_copy(const T& other) {
 // call that in every init/constructor
 template<typename T, typename Ext>
 void StateCRTP<T, Ext>::state_init([[maybe_unused]] bool assignment) {
-    assert(!state_flags.check(_initialized_bit) || assignment);
+    assert(!state_flags.at(_initialized_bit) || assignment);
     state_flags.set(_initialized_bit);
 }
 
 template<typename T, typename Ext>
 StateErr<T, Ext> StateCRTP<T, Ext>::_dtor_shallow() {
-    assert(!state_flags.check(_shallow_dtored_bit));
+    assert(!state_flags.at(_shallow_dtor_bit));
 
     auto err = static_cast<T*>(this)->dtor_shallow();
 
     if(err == ErrCategory::success)
-        state_flags.set(_shallow_dtored_bit);
+        state_flags.set(_shallow_dtor_bit);
 
     return err;
 }
 
 template<typename T, typename Ext>
 StateErr<T, Ext> StateCRTP<T, Ext>::_dtor_deep() {
-    assert(!state_flags.check(_deep_dtored_bit));
+    assert(!state_flags.at(_deep_dtor_bit));
 
-    static_assert(meta::is_same_v<decltype(meta::declval<T>().dtor_deep()), StateErr<T, Ext> >,
-                  "destory_deep() method has wrong return type.");
+    //static_assert(meta::is_same_v<decltype(meta::declval<T>().dtor_deep()), StateErr<T, Ext> >,
+    //              "destory_deep() method has wrong return type.");
     auto err = static_cast<T*>(this)->dtor_deep();
 
     if(err == ErrCategory::success)
-        state_flags.set(_deep_dtored_bit);
+        state_flags.set(_deep_dtor_bit);
 
     return err;
 }
@@ -182,20 +192,20 @@ StateErr<T, Ext> StateCRTP<T, Ext>::dtor() {
     StateErr<T, Ext> err = ErrCategory::success;
 
 #if defined(PROTO_DEBUG)
-    if(state_flags.check(_deep_dtored_bit)) {
+    if(state_flags.at(_deep_dtor_bit)) {
         err = ErrCategory::double_deep_dtor;
         debug_error(debug::category::data, err.message());
         return err; 
     }
 
-    if(state_flags.check(_shallow_dtored_bit)) {
+    if(state_flags.at(_shallow_dtor_bit)) {
         err = ErrCategory::double_shallow_dtor;
         debug_error(debug::category::data, err.message());
         return err;
     }
 #endif
 
-    if(state_flags.check(_initialized_bit)) {
+    if(state_flags.at(_initialized_bit)) {
         err = _dtor_shallow();
         if(!is_moved())
             err = _dtor_deep();
@@ -218,12 +228,18 @@ template<typename T, typename Ext>
 StateCRTP<T, Ext>::~StateCRTP() {
     using ErrCategory = typename StateCRTP<T, Ext>::ErrCategory;
 
-    if(state_flags.check(_autodestruct_bit)) dtor();
+    if(state_flags.at(_defer_dtor_bit)){
+        PROTO_DEPRECATED;
+
+        if(dtor())
+            debug_warn(debug::category::data, "Deffered destructor failed for type ", typeid(T).name());
+    }
 
 #if defined(PROTO_DEBUG)
-    if(state_flags.check(_initialized_bit) && !state_flags.check(_moved_bit)) {
-        if(!state_flags.check(_deep_dtored_bit)) {
-            debug_warn(debug::category::data, ErrCategory::message(ErrCategory::out_of_scope_leak));
+    if(state_flags.at(_initialized_bit) && !state_flags.at(_moved_bit)) {
+        // if object was initialized, deep dtor has to be run on it at some point
+        if(!state_flags.at(_deep_dtor_bit) && !state_flags.at(_no_dtor_bit)) {
+            debug_warn(debug::category::data, ErrCategory::message(ErrCategory::out_of_scope_leak), ' ', typeid(T).name());
             return;
         }
     }

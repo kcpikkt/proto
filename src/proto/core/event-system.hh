@@ -34,7 +34,10 @@ struct Sink {
 };
 
 template<typename EventType>
-struct Channel {
+struct Channel : StateCRTP<Channel<EventType>>{
+
+    using State = StateCRTP<Channel<EventType>>;
+
     struct SinkRecord {
         Sink<EventType> * sink;
         EventType mask;
@@ -43,10 +46,10 @@ struct Channel {
     memory::Allocator * _allocator;
     
     void init(size_t init_sink_cap, memory::Allocator * allocator) {
+        State::state_init();
         assert(allocator);
         _allocator = allocator;
         sinks.init(init_sink_cap, _allocator);
-        sinks.defer_dtor();
     }
     
     void attach(Sink<EventType> * sink) {
@@ -69,6 +72,10 @@ struct Channel {
             }
         }
         assert(0);
+    }
+
+    int dtor_deep() {
+        return sinks.dtor();
     }
 
 };

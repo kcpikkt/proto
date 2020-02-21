@@ -80,6 +80,7 @@ namespace serialization {
         if(file.open(filepath, sys::File::read_overwrite_mode ))
             return ArchiveErrCategory::file_open_fail;
 
+        //FIXME
         node_count += 1; // root //NOTE(kacper): node_count=max_u32 is a bug then
 
         auto data_offset = sizeof(Superblock) + node_count * sizeof(Node);
@@ -206,36 +207,20 @@ namespace serialization {
     }
     
     ArchiveErr Archive::store(Array<Entity>& ents) {
-        assert(ents.size());
-        u32 idx;
 
-        if( !(idx = _find_free_node()) )
-            return ArchiveErrCategory::no_free_nodes;
+        ECSTreeHeader header;
+        u64 comp_cnt[CompTList::size] = {0};
 
-        Node node; node.type = Node::ecs_tree;
-        node.parent_index = 0;
-        //node.hash = handle.hash;
-        CompBitset joint_comps_bitset;
-        u64 comps_size = 0;
+        assert( !create_ecs_tree_header(header, comp_cnt, ents) );
 
-        for(auto e : ents) {
-            if(auto mdata = get_mdata(e)) {
-                joint_comps_bitset |= mdata->comps;
+        u8 * new_block = _data_off2addr(superblock->data_size);
+        u8 * new_block_end = new_block + header.size;
+        u8 * mapping_end = mapping.data8 + mapping.size;
 
-                comps_size += mdata->sum_comps_size();
-            } else
-                return ArchiveErrCategory::invalid_argument;
-        }
-        u64 size = 0;
-        size += sizeof(Entity) * ents.size();
-        size += joint_comps_bitset.bitcount(); // * sizeof(ArrayHeader)
-        size += comps_size;
+        if( !belongs(new_block, mapping) || !belongs_incl(new_block_end, mapping))
+            return ArchiveErrCategory::out_of_memory;
 
-        println("Total size: ", size);
-        println("ents: ", sizeof(Entity) * ents.size());
-        println("comp: ", comps_size);
-
-        return ArchiveErrCategory::success;
+        return serialize_ecs_tree(MemBuffer{{new_block}, header.size}, ents, comp_cnt, header);
     }
  
     ArchiveErr Archive::store(AssetHandle handle) {

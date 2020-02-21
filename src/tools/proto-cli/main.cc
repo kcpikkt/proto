@@ -31,8 +31,6 @@ PROTO_SETUP {
     settings->asset_paths = "res/";
     settings->shader_paths = "src/demos/sokoban/shaders/";
 }
-#define LEN(arr) (sizeof(arr)/sizeof(arr[0]))
-
 #define FAIL(...) { \
     log_error(debug::category::main, __VA_ARGS__); return;}
 
@@ -46,6 +44,7 @@ Opt options[] = {
     {"verbose", 'v', 0 },
 };
 
+
 ArrayMap<u64, StringView> matched_opt;
 
 void display_help() {
@@ -55,13 +54,15 @@ void display_help() {
 
 void preview_init();
 
-
+Array<Entity> prev_ents;
 
 PROTO_INIT {
 
-    
     assert(proto::context);
     auto& ctx = *proto::context;
+
+
+
     search_paths.init_split(".", ':', &ctx.memory);
     loaded_texture_paths.init(&ctx.memory);
     loaded_assets.init(&ctx.memory);
@@ -71,10 +72,11 @@ PROTO_INIT {
     defer{
         for(auto buf : allocated_buffers)
             ctx.memory.free(buf.data);
-        loaded_texture_paths.dtor();
-        allocated_buffers.dtor();
+
         search_paths.dtor();
+        loaded_texture_paths.dtor();
         loaded_assets.dtor();
+        allocated_buffers.dtor();
         matched_opt.dtor();
     };
 
@@ -82,7 +84,7 @@ PROTO_INIT {
     ctx.exit_sig = true;
 
     StringView sentence =
-        argparse::match_sentence(cmdline_sentences, LEN(cmdline_sentences), 2);
+        argparse::match_sentence(cmdline_sentences, count_of(cmdline_sentences), 2);
 
     if(!sentence) { display_help(); return;}
 
@@ -91,8 +93,9 @@ PROTO_INIT {
         StringView outpath;
 
         Array<StringView> filepaths; filepaths.init(&ctx.memory);
+        defer { filepaths.dtor(); };
 
-        if(argparse::match_options(options, LEN(options), matched_opt, filepaths)) {
+        if(argparse::match_options(options, count_of(options), matched_opt, filepaths)) {
             display_help(); return;
         }
 
@@ -177,7 +180,7 @@ PROTO_INIT {
         for(auto asset : loaded_assets)
             ar_data_size_acc += INVOKE_FTEMPL_WITH_ASSET_REF(ser::serialized_size, asset);
 
-        if(auto ec = archive.create(outpath, loaded_assets.size(), ar_data_size_acc))
+        if(auto ec = archive.create(outpath, loaded_assets.size() + 1, ar_data_size_acc))
             return (void)log_error(debug::category::main, ec.message());
 
         defer {
@@ -191,8 +194,16 @@ PROTO_INIT {
             }
         }
 
+        preview_init();
+        println(prev_ents.size());
+
+        //if(prev_ents.size())
+        //    if(auto ec = archive.store(prev_ents))
+        //        log_error(debug::category::data, "Archiving entity tree failed. ", ec.message());
+
         for(auto& [mesh, metadata] : ctx.meshes.values) {
-            // make them look like they are not in memory, we want to load them from just written archive for test
+            // make them look like they are not in memory,
+            // we want to load them from just written archive for test
             mesh.flags.unset(Mesh::cached_bit);
             metadata.archive_hash = archive.superblock->hash;
         }
@@ -215,12 +226,6 @@ PROTO_INIT {
         println_fmt("Parsed % meshes, % textures and % materials. Written to % (% %).",
                     mesh_count, tex_count, mat_count, outpath, ar_size, ar_size_unit);
 
-        if(cli_flags.check(cli_preview_bit)) {
-            preview_init();
-        } else {
-            ctx.exit_sig = true;
-        }
-
     } else {
         log_error(debug::category::main, "Tell me what to do");
         display_help();
@@ -228,7 +233,6 @@ PROTO_INIT {
 }
 
 RenderBatch batch;
-Array<Entity> prev_ents;
 AssetHandle main_shader_h;
 
 void preview_init() {
@@ -274,7 +278,7 @@ void preview_init() {
     ctx.camera.position = vec3(0.0, 0.0, 5.2);
 }
 
-PROTO_UPDATE {
+//PROTO_UPDATE {
     //    auto& ctx = *context;
     //    auto& time = ctx.clock.elapsed_time;
     //
@@ -295,6 +299,5 @@ PROTO_UPDATE {
 
     //if(time > 1.0f)
     //    ctx.exit_sig = true;
-}
 
 

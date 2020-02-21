@@ -223,8 +223,8 @@ struct RenderBatch {
 
         Material * material = get_asset<Material>(render_mesh.material_h);
         if(material) {
-        } else
-            debug_warn(debug::category::data, "RenderMesh is not assigned any material.");
+        }
+        //else debug_warn(debug::category::data, "RenderMesh is not assigned any material.");
     }
 
     void render() {

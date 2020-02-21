@@ -10,46 +10,73 @@ namespace memory{
     // allocation calls are not so often to be a bottleneck
     // there are only few types of allocators so vtables are small
     struct Allocator {
-        virtual void * alloc(proto::u64) = 0;
-        virtual void * realloc(void *, proto::u64) = 0;
+        virtual void * alloc(u64) = 0;
+        virtual void * realloc(void *, u64) = 0;
         virtual void   free(void *) = 0;
     };
 
 
     using byte = unsigned char;
+    static u64 _def_align = 16;
 
-    static constexpr proto::u64 max_alignment = alignof(long double);
+    static constexpr u64 max_alignment = alignof(long double);
 
-    static constexpr proto::u64 kilobytes(proto::u64 bytes) {
+    static constexpr u64 kilobytes(u64 bytes) {
         return 1024ull * bytes;
     }
-    static constexpr proto::u64 megabytes(proto::u64 bytes) {
+    static constexpr u64 megabytes(u64 bytes) {
         return 1024ull * kilobytes(bytes);
     }
-    static constexpr proto::u64 gigabytes(proto::u64 bytes) {
+    static constexpr u64 gigabytes(u64 bytes) {
         return 1024ull * megabytes(bytes);
     }
-    static constexpr bool is_power_of_two(proto::u64 n) {
+    static constexpr bool is_power_of_two(u64 n) {
         return (n != 0) && !(n & (n-1));
     }
 
-    static bool is_aligned(void * addr, proto::u64 alignment) {
-        return ((proto::u64)addr % alignment == 0);
+    static inline bool is_aligned(u64 off, u64 alignment = _def_align) {
+        return ((off % alignment) == 0);
     }
 
-    template<typename T>
-    static void * align_forw(T * addr, proto::u64 alignment) {
+    static inline bool is_aligned(void * addr, u64 alignment = _def_align) {
+        return is_aligned((u64)addr, alignment);
+    }
+
+
+    // alginoff
+    static inline u64 align_back(u64 offset, u64 alignment = _def_align) {
         assert(is_power_of_two(alignment));
-        return (void *)(  (proto::u64)((byte*)addr + (alignment - 1)) &
-                        ~((proto::u64)(alignment - 1)) );
+        return offset & ~(alignment - 1);
+    }
+
+    static inline u64 align_forw(u64 offset, u64 alignment = _def_align) {
+        return align_back(offset + alignment - 1, alignment);
+    }
+
+    static inline u64 align(u64 offset, u64 alignment = _def_align) {
+        return align_forw(offset, alignment);
     }
 
     template<typename T>
-    static void * align_back(T * addr, proto::u64 alignment) {
+    static void * align_forw(T * addr, u64 alignment = _def_align) {
+        assert(is_power_of_two(alignment));
+        return (void *)(  (u64)((byte*)addr + (alignment - 1)) &
+                        ~((u64)(alignment - 1)) );
+    }
+
+    template<typename T>
+    static void * align_back(T * addr, u64 alignment = _def_align) {
         assert(is_power_of_two(alignment));
         return align_forw((void*)((byte*)addr - (alignment - 1)),
                           alignment);
     }
+
+    template<typename T>
+    static void * align(T * addr, u64 alignment = _def_align) {
+        return align_forw(addr, alignment);
+    }
+
+
 
 } // namespace memory
 } // namespace proto

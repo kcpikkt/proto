@@ -14,6 +14,7 @@ struct Option {
     constexpr static u8 required_bit = BIT(0); // this option is absolutely requiered
     constexpr static u8 param_bit = BIT(1);  // this option takes parameter
     constexpr static u8 multiple_bit = BIT(2); // this option can appear multiple times
+    constexpr static u8 pos_1 = BIT(2); // this option can appear multiple times
 
     Bitfield<u8> flags;
 };

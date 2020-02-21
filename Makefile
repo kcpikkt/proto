@@ -48,7 +48,7 @@ else
     endif
 endif
 
-# todo get rid of that, no mercy for windows people, get unix tools, scrub!
+# todo get rid of that, no mercy for windows people, get coreutil tools, scrub!
 #ifeq ($(platform), LINUX)
 #define makedir
 #	mkdir -p $(1)

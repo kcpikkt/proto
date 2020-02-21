@@ -122,7 +122,10 @@ void StringArena::store(StringView str) {
     _cursor += len;
 }
 
-Err<StringArena::StateBase::ErrCategory> StringArena::destroy_shallow() {
+Err<StringArena::StateBase::ErrCategory> StringArena::dtor_deep() {
+    assert(_allocator);
+    _allocator->free(_data);
+    _offsets.dtor();
     return StateBase::ErrCategory::success;
 }
 
@@ -139,3 +142,4 @@ Err<StringArena::StateBase::ErrCategory> StringArena::destroy_shallow() {
     //}
 
 }
+

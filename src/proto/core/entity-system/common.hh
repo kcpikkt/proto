@@ -3,6 +3,8 @@
 #include "proto/core/asset-system/common.hh"
 #include "proto/core/math/common.hh"
 #include "proto/core/util/Bitset.hh"
+#include "proto/core/entity-system/components.hh"
+#include "proto/core/entity-system/entity.hh"
 #include "proto/core/graphics/Framebuffer.hh"
 
 namespace proto {
@@ -13,21 +15,21 @@ struct TransformComp;
 struct RenderMeshComp;
 struct PointlightComp;
     
-using ComponentTypeIndex = u8;
+using CompTypeIndex = u8;
 
-template<u8 _index, const char * _name> struct _ComponentType {
-    constexpr static ComponentTypeIndex index = _index;
+template<u8 _index, const char * _name> struct _CompType {
+    constexpr static CompTypeIndex index = _index;
     constexpr static const char * name = _name;
     //    constexpr static u32 hash = hash::crc32(_name);
 };
 
-struct RuntimeComponentType {};
-template<typename = RuntimeComponentType> struct ComponentType;
+struct RuntimeCompType {};
+template<typename = RuntimeCompType> struct CompType;
 
 #define PROTO_COMPONENT_TYPE(TYPE, INDEX)                     \
-    template<> struct ComponentType<TYPE> {                   \
+    template<> struct CompType<TYPE> {                   \
         using type = TYPE;                                    \
-        constexpr static ComponentTypeIndex index = INDEX;    \
+        constexpr static CompTypeIndex index = INDEX;    \
         constexpr static const char * name = PROTO_STR(TYPE); \
     };
  
@@ -39,43 +41,58 @@ PROTO_COMPONENT_TYPE(PointlightComp, 3);
 // Below is the main components typelist, based on it components arrays are created
 using CompTList = meta::typelist<TransformComp, RenderMeshComp, PointlightComp>;
 
+// for runtime index based typeinfo
 // default for runtime typeinfo
-template<typename T>
-struct ComponentType {
-    const char * name;
-    ComponentTypeIndex index;
-    
-private:
-    template<typename U>
-    void map_type_info(){
-        name = ComponentType<U>::name;
-        index = ComponentType<U>::index;
-    }
-public:
-    ComponentType(ComponentTypeIndex index){
-        switch(index){
-            //case ComponentType<*>::index:
-            //    map_type_info<*>();          break;
-        default:
-            map_type_info<InvalidComp>();  break;
+
+template<typename T = RuntimeCompType> using CompT = CompType<T>;
+
+// Runtype type information lookup table for O(1) comptypeinfo
+struct _CompTypeData {
+    template<size_t I>
+    using CompAt = typename CompTList::template at_t<I>;
+
+    struct Data {
+        const char * name;
+        CompTypeIndex index;
+        u64 size;
+    };
+
+
+    template<typename...> struct _Lookup;
+    template<size_t...Is> struct _Lookup<meta::sequence<Is...>> {
+        template<size_t I> constexpr static Data make_data() {
+            return {CompType<CompAt<I>>::name, CompType<CompAt<I>>::index, sizeof(CompAt<I>)};
         }
+
+        static_assert(sizeof...(Is) == CompTList::size);
+        inline static Data table[sizeof...(Is)] = { make_data<Is>()...};
+    };
+    using Lookup = _Lookup<meta::make_sequence<0,CompTList::size>>;
+
+    static constexpr Data& at(u64 i) {
+        return Lookup::table[i];
     }
+};
+
+template<typename T>
+struct CompType {
+    const CompTypeIndex _index;
+    
+    constexpr CompType(CompTypeIndex index)
+        : _index(index)
+    {}
+
+    constexpr auto name() {
+        return _CompTypeData::at(_index).name;}
+
+    constexpr auto index() {
+        return _CompTypeData::at(_index).index;}
+
+    constexpr auto size() {
+        return _CompTypeData::at(_index).size;}
 };
     //using Component_List = meta::typelist<TransformComp,
     //                                      RenderMeshComp>
-using EntityId = u32;
-using EntityGen = u32;
-
-struct Entity {
-    EntityId id = 0;
-    EntityGen gen = 0;
-
-    bool operator==(Entity other) const;
-    bool is_valid() const;
-    operator bool() const;
-};
-static Entity invalid_entity = Entity{.id = 0, .gen = 0};
-
 using CompBitset = Bitset<CompTList::size>;
 
 struct EntityMetadata {

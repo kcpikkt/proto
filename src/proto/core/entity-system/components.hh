@@ -1,5 +1,6 @@
 #pragma once
 #include "proto/core/util/Bitfield.hh"
+#include "proto/core/entity-system/entity.hh"
 
 namespace proto {
 

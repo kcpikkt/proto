@@ -48,6 +48,12 @@ inline bool belongs(void * ptr, MemBuffer buffer) {
     return (ptr >= buffer.data && ptr < (void*)(buffer.data8 + buffer.size));
 }
 
+inline bool belongs_incl(void * ptr, MemBuffer buffer) {
+    return (ptr >= buffer.data && ptr <= (void*)(buffer.data8 + buffer.size));
+}
+
+
+
     //template<typename T, typename Arr>
     //inline T sum(const Arr& arr, T init = 0) {
     //    for(auto x : arr) init += x;

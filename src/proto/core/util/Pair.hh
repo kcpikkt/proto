@@ -1,7 +1,16 @@
 #pragma once
 
-template<typename First, typename Second> 
+namespace proto {
+template<typename Fst, typename Snd> 
 struct Pair {
-    First first;
-    Second second;
+    Fst first;
+    Snd second;
 };
+
+// should RVO
+//template<typename Fst, typename Snd>
+//inline Pair<Fst, Snd> make_pair(Fst& first, Snd& second) {
+//    return Pair<Fst, Snd>(first,second);
+//}
+
+} // namespace proto

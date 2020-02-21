@@ -16,7 +16,6 @@
 #include "proto/core/containers/StringArena.hh"
 #include "proto/core/event-system.hh"
 #include "proto/core/asset-system/common.hh"
-#include "proto/core/asset-system/AssetRegistry.hh"
 #include "proto/core/serialization/Archive.hh"
 
 #include "proto/core/graphics/Camera.hh"
@@ -106,7 +105,6 @@ namespace proto {
     };
 
     struct AssetContext {
-        //AssetRegistry assets;
         memory::LinkedListAllocator asset_metadata_allocator;
 
         // NOTE(kacper): should you do the same thing as with comp_arrs here?

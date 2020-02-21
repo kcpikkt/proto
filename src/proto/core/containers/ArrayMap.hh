@@ -252,10 +252,10 @@ struct ArrayMap
     //Err<typename State::ErrCategory> dtor_shallow() {}
 
     Err<typename State::ErrCategory> dtor_deep() {
-        if(!keys.dtor() && !values.dtor())
-            return State::ErrCategory::success;
-        else
+        if(keys.dtor() || values.dtor())
             return State::ErrCategory::dtor_fail;
+        else
+            return State::ErrCategory::success;
     }
 };
 

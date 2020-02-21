@@ -5,7 +5,6 @@
 
 namespace proto {
 namespace {
-    
 
     [[nodiscard]]
     Entity create_entity() {
@@ -123,4 +122,9 @@ namespace {
 
 
 } // namespace (anonymous)
+
+    void * get_comp(Entity entity, u64 comp_idx);
+    void * add_comp(Entity entity, u64 comp_idx);
+
+    
 } // namespace proto

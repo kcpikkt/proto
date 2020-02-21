@@ -1,7 +1,7 @@
 #pragma once
 #include "proto/core/common/types.hh"
 
-#include <type_traits>
+//#include <type_traits>
 
 namespace proto {
 namespace meta {

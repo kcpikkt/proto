@@ -38,6 +38,6 @@ namespace debug {
 
 #define PROTO_DEPRECATED \
     { debug_warn(proto::debug::category::main, \
-                 "Usage of deprecated function. ", __PRETTY_FUNCTION__); }
+                 "Usage of deprecated functionality. ", __PRETTY_FUNCTION__); }
 
 
