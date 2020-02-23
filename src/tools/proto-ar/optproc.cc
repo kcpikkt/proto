@@ -35,7 +35,7 @@ int opt_input_proc(Array<StringView>& args){
     }
 
     for(auto& fp : filepaths) {
-        if(fetch(fp.view())) {
+        if(!fetch(fp.view())) {
             log_error(debug::category::main, "Failed to fetch data from ", fp.view());
             return -1;
         }
@@ -60,7 +60,18 @@ int opt_output_proc(Array<StringView>& args) {
     for(auto asset : loaded_assets)
         ar_data_size_acc += INVOKE_FTEMPL_WITH_ASSET_REF(ser::serialized_size, asset);
 
-    if(auto ec = archive.create(outpath, loaded_assets.size() + 1, ar_data_size_acc)) {
+    ECSTreeMemLayout layout;
+    if(auto ec = calc_ecs_tree_memlayout(layout, loaded_ents)) {
+        log_error(debug::category::data, "Computing ECS Tree memory layout failed: ");
+        return -1;
+    }
+
+    ar_data_size_acc += layout.size;
+
+    if(auto ec = archive.create(outpath,
+                                loaded_assets.size() + 2, // root + ecs_tree
+                                ar_data_size_acc))
+    {
         log_error(debug::category::main, ec.message());
         return -1;
     }
@@ -74,17 +85,16 @@ int opt_output_proc(Array<StringView>& args) {
     for(auto asset : loaded_assets) {
         if(auto ec = archive.store(asset)) {
             log_error(debug::category::data,
-                      "Archiving ", get_metadata(asset)->name, " failed. ", ec.message());
+                      "Archiving ", get_metadata(asset)->name, " failed: ", ec.message());
             break;
         }
     }
-        //    preview_init();
-        //    println(prev_ents.size());
-        //
-        //    //if(prev_ents.size())
-        //    //    if(auto ec = archive.store(prev_ents))
-        //    //        log_error(debug::category::data, "Archiving entity tree failed. ", ec.message());
-        //
+
+
+    if(auto ec = archive.store(loaded_ents, &layout)) {
+        log_error(debug::category::data, "Archiving ECS Tree failed: ", ec.message());
+    }
+
         //    for(auto& [mesh, metadata] : ctx.meshes.values) {
         //        // make them look like they are not in memory,
         //        // we want to load them from just written archive for test
@@ -149,6 +159,7 @@ int opt_list_proc(Array<StringView>& args){
     }
 
     for(auto arg : args) {
+        using Node = serialization::Archive::Node;
         ser::Archive archive;
         if(auto ec = archive.open(arg)) {
             log_error(debug::category::main, ec.message());
@@ -157,7 +168,21 @@ int opt_list_proc(Array<StringView>& args){
         } else {
             println(archive.superblock->name);
             for(auto& node : archive.nodes) {
-                println(node.name);
+                switch(node.type) {
+                case Node::free:
+                    print("Free Node "); break;
+                case Node::directory:
+                    print("Directory "); break;
+                case Node::asset: 
+                    print("Asset     "); break;
+                case Node::ecs_tree: 
+                    print("ECS Tree  "); break;
+                default:
+                    print("Unknown   ");
+                }
+                
+                print(node.name);
+                println();
             }
 
             if(auto ec = archive.dtor()) {

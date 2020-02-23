@@ -184,7 +184,7 @@ namespace serialization {
     template<typename T> static MemBuffer _get_asset_cached_mem(T*);
 
     template<> MemBuffer _get_asset_cached_mem(Mesh * mesh) {
-        return mesh && mesh->flags.check(Mesh::cached_bit) ? mesh->cached : MemBuffer{};}
+        return mesh && mesh->flags.at(Mesh::cached_bit) ? mesh->cached : MemBuffer{};}
 
     template<> MemBuffer _get_asset_cached_mem(Texture2D * texture) {
         return texture && texture->flags.check(Texture2D::cached_bit) ? texture->cached : MemBuffer{}; }
@@ -206,21 +206,38 @@ namespace serialization {
         return (idx != nodes.size()) ? idx : 0;
     }
     
-    ArchiveErr Archive::store(Array<Entity>& ents) {
+    ArchiveErr Archive::store(Array<Entity>& ents, ECSTreeMemLayout * const layout) {
+        if(!layout) {
+            assert( !calc_ecs_tree_memlayout(*layout, ents) );
+        }
 
-        ECSTreeHeader header;
-        u64 comp_cnt[CompTList::size] = {0};
+        Node node; node.type = Node::ecs_tree;
+        node.parent_index = 0;
+        node.hash = 0;
 
-        assert( !create_ecs_tree_header(header, comp_cnt, ents) );
-
-        u8 * new_block = _data_off2addr(superblock->data_size);
-        u8 * new_block_end = new_block + header.size;
+        node.block_offset = cursor;
+        u8 * new_block = _data_off2addr(cursor);
+        u8 * new_block_end = new_block + layout->size;
         u8 * mapping_end = mapping.data8 + mapping.size;
 
         if( !belongs(new_block, mapping) || !belongs_incl(new_block_end, mapping))
             return ArchiveErrCategory::out_of_memory;
 
-        return serialize_ecs_tree(MemBuffer{{new_block}, header.size}, ents, comp_cnt, header);
+        if( !serialize_ecs_tree(MemBuffer{{new_block}, layout->size}, ents, *layout));
+            return -1;
+
+        cursor += cached_mem.size;
+        node.block_size = cached_mem.size;
+        node.handle = handle;
+
+        superblock->data_size += cached_mem.size;
+
+        memcpy(&nodes[idx], &node, sizeof(Node));
+
+        superblock->free_node_count--;
+
+        return ArchiveErrCategory::success;
+
     }
  
     ArchiveErr Archive::store(AssetHandle handle) {

@@ -22,21 +22,23 @@ namespace proto {
         constexpr static auto size = (I + 7) / 8;
         constexpr static auto _bitsize = size * 8;
         constexpr static auto bitsize = I;
-        u8 _arr[size] = {};
+        u8 _arr[size] = {0};
 
-
-        inline void set(u64 index) {
+        inline Bitset<I>& set(u64 index) {
             assert(index < I);
             _arr[index/8] |= (1 << (index % 8 ));
+            return *this;
         }
 
-        inline void set_range(u64 begin, u64 end) {
+
+        inline Bitset<I>& set_range(u64 begin, u64 end) {
             assert(begin < end);
             assert(begin < bitsize);
             assert(end <= bitsize);
 
             //TODO(kacper): this is lazy code, make it proper
             for(u64 i=begin; i<end; i++) set(i);
+            return *this;
         }
 
         inline void toggle(u64 index) {
@@ -52,6 +54,22 @@ namespace proto {
         inline bool at(u64 index) const {
             assert(index < I);
             return (_arr[index/8] & (1 << (index % 8)));
+        }
+
+        inline bool at_and(u64 index) const
+        { return at(index); }
+
+        template<typename... Is>
+        inline bool at_and(u64 i, Is... is) const {
+            return (at(i) & at_and(is...));
+        }
+
+        inline bool at_or(u64 index) const
+        { return at(index); }
+
+        template<typename... Is>
+        inline bool at_or(u64 i, Is... is) const {
+            return (at(i) & at_or(is...));
         }
 
         inline void zero(){

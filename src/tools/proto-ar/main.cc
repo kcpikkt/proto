@@ -97,6 +97,8 @@ PROTO_INIT {
     for(auto buf : allocated_buffers)
         ctx.memory.free(buf.data);
 
+    println(loaded_ents.count());
+
     search_paths.dtor();
     loaded_texture_paths.dtor();
     loaded_assets.dtor();

@@ -5,6 +5,7 @@
 #include "proto/core/util/namespace-shorthands.hh"
 #include "proto/core/error-handling.hh"
 #include "proto/core/asset-system/common.hh"
+#include "proto/core/entity-system/serialization.hh"
 #include "proto/core/containers/Array.hh"
 #include "proto/core/meta.hh"
 #include "proto/core/entity-system/common.hh"
@@ -194,7 +195,8 @@ struct Archive : StateCRTP<Archive> {
     ArchiveErr create(StringView filepath, u32 node_count, u64 data_size);
     ArchiveErr open(StringView filepath /* , sys::File::Mode filemode = sys::File::read_mode */ );
     ArchiveErr store(AssetHandle handle);
-    ArchiveErr store(Array<Entity>&);
+
+    ArchiveErr store(Array<Entity>&, ECSTreeMemLayout * const layout = nullptr);
 
     MemBuffer get_node_memory(u64 node_idx);
     AssetHandle load_asset(u32 index);

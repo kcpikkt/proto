@@ -2,63 +2,66 @@
 #include "proto/core/entity-system/interface.hh"
 
 namespace proto {
-
-int create_ecs_tree_header
-    (ECSTreeHeader& header, u64 (&comp_cnt)[CompTList::size], Array<Entity>& ents)
+int calc_ecs_tree_memlayout(ECSTreeMemLayout& layout, Array<Entity>& ents)
 {
-    memset(&header,  0, sizeof header);
-    memset(&comp_cnt,  0, sizeof comp_cnt);
+    memset(&layout, 0, sizeof layout);
 
     for(auto e : ents) {
         if(auto mdata = get_mdata(e)) {
             // or all comps bitset so we have bitset of all used comps
-            header.comp_bits |= mdata->comps;
+            layout.comp_bits |= mdata->comps;
 
-            for(u64 i=0; i<header.comp_bits.bitsize; ++i)
-                if(header.comp_bits.at(i)) comp_cnt[i]++;
+            for(u64 i=0; i<layout.comp_bits.bitsize; ++i)
+                if(layout.comp_bits.at(i)) layout.comp_cnt[i]++;
         } else
             return -1;
     }
 
-    u64 comp_arr_arena_sz_algn = 0;
+    for(u64 i=0; i<layout.comp_bits.bitsize; ++i) {
+        assert((bool)layout.comp_bits.at(i) == (bool)layout.comp_cnt[i]);
 
-    for(u64 i=0; i<header.comp_bits.bitsize; ++i) {
-        assert((bool)header.comp_bits.at(i) == (bool)comp_cnt[i]);
-
-        comp_arr_arena_sz_algn +=
-            mem::align( comp_cnt[i] * CompType(i).size() );
+        layout.comp_arr_arena_sz_algn +=
+            mem::align( layout.comp_cnt[i] * CompType(i).size() );
     }
-    assert(mem::is_aligned(comp_arr_arena_sz_algn, 16));
+    assert(mem::is_aligned(layout.comp_arr_arena_sz_algn, 16));
 
-    u64 comp_arrs_count = header.comp_bits.bitcount();
+    layout.comp_arrs_count = layout.comp_bits.bitcount();
 
-    u64 comp_arrs_arr_sz      = comp_arrs_count * sizeof(ArrayHeader);
-    u64 comp_arrs_arr_sz_algn = mem::align(comp_arrs_arr_sz);
+    layout.comp_arrs_arr_sz      = layout.comp_arrs_count * sizeof(ArrayHeader);
+    layout.comp_arrs_arr_sz_algn = mem::align(layout.comp_arrs_arr_sz);
 
-    u64 header_sz      = sizeof(ECSTreeHeader);
-    u64 header_sz_algn = mem::align(header_sz);
+    layout.header_sz      = sizeof(ECSTreeHeader);
+    layout.header_sz_algn = mem::align(layout.header_sz);
 
-    u64 ent_arr_sz      = sizeof(Pair<Entity, EntityMetadata>) * ents.size();
-    u64 ent_arr_sz_algn = mem::align(ent_arr_sz);
+    layout.ent_arr_sz      = sizeof(Pair<Entity, EntityMetadata>) * ents.size();
+    layout.ent_arr_sz_algn = mem::align(layout.ent_arr_sz);
 
-    header.size = header_sz_algn + ent_arr_sz_algn + comp_arrs_arr_sz_algn + comp_arr_arena_sz_algn;
-
-    header.ents.offset = header_sz_algn;
-    header.ents.size   = ent_arr_sz;
-    header.ents.count  = ents.count();
-
-    header.comp_arrs.offset = header.ents.offset + ent_arr_sz_algn;
-    header.comp_arrs.size   = comp_arrs_arr_sz;
-    header.comp_arrs.count  = comp_arrs_count;
-
-    header.comp_arena_offset = header.comp_arrs.offset + comp_arrs_arr_sz_algn;
-    header.comp_arena_size = header.size - header.comp_arena_offset;
+    layout.size =
+        layout.header_sz_algn +
+        layout.ent_arr_sz_algn +
+        layout.comp_arrs_arr_sz_algn +
+        layout.comp_arr_arena_sz_algn;
     return 0;
 }
 
-int serialize_ecs_tree
-    (MemBuffer buf, Array<Entity>& ents, u64 (&comp_cnt)[CompTList::size], ECSTreeHeader& header)
+int serialize_ecs_tree (MemBuffer buf, Array<Entity>& ents, ECSTreeMemLayout& layout)
 {
+    ECSTreeHeader header;
+    header.size = layout.size;
+
+    header.ents.offset = layout.header_sz_algn;
+    header.ents.size   = layout.ent_arr_sz;
+    header.ents.count  = ents.count();
+    
+    header.comp_bits = layout.comp_bits;
+
+    header.comp_arrs.offset = header.ents.offset + layout.ent_arr_sz_algn;
+    header.comp_arrs.size   = layout.comp_arrs_arr_sz;
+    header.comp_arrs.count  = layout.comp_arrs_count;
+    
+    header.comp_arena_offset = header.comp_arrs.offset + layout.comp_arrs_arr_sz_algn;
+    header.comp_arena_size = header.size - header.comp_arena_offset;
+
     // TODO(kacper): THEORETICAL SECURITY ISSUE (if there is need for sec any here)
     //               leaking bytes in align padding, zero buffer or smth
 
@@ -89,8 +92,8 @@ int serialize_ecs_tree
             (buf.data8 + header.comp_arrs.offset + i * sizeof(ArrayHeader));
 
         comp_arr_header->offset = comp_arena_off;
-        comp_arr_header->count = comp_cnt[bit];
-        comp_arr_header->size = comp_cnt[bit] * CompType(i).size();
+        comp_arr_header->count = layout.comp_cnt[bit];
+        comp_arr_header->size = layout.comp_cnt[bit] * CompType(i).size();
 
         comp_arena_off += mem::align(comp_arr_header->size);
 
@@ -141,7 +144,7 @@ int serialize_ecs_tree
 
                     // we subtract from array count for given component
                     // checking at the end it should give us only zeros
-                    comp_cnt[i]--;
+                    layout.comp_cnt[i]--;
                 }
 
             } else
@@ -149,7 +152,7 @@ int serialize_ecs_tree
         }
 
         comps_bitset.unset(bit);
-        assert(comp_cnt[i] == 0);
+        assert(layout.comp_cnt[i] == 0);
     }
     // we should have inspected all bits
     assert(comps_bitset.is_zero());

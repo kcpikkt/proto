@@ -206,6 +206,15 @@ struct Array
         _count--;
     }
 
+    //template<typename = meta::enable_if_t<meta::has_operator_eq_v<T>>>
+    //u64 find(T& val, u64 hint = 0) {
+    //    if(hint && hint < _count && at(hint) == val) return hint;
+
+    //    u64 i=0;
+    //    for(; i<_count; i++) if(at(i) == val) break;
+    //    return i;
+    //}
+
     u64 find_if(FunctionView<bool(T&)> predecate, u64 hint = 0) {
         if(hint && hint < _count && predecate(at(hint))) return hint;
 

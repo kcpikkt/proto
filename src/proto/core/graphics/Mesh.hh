@@ -13,11 +13,15 @@ namespace proto {
 struct Mesh : Asset{
     MemBuffer cached;
 
-    constexpr static u8 on_gpu_bit = BIT(0);
-    constexpr static u8 cached_bit = BIT(1);
-    constexpr static u8 archived_bit = BIT(2);
-    constexpr static u8 indexed_bit = BIT(3);
-    Bitfield<u8> flags = 0;
+    enum {
+        on_gpu_bit = 0,
+        cached_bit,
+        archived_bit,
+        indexed_bit,
+        /////////////////////
+        _bitset_size
+    };
+    Bitset<_bitset_size> flags;
 
     u64 vertices_count;
     u64 indices_count;

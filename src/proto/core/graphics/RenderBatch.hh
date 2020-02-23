@@ -130,7 +130,7 @@ struct RenderBatch {
             };
 
         MemBuffer cached;
-        if(mesh_ptr->flags.check(Mesh::cached_bit)) {
+        if(mesh_ptr->flags.at(Mesh::cached_bit)) {
             cached = mesh_ptr->cached;
             proto_assert(cached);
             
@@ -263,7 +263,7 @@ struct RenderBatch {
                 .$_set_mat4  ("u_mvp", &mvp)
                 .$_set_vec3  ("u_color", &render_mesh.color);
 
-            if(mesh.flags.check(Mesh::indexed_bit)){
+            if(mesh.flags.at(Mesh::indexed_bit)){
                 auto& [r_begin, r_size] = mesh.batch_index_range;
                 u32 offset = mesh.batch_vertex_range.begin / sizeof(Vertex);
                 glDrawElementsBaseVertex (GL_TRIANGLES, r_size / sizeof(u32), GL_UNSIGNED_INT,
