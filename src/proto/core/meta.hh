@@ -521,14 +521,15 @@ namespace meta {
     using remove_ref_t = typename remove_ref<T>::type;
 
     template<typename T>
-    inline remove_ref_t<T>&& move(T&& arg) {
-        return static_cast<remove_ref_t<T>&&>(arg);
+    constexpr static inline remove_ref_t<T>&& move(T&& x) {
+        return static_cast<remove_ref_t<T>&&>(x);
     }
 
     template<typename T>
-    inline T&& forward(remove_ref_t<T>& arg) {
+    constexpr static inline T&& forward(remove_ref_t<T>& arg) {
         return static_cast<T&&>(arg);
     }
+
 
     namespace internal {
         // NOTE(kacper): hmmm...

@@ -33,6 +33,12 @@ void println(Ts... args) {
     print(args..., '\n');
 }
 
+template<typename T>
+void printn(T arg, u64 n) {
+    // TEMPORARY LAZY IMPl
+    for(u64 i=0; i<n; ++i) print(arg);
+}
+
 template<typename ...Ts>
 inline void println_fmt(StringView fmt, Ts... ts) {
     println(format(fmt, ts...));

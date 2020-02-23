@@ -85,13 +85,17 @@ struct ArrayMap
         init(default_init_capacity, allocator);
     }
 
-    void init_resize(u64 init_size, memory::Allocator * allocator) {
-        init(init_size, allocator);
-        resize(init_size);
+    void init_resize(u64 init_count, memory::Allocator * allocator) {
+        init(init_count, allocator);
+        resize(init_count);
     }
 
     u64 size() const {
         return keys.size();
+    }
+
+    u64 count() const {
+        return keys.count();
     }
     u64 capacity() const {
         return keys.capacity();
@@ -172,7 +176,7 @@ struct ArrayMap
     //inline void zero() {
     //    assert(_data);
     //    // TODO(kacper): dont warn if T is trivially descructible
-    //    if(_size != 0)
+    //    if(_count != 0)
     //        debug_warn(proto::debug::category::memory, "zeroing non-empty array");
     //    memset(_data, 0, _capacity * sizeof(T));
     //}
@@ -188,7 +192,7 @@ struct ArrayMap
     //inline auto contains_key(const U& key)
     //    -> meta::enable_if_t<meta::has_operator_eq_v<K>, bool> const
     //{
-    //    for(u64 i=0; i<_size; i++)
+    //    for(u64 i=0; i<_count; i++)
     //        if(keys[i] == key) return true;
     //    return false;
     //}
@@ -205,30 +209,30 @@ struct ArrayMap
     //void erase(u64 index) {
     //    at(index).~T();
     //    u64 i = index;
-    //    for(; i<_size - 1; i++) {
+    //    for(; i<_count - 1; i++) {
     //        at(i) = meta::move(at(i + 1));
     //    } at(i).~T();
-    //    _size--;
+    //    _count--;
     //}
 
 
-    void resize(u64 new_size) {
-        keys.resize(new_size);
-        values.resize(new_size);
-        //if(new_size == _size) return;
-        //if(new_size < _size) {
+    void resize(u64 new_count) {
+        keys.resize(new_count);
+        values.resize(new_count);
+        //if(new_count == _count) return;
+        //if(new_count < _count) {
         //    if constexpr(has_state) {
-        //        for(size_t i=new_size; i<_size; i++)
+        //        for(size_t i=new_count; i<_count; i++)
         //            (_data + i)->~T();
         //    }
         //} else {
-        //    if(new_size > _capacity)
-        //        reserve(new_size);
+        //    if(new_count > _capacity)
+        //        reserve(new_count);
 
-        //    for(size_t i=_size; i<new_size; i++)
+        //    for(size_t i=_count; i<new_count; i++)
         //          new ((void*)(_data + i)) T(); //FIXME(kacper):
         //}
-        //_size = new_size;
+        //_count = new_count;
     }
 
     void reserve(u64 new_capacity) {

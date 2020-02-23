@@ -32,48 +32,11 @@ Array<Entity> ents;
 AssetHandle main_shader_h;
 
 using namespace proto;
-struct Option {
-    StringView name, alt_name;
-
-    enum : u32 {
-        required_bit = BIT(0), // this option is absolutely requiered
-        no_args_bit  = BIT(1), // this option takes arguments
-        many_args_bit = BIT(2), // this option takes many arguments
-        multiple_bit  = BIT(3), // this option can appear multiple times
-        // positional
-        pos_1 = BIT(4), pos_2 = BIT(5), pos_3 = BIT(6), pos_4 = BIT(7)
-    } flags;
-};
-using Opt = Option;
-Opt opts_desc[] = {
-    {"-size", "", Opt::required_bit},
-    {"-size", "", Opt::required_bit},
-};
-ArrayMap<StringView, Array<StringView>> opts;
-
-void test() {
-    opts.init(&context->memory);
-
-    for(u64 i=0; i<count_of(opts_desc); ++i) {
-        for(u64 j=0; j<count_of(opts_desc); ++j) {
-            if(opts_desc[i].name && opts_desc[i].name.lenth()) {
-            }
-
-            if(opts_desc && opts_desc.lenth()) {
-            }
-        }
-    }
-}
 
 PROTO_INIT {
     auto& ctx = *context;
     ctx.exit_sig = true;
 
-    for(auto arg : ctx.cmdline) {
-        println(arg);
-    }
-
-    return;
     ents.init(500, &ctx.memory);
 
     StringView archive_path = "outmesh/sponza.pack";

@@ -45,7 +45,7 @@ auto to_string_integer(char * buffer, u64 max_len, I arg) ->
 template<>
 u64 to_string_specific<StringView>(char * buffer, u64 max_len, StringView arg)
 {
-    u64 len = min(arg.length(), max_len - 1);
+    u64 len = min(arg.length, max_len - 1);
     memcpy(buffer, arg, len);
     buffer[len] = '\0';
     return len;
@@ -129,8 +129,8 @@ template u64 sprint<ivec3> (char*, u64, ivec3);
 template u64 sprint<ivec4> (char*, u64, ivec4);
 
 char * strview_copy(char * dest, StringView src) {
-    memcpy(dest, src, src.length());
-    dest[src.length()] = '\0';
+    memcpy(dest, src, src.length);
+    dest[src.length] = '\0';
     return dest;
 }
 
@@ -172,19 +172,19 @@ u32 strview_count(StringView str, char c) {
 }
 
 bool strview_cmp(StringView fst, StringView snd) {
-    if(fst.length() != snd.length()) return false;
-    u32 index = 0, len = fst.length();
-    while( *(fst.str() + index) == *(snd.str() + index) && index < len) index++;
+    if(fst.length != snd.length) return false;
+    u32 index = 0, len = fst.length;
+    while( *(fst.str + index) == *(snd.str + index) && index < len) index++;
     return (index == len);
 }
 
 bool strview_cmp_i(StringView fst, StringView snd) {
-    if(fst.length() != snd.length()) return false;
+    if(fst.length != snd.length) return false;
     char ch1, ch2;
-    u32 index = 0, len = fst.length();;
+    u32 index = 0, len = fst.length;;
     while(index < len) {
-        ch1 = *(fst.str() + index);
-        ch2 = *(snd.str() + index);
+        ch1 = *(fst.str + index);
+        ch2 = *(snd.str + index);
         int diff = ch1 - ch2;
         if((diff == 0)                               ||
            (ch1 >= 'a' && ch1 <= 'z' && diff ==  32) ||

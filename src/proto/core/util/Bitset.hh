@@ -39,6 +39,11 @@ namespace proto {
             for(u64 i=begin; i<end; i++) set(i);
         }
 
+        inline void toggle(u64 index) {
+            assert(index < I);
+            _arr[index/8] ^= (1 << (index % 8 ));
+        }
+
         inline void unset(u64 index) {
             assert(index < I);
             _arr[index/8] &= ~(1 << (index % 8));

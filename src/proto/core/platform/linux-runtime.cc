@@ -51,7 +51,7 @@ namespace proto { Context * context = nullptr; };
 static PROTO_CLIENT_SETUP_FUNCTION_SIGNATURE  (proto_client_setup_stub)  {}
 static PROTO_CLIENT_INIT_FUNCTION_SIGNATURE   (proto_client_init_stub)   {}
 static PROTO_CLIENT_UPDATE_FUNCTION_SIGNATURE (proto_client_update_stub) {
-    log_info(debug::category::main, "No update procedure provided, exiting.");
+    //log_info(debug::category::main, "No update procedure provided, exiting.");
     proto::context->exit_sig = true;
 }
 static PROTO_CLIENT_LINK_FUNCTION_SIGNATURE   (proto_client_link_stub)   {}
@@ -340,11 +340,13 @@ int proto::platform::runtime(int argc, char ** argv){
     void * _mem = malloc(_mem_size);
     assert(!_context.memory.init(_mem, _mem_size));
 
-    _context.cmdline.init_resize(argc, &_context.memory);
+    // TMP, it depends if we are running from runtime or standalone
+    auto skip_arg = 2;
+    _context.cmdline.init_resize(argc - skip_arg, &_context.memory);
     defer { _context.cmdline.dtor(); };
 
-    for(s32 i=0; i<argc; i++)
-        _context.cmdline[i] = argv[i];
+    for(s32 i=skip_arg; i<argc; i++)
+        _context.cmdline[i - skip_arg] = argv[i];
 
     //_context.gp_string_allocator
     //    .init(&_context.memory, mem::megabytes(5));
@@ -421,7 +423,7 @@ int proto::platform::runtime(int argc, char ** argv){
     create_comp_arrays<CompTList>();
     defer { _context.comp_arrs.dtor(); };
 
-    if(settings.asset_paths && settings.asset_paths.length()) {
+    if(settings.asset_paths && settings.asset_paths.length) {
         _context.asset_paths
             .init_split(settings.asset_paths, ':', &_context.memory);
     } else
@@ -429,7 +431,7 @@ int proto::platform::runtime(int argc, char ** argv){
 
     defer { _context.asset_paths.dtor(); };
 
-    if(settings.shader_paths && settings.shader_paths.length())
+    if(settings.shader_paths && settings.shader_paths.length)
         _context.shader_paths
             .init_split(settings.shader_paths, ':', &_context.memory);
     else 

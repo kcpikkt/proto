@@ -1,5 +1,7 @@
+#if 0
+
 #include "fetch_texture.hh"
-#include "cli-common.hh"
+#include "ar-common.hh"
 
 #include "stb_image.hh"
 
@@ -16,7 +18,7 @@ AssetHandle fetch_texture(StringView filepath) {
     }
 
     int x,y,n;
-    void * data = stbi_load(filepath.str(), &x, &y, &n, 0);
+    void * data = stbi_load(filepath.str, &x, &y, &n, 0);
 
     if(!data) {
         log_error(debug::category::main, "Failed to read image data from ", filepath);
@@ -67,3 +69,5 @@ AssetHandle fetch_texture(StringView filepath) {
     return texture.handle;
 }
 
+
+#endif

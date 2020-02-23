@@ -16,7 +16,7 @@ namespace proto {
         }
 
         void init(StringView view, memory::Allocator * allocator) {
-            init_resize(view.length() + 1, allocator);
+            init_resize(view.length + 1, allocator);
             strview_copy(_data, view);
         }
         

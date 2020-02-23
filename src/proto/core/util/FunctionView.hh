@@ -1,4 +1,5 @@
 #pragma once
+#include "proto/core/meta.hh"
 // based on https://vittorioromeo.info/index/blog/passing_functions_to_functions.html
 
 namespace proto {
@@ -22,7 +23,7 @@ struct FunctionView<Ret(Args...)> final {
     FunctionView(T&& f) : _ptr{ (void*)&f }
     {
         _erased_function = [](void* ptr, Args... args) -> Ret {
-                return (*reinterpret_cast<meta::add_pointer_t<T>>(ptr))(std::forward<Args>(args)...);
+            return (*reinterpret_cast<meta::add_pointer_t<T>>(ptr))(meta::forward<Args>(args)...);
         };
     }
 

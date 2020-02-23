@@ -44,21 +44,21 @@ void StringArena::init_split(StringView str, char delimiter,
 {
     // just don't, I don't want to check for it
     assert(str[0] != '\0');
-    assert(str[str.length() - 1] != '\0');
+    assert(str[str.length - 1] != '\0');
 
-    init(max(str.length() + 1, default_init_capacity), allocator);
+    init(max(str.length + 1, default_init_capacity), allocator);
     u32 count = strview_count(str, delimiter) + 1;
     _offsets.resize(count);
     strview_copy(_data, str);
 
-    _cursor = _data + str.length() + 1;
+    _cursor = _data + str.length + 1;
 
     str_swap(_data, delimiter, '\0');
 
     u32 view_index = 0;
     _offsets[view_index++] = Offset(0, strlen(_data));
 
-    for(u32 i=0; i<str.length(); i++) {
+    for(u32 i=0; i<str.length; i++) {
         if(_data[i] == '\0') {
             _offsets[view_index++] =
                 Offset(i + 1, strlen(_data + i + 1));
@@ -112,7 +112,7 @@ void StringArena::store(StringView str) {
     assert((_data + _capacity) >= _cursor);
 
     u64 left = (_data + _capacity) - _cursor;
-    u64 len = str.length() + 1;
+    u64 len = str.length + 1;
     if(left < len)
         grow(_capacity - left + len);
 

@@ -52,24 +52,24 @@ const char * basename_substr(const char * path, u32 * no_ext_len) {
 
 StringView basename_view(StringView path) {
     u32 index = 0;
-    const char * basename = path.str();
+    const char * basename = path.str;
     char c;
-    while(index < path.length()) {
+    while(index < path.length) {
         c = path[index];
         if(c == '\0') break;
         // no backslashes in names, ok?
-        if(c == '/' || c == '\\') { basename = path.str() + index + 1; }
+        if(c == '/' || c == '\\') { basename = path.str + index + 1; }
         index++;
     }
-    if(index != path.length())
+    if(index != path.length)
         debug_warn(debug::category::main,
                    "StringView contains null character on index "
-                   "less than its length.", index, " ", path.length());
+                   "less than its length.", index, " ", path.length);
 
-    u32 basename_offset = basename - path.str();
-    u32 len = path.length() - basename_offset;
+    u32 basename_offset = basename - path.str;
+    u32 len = path.length - basename_offset;
 
-    index = path.length() - basename_offset;
+    index = path.length - basename_offset;
     // what about multiple file extensions?
     while(c = basename[index], index >= 0) {
         if(c == '.') {
@@ -186,7 +186,7 @@ String search_for_file(StringView filename, StringArena& dirs) {
             }
         }
     } else {
-        //TOOD(kacper): use proper allocator for that
+        //TOOD(kacper): use proper(er) allocator for that
         ret.init(filename, &context->memory);
     }
     return meta::move(ret);
@@ -267,7 +267,7 @@ path_ncat(char * dest,
     if(dest[destlen - 1] != '/' && src[0] != '/')
         dest[destlen++] = '/';
 
-    u32 applen = min(src.length(), num);
+    u32 applen = min(src.length, num);
 
     strncpy((dest + destlen), src, applen);
 

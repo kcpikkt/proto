@@ -1,7 +1,6 @@
-#pragma once
 
-#include "cli-common.hh"
-#include "fetch_texture.hh"
+#include "fetch_model_tree.hh"
+#include "fetch.hh"
 
 #include "proto/core/asset-system/interface.hh" 
 #include "proto/core/asset-system/serialization.hh" 
@@ -26,7 +25,7 @@ static vec3 to_vec3(aiVector3D& ai_vec) {
     return vec3(ai_vec.x, ai_vec.y, ai_vec.z); }
 
 
-static int fetch_model_tree(StringView filepath) {
+AssetHandle fetch_3d_model(StringView filepath) {
     // render preview of loaded mesh
     // hmm, but first you need separate thread...
     // or render per load non realtime
@@ -39,12 +38,12 @@ static int fetch_model_tree(StringView filepath) {
 
     if(!platform::is_file(filepath))  {
         log_error(debug::category::main, filepath, " is not a file");
-        return -1;
+        return invalid_asset_handle;
     }
 
     Assimp::Importer importer;
     const aiScene * scene_ptr =
-        importer.ReadFile(filepath.str(),
+        importer.ReadFile(filepath.str,
                           aiProcess_CalcTangentSpace      |
                           aiProcess_GenNormals            |
                           aiProcess_CalcTangentSpace      |
@@ -54,7 +53,7 @@ static int fetch_model_tree(StringView filepath) {
 
     if(!scene_ptr) {
         debug_error(debug::category::main, importer.GetErrorString());
-        return 1;
+        return invalid_asset_handle;
     }
 
     auto& scene = *scene_ptr;
@@ -184,7 +183,7 @@ static int fetch_model_tree(StringView filepath) {
         aiString ai_texture_path; u32 tex_count;
 
         tex_count = ai_material.GetTextureCount(aiTextureType_DIFFUSE);
-        auto try_fetch_texture =
+        auto try_fetch_image =
             [&](aiTextureType ai_texture_type) -> AssetHandle {
                 if(tex_count) {
                     if(tex_count > 1) warn_multitex();
@@ -199,7 +198,7 @@ static int fetch_model_tree(StringView filepath) {
                     } else {
                         if(!loaded_texture_paths.contains(conf_texture_path.view())) {
 
-                            auto h = fetch_texture(conf_texture_path.view());
+                            auto h = fetch(conf_texture_path.view());
                             if(h) {
                                 loaded_texture_paths.store(conf_texture_path.view());
                                 loaded_assets.push_back(h);
@@ -213,15 +212,14 @@ static int fetch_model_tree(StringView filepath) {
                 return invalid_asset_handle;
             };
 
-        material.trad.diffuse_map = try_fetch_texture(aiTextureType_DIFFUSE);
-        material.trad.specular_map = try_fetch_texture(aiTextureType_SPECULAR);
-        material.trad.height_map = try_fetch_texture(aiTextureType_DISPLACEMENT);
-        material.trad.normal_map = try_fetch_texture(aiTextureType_NORMALS);
+        material.trad.diffuse_map = try_fetch_image(aiTextureType_DIFFUSE);
+        material.trad.specular_map = try_fetch_image(aiTextureType_SPECULAR);
+        material.trad.height_map = try_fetch_image(aiTextureType_DISPLACEMENT);
+        material.trad.normal_map = try_fetch_image(aiTextureType_NORMALS);
 
         loaded_assets.push_back(material.handle);
     }
 
 
-
-    return 0;
+    return invalid_asset_handle;
 }

@@ -33,7 +33,7 @@ namespace serialization {
     }
 
     void Archive::set_name(StringView name) {
-        assert(name.length() >= PROTO_ARCHIVE_MAX_NAME_LEN);
+        assert(name.length >= PROTO_ARCHIVE_MAX_NAME_LEN);
 
         strview_copy(superblock->name, name);
     }

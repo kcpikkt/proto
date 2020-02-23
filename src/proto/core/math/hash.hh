@@ -10,12 +10,12 @@ constexpr static u32 crc32_poly = 0xEDB88320;
 static constexpr u32 crc32(StringView data, u32 prev_crc = 0) {
     u32 crc = ~prev_crc;
 
-    u32 length = data.length();
-    assert(data.length());
+    u32 length = data.length;
+    assert(data.length);
 
     // It was cast to unsigned but cant do that in constexpr
     // shouldnt be a problem as long as integers are twos compliment
-    const char * current = data.str();
+    const char * current = data.str;
 
     while(length--){ 
         crc ^= *(current++);

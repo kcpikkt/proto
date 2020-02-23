@@ -4,17 +4,15 @@
 
 namespace proto {
 // this function returns pointer to internal buffer that is rewritten
-// and may in future be even reallocated so DONT KEEP ITS RETURN VAL, PRINT IT OR COPY IMMEDIATELY AFTER USE
+// and may in future be even reallocated so
+// DONT KEEP ITS RETURN VAL, PRINT IT OR COPY IMMEDIATELY AFTER USE
 // or you will get wacky, stupid, confusing bugs, thanks
 
-//template<typename T> 
-//StringView _format(char * buffer, u64 max_len, StringView fmt, T arg) {
-//}
 template<typename T> 
 u32 _format(MemBuffer buf, StringView& fmt, T arg) {
     if(buf.size == 0) return 0;
 
-    for(u32 i=0; i < fmt.length(); ++i) {
+    for(u32 i=0; i < fmt.length; ++i) {
         char c = fmt[i];
         //TODO(kacper): escaped %%%
         if(c == '%') {
@@ -52,7 +50,7 @@ StringView format(StringView fmt, Ts... args) {
     static char buffer[bufsz]; //temp
 
     u32 written = _format( {{buffer}, bufsz}, /*ref*/ fmt, args... );
-    u32 len = min(bufsz - written, fmt.length());
+    u32 len = min(bufsz - written, fmt.length);
     strview_copy(buffer + written, fmt.prefix(len));
     written += len;
 
