@@ -3,45 +3,18 @@
 #include "proto/core/util/Bitfield.hh"
 #include "proto/core/util/Buffer.hh"
 #include "proto/core/util/Range.hh" 
+#include "proto/core/util/StringView.hh" 
+
+#if defined(PROTO_PLATFORM_WINDOWS)
+    #error not implemented
+#elif defined(PROTO_PLATFORM_MAC)
+    #error not implemented
+#else 
+# include <stdio.h> // FILE
+#endif
 
 namespace proto {
 namespace platform {
-
-struct FileErrCategory : ErrCategoryCRTP<FileErrCategory> {
-    enum {
-          success = 0,
-          open_fail,
-          desc_retrieve,
-          wrong_mode,
-          desc_retrieve_fail,
-          resize_fail,
-          reserve_fail,
-          close_fail,
-          seek_fail,
-    };
-    static ErrMessage message(ErrCode code){
-        switch(code) {
-        case success:
-            return "Success.";
-        case open_fail:
-            return "Failed to open file.";
-        case wrong_mode:
-            return "Wrong or unsupported file open mode bitflags.";
-        case desc_retrieve_fail:
-            return "Failed to retrieve file descriptor of a file.";
-        case resize_fail:
-            return "Failed to resize file descriptor of a file.";
-        case reserve_fail:
-            return "Failed to retrieve file descriptor of a file.";
-        case seek_fail:
-            return "Failed to seek into the file.";
-        default:
-            return "Unknown error";
-        }
-    }
-};
-
-using FileErr = Err<FileErrCategory>;
 
 struct File {
 
@@ -71,7 +44,7 @@ struct File {
     Bitfield<u8> flags;
     //constexpr static u8 is_open_bit = BIT(0);
 
-    FileErr open(StringView filename, Mode mode);
+    Err open(StringView filename, Mode mode);
     u64 size();
     u64 write(void const * buf, u64 size); 
     u64 write(MemBuffer buf);
@@ -80,17 +53,17 @@ struct File {
     u64 read(MemBuffer buf); 
     void flush();
 
-    FileErr seek(s64 offset);
-    FileErr seek_end(s64 offset = 0);
+    Err seek(s64 offset);
+    Err seek_end(s64 offset = 0);
 
     s64 cursor();
 
     MemBuffer map(Mode mode, Range range = {0,0});
     void unmap(MemBuffer mem);
 
-    FileErr resize(u64 size);
-    FileErr reserve(u64 size);
-    FileErr close();
+    Err resize(u64 size);
+    Err reserve(u64 size);
+    Err close();
 };
 
 } // namespace platform 

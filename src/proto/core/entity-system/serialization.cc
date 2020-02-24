@@ -75,7 +75,7 @@ int serialize_ecs_tree (MemBuffer buf, Array<Entity>& ents, ECSTreeMemLayout& la
             auto arr = (Pair<Entity, EntityMetadata>*)(buf.data8 + header.ents.offset);
             arr[i] = {ents[i], *mdata};
         } else
-            return serialization::ArchiveErrCategory::invalid_argument;
+            return INVALID_ARG_ERR;
     }
     //memcpy(buf.data8 + header.ents.offset, ents.raw(), header.ents.size);
     // ents arr, done
@@ -139,7 +139,7 @@ int serialize_ecs_tree (MemBuffer buf, Array<Entity>& ents, ECSTreeMemLayout& la
                         debug_warn(debug::category::main,
                                    CompType(bit).name(), " component bit is set on entity ", e.id,
                                    " but the component isn't there.");
-                        return serialization::ArchiveErrCategory::invalid_argument;
+                        return INVALID_ARG_ERR;
                     }
 
                     // we subtract from array count for given component
@@ -148,7 +148,7 @@ int serialize_ecs_tree (MemBuffer buf, Array<Entity>& ents, ECSTreeMemLayout& la
                 }
 
             } else
-                return serialization::ArchiveErrCategory::invalid_argument;
+                return INVALID_ARG_ERR;
         }
 
         comps_bitset.unset(bit);
@@ -157,7 +157,7 @@ int serialize_ecs_tree (MemBuffer buf, Array<Entity>& ents, ECSTreeMemLayout& la
     // we should have inspected all bits
     assert(comps_bitset.is_zero());
 
-    return serialization::ArchiveErrCategory::success;
+    return SUCCESS;
 }
 
 int deserialize_ecs_tree (MemBuffer buf)

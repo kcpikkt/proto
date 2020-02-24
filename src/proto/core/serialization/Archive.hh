@@ -18,57 +18,57 @@ u64 calc_flat_asset_archive_size(Array<AssetHandle>& assets);
 #define PROTO_ARCHIVE_MAX_NAME_LEN 255
 #define PROTO_ARCHIVE_MAX_PATH_LEN 255
 
-struct ArchiveErrCategory : ErrCategoryCRTP<ArchiveErrCategory> {
-    enum : u32 { success = 0,
-                 out_of_memory,
-                 invalid_archive,
-                 file_open_fail,
-                 file_write_fail,
-                 file_read_fail,
-                 file_resize_fail,
-                 file_mapping_fail,
-                 header_alloc_fail,
-                 no_free_nodes,
-                 asset_not_cached,
-                 invalid_argument,
-    };
+    //struct ArchiveErrCategory : ErrCategoryCRTP<ArchiveErrCategory> {
+    //    enum : u32 { success = 0,
+    //                 out_of_memory,
+    //                 invalid_archive,
+    //                 file_open_fail,
+    //                 file_write_fail,
+    //                 file_read_fail,
+    //                 file_resize_fail,
+    //                 file_mapping_fail,
+    //                 header_alloc_fail,
+    //                 no_free_nodes,
+    //                 asset_not_cached,
+    //                 invalid_argument,
+    //    };
+    //
+    //    static ErrMessage message(ErrCode code) {
+    //        switch(code) {
+    //        case success:
+    //            return "Success";
+    //        case out_of_memory:
+    //            return "Implement archive resize";
+    //        case invalid_archive:
+    //            return "The archive is corrupted.";
+    //        case file_write_fail:
+    //            return "Failed to write to archive file.";
+    //        case file_read_fail:
+    //            return "Failed to read archive file.";
+    //        case file_resize_fail:
+    //            return "Failed to resize archive file.";
+    //        case file_mapping_fail:
+    //            return "Failed to map archive file to memory.";
+    //        case file_open_fail:
+    //            return "Failed to open archive file.";
+    //        case header_alloc_fail:
+    //            return "Failed to allocate memory for archive file header cache.";
+    //        case no_free_nodes:
+    //            return "No free nodes left in the archive.";
+    //            // perhaps last block of node table could be pointer to block of
+    //            // more nodes? that would be kinda cool, no restriction on number of nodes
+    //            // though it would be more tidious to implement
+    //        case asset_not_cached:
+    //            return "Could not obtain cached memory of an asset.";
+    //        case invalid_argument:
+    //            return "Argument passed to a function was invalid.";
+    //        default:
+    //            return "Unknown error.";
+    //        }
+    //    }
+    //};
 
-    static ErrMessage message(ErrCode code) {
-        switch(code) {
-        case success:
-            return "Success";
-        case out_of_memory:
-            return "Implement archive resize";
-        case invalid_archive:
-            return "The archive is corrupted.";
-        case file_write_fail:
-            return "Failed to write to archive file.";
-        case file_read_fail:
-            return "Failed to read archive file.";
-        case file_resize_fail:
-            return "Failed to resize archive file.";
-        case file_mapping_fail:
-            return "Failed to map archive file to memory.";
-        case file_open_fail:
-            return "Failed to open archive file.";
-        case header_alloc_fail:
-            return "Failed to allocate memory for archive file header cache.";
-        case no_free_nodes:
-            return "No free nodes left in the archive.";
-            // perhaps last block of node table could be pointer to block of
-            // more nodes? that would be kinda cool, no restriction on number of nodes
-            // though it would be more tidious to implement
-        case asset_not_cached:
-            return "Could not obtain cached memory of an asset.";
-        case invalid_argument:
-            return "Argument passed to a function was invalid.";
-        default:
-            return "Unknown error.";
-        }
-    }
-};
-
-using ArchiveErr = Err<ArchiveErrCategory>;
+    //using ArchiveErr = Err<ArchiveErrCategory>;
 
 struct Archive : StateCRTP<Archive> {
     
@@ -188,15 +188,15 @@ struct Archive : StateCRTP<Archive> {
 
     // perhaps you can just map file to memory, right?
 
-    ArchiveErr _commit_cached_header();
+    Err _commit_cached_header();
 
-    StateErr<Archive> dtor_deep();
+    Err dtor_deep();
 
-    ArchiveErr create(StringView filepath, u32 node_count, u64 data_size);
-    ArchiveErr open(StringView filepath /* , sys::File::Mode filemode = sys::File::read_mode */ );
-    ArchiveErr store(AssetHandle handle);
+    Err create(StringView filepath, u32 node_count, u64 data_size);
+    Err open(StringView filepath /* , sys::File::Mode filemode = sys::File::read_mode */ );
+    Err store(AssetHandle handle);
 
-    ArchiveErr store(Array<Entity>&, ECSTreeMemLayout * const layout = nullptr);
+    Err store(Array<Entity>&, ECSTreeMemLayout * const layout = nullptr);
 
     MemBuffer get_node_memory(u64 node_idx);
     AssetHandle load_asset(u32 index);

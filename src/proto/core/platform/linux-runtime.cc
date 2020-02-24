@@ -17,6 +17,7 @@
 #include "proto/core/io.hh"
 #include "proto/core/util/defer.hh"
 #include "proto/core/entity-system.hh"
+#include "proto/core/error-handling.hh"
 
 #include <sys/types.h>
 #include <stdio.h>
@@ -145,6 +146,16 @@ void * clientlib_h;
 
 
 int proto::platform::runtime(int argc, char ** argv){
+
+    // for lack of a better place to run this
+
+    println(count_of(_err_msg_map));
+    println((int)_err_count);
+    if(auto ec = _errmsg_sanity_check()) {
+        debug_error(debug::category::main,
+                    "Error messages do not match error codes, fix&recompile, exiting.");
+        return -1;
+    }
 
     proto::context = &_context;
     auto& ctx = _context;

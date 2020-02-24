@@ -105,7 +105,7 @@ struct StringArena : StateCRTP<StringArena>, debug::Marker{
 
     bool contains(StringView str);
 
-    Err<StateBase::ErrCategory> dtor_deep();
+    Err dtor_deep();
 };
 
 } // namespace proto

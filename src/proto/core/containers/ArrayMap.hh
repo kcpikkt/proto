@@ -255,11 +255,11 @@ struct ArrayMap
 
     //Err<typename State::ErrCategory> dtor_shallow() {}
 
-    Err<typename State::ErrCategory> dtor_deep() {
+    Err dtor_deep() {
         if(keys.dtor() || values.dtor())
-            return State::ErrCategory::dtor_fail;
+            return ST_DTOR_ERR;
         else
-            return State::ErrCategory::success;
+            return SUCCESS;
     }
 };
 

@@ -9,7 +9,7 @@
 namespace proto {
 namespace platform {
 
-    FileErr File::open(StringView filepath, Mode mode) {
+    Err File::open(StringView filepath, Mode mode) {
         const char * mode_str;
         switch(mode) {
             case read_mode:
@@ -27,9 +27,9 @@ namespace platform {
 
         _file_ptr = fopen(filepath, mode_str);
         if(!_file_ptr)
-            return FileErrCategory::open_fail;
+            return IO_FILE_OPEN_ERR;
 
-        return FileErrCategory::success;
+        return SUCCESS;
     }
 
     u64 File::size() {
@@ -58,40 +58,40 @@ namespace platform {
         return read(buf.data, buf.size);
     }
 
-    FileErr File::seek(s64 offset) {
+    Err File::seek(s64 offset) {
         return fseek(_file_ptr, offset, SEEK_SET)
-            ? FileErrCategory::seek_fail
-            : FileErrCategory::success;
+            ? IO_FILE_SEEK_ERR
+            : SUCCESS;
     }
 
-    FileErr File::seek_end(s64 offset) {
+    Err File::seek_end(s64 offset) {
         return fseek(_file_ptr, offset, SEEK_END)
-            ? FileErrCategory::seek_fail
-            : FileErrCategory::success;
+            ? IO_FILE_SEEK_ERR
+            : SUCCESS;
     }
 
     s64 File::cursor() {
         return ftell(_file_ptr);
     }
 
-    FileErr File::resize(u64 size) {
+    Err File::resize(u64 size) {
         int fd = fileno(_file_ptr);
-        if(fd == -1) return FileErrCategory::desc_retrieve_fail;
+        if(fd == -1) return IO_FILE_ERR;
 
         if(ftruncate(fd, size)) 
-            return FileErrCategory::resize_fail;
+            return IO_FILE_ERR;
 
-        return FileErrCategory::success;
+        return SUCCESS;
     }
 
-    FileErr File::reserve(u64 size) {
+    Err File::reserve(u64 size) {
         int file_desc = fileno(_file_ptr);
-        if(file_desc == -1) return FileErrCategory::desc_retrieve_fail;
+        if(file_desc == -1) return IO_FILE_ERR;
 
         if(posix_fallocate(file_desc, 0, size))
-            return FileErrCategory::reserve_fail;
+            return IO_FILE_RESERVE_ERR;
 
-        return FileErrCategory::success;
+        return SUCCESS;
     }
 
     MemBuffer File::map(File::Mode mode, Range range) {
@@ -109,7 +109,8 @@ namespace platform {
 
         if(flags.check(mapped_bit)) {
             debug_warn(debug::category::main,
-                       "Tried to map file to memory second time (that should be ok but unsupported), no operation performed.");
+                       "Tried to map file to memory second time "
+                       "(that should be ok but unsupported), no operation performed.");
             return {};
         }
 
@@ -151,15 +152,15 @@ namespace platform {
         munmap(mem.data, mem.size);
     }
 
-    FileErr File::close() {
+    Err File::close() {
         assert(_file_ptr);
 
         if(flags.check(mapped_bit))
             debug_warn(debug::category::main, "Closing memory mapped file that wasn't unmapped");
 
         return (fclose(_file_ptr)
-                ? FileErrCategory::close_fail
-                : FileErrCategory::success);
+                ? IO_FILE_CLOSE_ERR 
+                : SUCCESS);
     }
 
 } // namespace platform

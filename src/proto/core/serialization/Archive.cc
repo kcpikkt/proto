@@ -41,25 +41,25 @@ namespace serialization {
     #if 0 
 
     // perhaps you can just map file to memory, right?
-    ArchiveErr Archive::_commit_cached_header() {
+    Err Archive::_commit_cached_header() {
         auto _cursor = file.cursor();
         file.seek(0);
         if(sizeof(Superblock) != file.write(superblock, sizeof(Superblock)))
-            return ArchiveErrCategory::file_write_fail;
+            return IO_FILE_WRITE_ERR;
          
         assert(superblock->node_table_size == nodes.size() * sizeof(Node));
 
         file.seek(superblock->node_table_offset);
         if(superblock->node_table_size != file.write(nodes._data, superblock->node_table_size))
-            return ArchiveErrCategory::file_write_fail;
+            return IO_FILE_WRITE_ERR;
 
         file.seek(_cursor);
-        return ArchiveErrCategory::success;
+        return SUCCESS;
     }
     #endif
 
-    StateErr<Archive> Archive::dtor_deep() {
-        StateErr<Archive> err = StateErrCategory<Archive>::success;
+    Err Archive::dtor_deep() {
+        Err err = SUCCESS;
 
         //if(auto ec = _commit_cached_header())
         //    return StateErrCategory<Archive>::dtor_fail;
@@ -67,18 +67,18 @@ namespace serialization {
         file.unmap(mapping);
 
         if(file.close())
-            return StateErrCategory<Archive>::file_close_fail;
+            return IO_FILE_CLOSE_ERR;
 
         if(nodes.dtor())
-            return StateErrCategory<Archive>::dtor_fail;
+            return ST_DTOR_ERR;
 
         // double free just crash
         return err;
     }
 
-    ArchiveErr Archive::create(StringView filepath, u32 node_count, u64 data_size) {
-        if(file.open(filepath, sys::File::read_overwrite_mode ))
-            return ArchiveErrCategory::file_open_fail;
+    Err Archive::create(StringView filepath, u32 node_count, u64 data_size) {
+        Err ec;
+        if( (ec = file.open(filepath, sys::File::read_overwrite_mode)) ) return ec;
 
         //FIXME
         node_count += 1; // root //NOTE(kacper): node_count=max_u32 is a bug then
@@ -88,11 +88,11 @@ namespace serialization {
 
 
         if(file.size() < size)
-            if(file.resize(size))
-                return ArchiveErrCategory::file_resize_fail;
+            if(auto ec = file.resize(size)) return ec;
+                
 
         mapping = file.map(sys::File::read_write_mode, Range{0, size});
-        if(!mapping) return ArchiveErrCategory::file_mapping_fail;
+        if(!mapping) return IO_FILE_MAP_ERR;
 
         assert(mapping.size == size);
 
@@ -124,61 +124,61 @@ namespace serialization {
         superblock->free_node_count--;
 
         State::state_init();
-        return ArchiveErrCategory::success;
+        return SUCCESS;
     }
     
-    ArchiveErr Archive::open(StringView filepath /* , sys::File::Mode filemode = sys::File::read_mode */ ) {
-        if(file.open(filepath, sys::File::read_mode))
-            return ArchiveErrCategory::file_open_fail;
+    Err Archive::open(StringView filepath /* , sys::File::Mode filemode = sys::File::read_mode */ ) {
+        Err ec;
+        if( (ec = file.open(filepath, sys::File::read_mode)) ) return ec;
 
         mapping = file.map(sys::File::read_mode, Range{0, file.size()});
-        if(!mapping) return ArchiveErrCategory::file_mapping_fail;
+        if(!mapping) return IO_FILE_MAP_ERR;
 
         superblock = (Superblock*)mapping.data;
 
         auto file_sz = file.size();
         if(superblock->sig != Superblock::signature) {
             debug_error(debug::category::data, filepath, " archive signature is corrupted");
-            return ArchiveErrCategory::invalid_archive;}
+            return AR_INVALID_ERR;}
 
         if(superblock->archive_size > file_sz) {
             debug_error_fmt(debug::category::data, "Sanity check failed, "
                             "archive claims to be % while its file size is %.",
                             superblock->archive_size, file_sz);
 
-            return ArchiveErrCategory::invalid_archive;}
+            return AR_INVALID_ERR;}
 
         if(superblock->node_table_size > superblock->archive_size) {
             debug_error_fmt(debug::category::data, "Sanity check failed, "
                             "archve node_table_offset is % which is greater than the size of the file itself - %" ,
                             superblock->node_table_offset , superblock->archive_size);
 
-            return ArchiveErrCategory::invalid_archive;}
+            return AR_INVALID_ERR;}
 
         auto tmp = superblock->node_table_offset + superblock->node_table_size;
         if(tmp > superblock->archive_size) {
             debug_error(debug::category::data, "Sanity check failed, "
                         "archve node_table_offset + node_table_size is ", tmp,
                         ", which is greater than the size of the file itself - ", superblock->archive_size );
-            return ArchiveErrCategory::invalid_archive;}
+            return AR_INVALID_ERR;}
 
         // in theory this dont have to hold but whatever
         if(superblock->node_table_offset != sizeof(Superblock)) {
             debug_error(debug::category::data, "Sanity check failed, "
                         "node_table_offset (", superblock->node_table_offset, ") is not equal to sizeof(Superblock) (",
                         sizeof(Superblock), "). (This does not have to hold, delete me after you start maybe 16-align or something)");
-            return ArchiveErrCategory::invalid_archive;}
+            return AR_INVALID_ERR;}
 
         if(superblock->data_offset > superblock->archive_size) {
             debug_error(debug::category::data, "Sanity check failed, "
                         "archve data_offset ", superblock->data_offset,
                         ", which is greater than the size of the file itself - ", superblock->archive_size );
-            return ArchiveErrCategory::invalid_archive;}
+            return AR_INVALID_ERR;}
 
         nodes.init_place_resize((u8*)superblock + superblock->node_table_offset, superblock->node_count);
 
         State::state_init();
-        return ArchiveErrCategory::success;
+        return SUCCESS;
     }
 
     template<typename T> static MemBuffer _get_asset_cached_mem(T*);
@@ -206,7 +206,7 @@ namespace serialization {
         return (idx != nodes.size()) ? idx : 0;
     }
     
-    ArchiveErr Archive::store(Array<Entity>& ents, ECSTreeMemLayout * const layout) {
+    Err Archive::store(Array<Entity>& ents, ECSTreeMemLayout * const layout) {
         if(!layout) {
             assert( !calc_ecs_tree_memlayout(*layout, ents) );
         }
@@ -221,30 +221,29 @@ namespace serialization {
         u8 * mapping_end = mapping.data8 + mapping.size;
 
         if( !belongs(new_block, mapping) || !belongs_incl(new_block_end, mapping))
-            return ArchiveErrCategory::out_of_memory;
+            return MEM_OOM_ERR;
 
-        if( !serialize_ecs_tree(MemBuffer{{new_block}, layout->size}, ents, *layout));
+        if( !serialize_ecs_tree(MemBuffer{{new_block}, layout->size}, ents, *layout))
             return -1;
 
-        cursor += cached_mem.size;
-        node.block_size = cached_mem.size;
-        node.handle = handle;
+        //cursor += cached_mem.size;
+        //node.block_size = cached_mem.size;
+        //node.handle = handle;
 
-        superblock->data_size += cached_mem.size;
+        //superblock->data_size += cached_mem.size;
 
-        memcpy(&nodes[idx], &node, sizeof(Node));
+        //memcpy(&nodes[idx], &node, sizeof(Node));
 
-        superblock->free_node_count--;
+        //superblock->free_node_count--;
 
-        return ArchiveErrCategory::success;
-
+        return SUCCESS;
     }
  
-    ArchiveErr Archive::store(AssetHandle handle) {
+    Err Archive::store(AssetHandle handle) {
         u32 idx;
 
         if( !(idx = _find_free_node()) )
-            return ArchiveErrCategory::no_free_nodes;
+            return AR_NO_FREE_NODES_ERR;
 
         Node node; node.type = Node::asset;
         node.parent_index = 0;
@@ -254,7 +253,7 @@ namespace serialization {
             INVOKE_FTEMPL_WITH_ASSET_PTR(_get_asset_cached_mem, handle);
 
         if(!cached_mem)
-            return ArchiveErrCategory::asset_not_cached;
+            return UNIMPL_ERR;
 
         // this should be now O(1) now as handle should be already hinted
         AssetMetadata* metadata = get_metadata(handle);
@@ -268,7 +267,7 @@ namespace serialization {
         if(  !belongs(new_block, mapping) ||
             (!belongs(new_block_end, mapping) && mapping_end != new_block_end) ) {
 
-            return ArchiveErrCategory::out_of_memory;
+            return MEM_OOM_ERR;
         }
 
         memcpy(new_block, cached_mem.data, cached_mem.size);
@@ -284,7 +283,7 @@ namespace serialization {
 
         superblock->free_node_count--;
 
-        return ArchiveErrCategory::success;
+        return SUCCESS;
     }
 
     AssetHandle Archive::load_asset(u32 index) {

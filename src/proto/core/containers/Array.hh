@@ -276,11 +276,9 @@ struct Array
         _capacity = new_capacity;
     }
 
-    //Err<typename State::ErrCategory> dtor_shallow() {}
-
-    Err<typename State::ErrCategory> dtor_deep() {
+    Err dtor_deep() {
         assert(_allocator);
-        auto err = State::ErrCategory::success;
+        auto err = SUCCESS;
         if constexpr(has_state) {
                 // monitor for destruction errors
             for(u64 i=0; i<_count; i++) _data[i].dtor();

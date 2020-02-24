@@ -122,11 +122,11 @@ void StringArena::store(StringView str) {
     _cursor += len;
 }
 
-Err<StringArena::StateBase::ErrCategory> StringArena::dtor_deep() {
+Err StringArena::dtor_deep() {
     assert(_allocator);
     _allocator->free(_data);
     _offsets.dtor();
-    return StateBase::ErrCategory::success;
+    return SUCCESS;
 }
 
     //Err<StringArena::StateBase::ErrCategory> StringArena::destroy_deep() {

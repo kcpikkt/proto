@@ -72,27 +72,25 @@ int opt_output_proc(Array<StringView>& args) {
                                 loaded_assets.size() + 2, // root + ecs_tree
                                 ar_data_size_acc))
     {
-        log_error(debug::category::main, ec.message());
+        log_error(debug::category::main, errmsg(ec));
         return -1;
     }
 
     defer {
         if(auto ec = archive.dtor())
-            return (void)log_error(debug::category::main, ec.message());
+            return (void)log_error(debug::category::main, errmsg(ec));
     };
 
-    
     for(auto asset : loaded_assets) {
         if(auto ec = archive.store(asset)) {
             log_error(debug::category::data,
-                      "Archiving ", get_metadata(asset)->name, " failed: ", ec.message());
+                      "Archiving ", get_metadata(asset)->name, " failed: ", errmsg(ec));
             break;
         }
     }
 
-
     if(auto ec = archive.store(loaded_ents, &layout)) {
-        log_error(debug::category::data, "Archiving ECS Tree failed: ", ec.message());
+        log_error(debug::category::data, "Archiving ECS Tree failed: ", errmsg(ec));
     }
 
         //    for(auto& [mesh, metadata] : ctx.meshes.values) {
@@ -162,7 +160,7 @@ int opt_list_proc(Array<StringView>& args){
         using Node = serialization::Archive::Node;
         ser::Archive archive;
         if(auto ec = archive.open(arg)) {
-            log_error(debug::category::main, ec.message());
+            log_error(debug::category::main, errmsg(ec));
             return -1;
 
         } else {
@@ -186,7 +184,7 @@ int opt_list_proc(Array<StringView>& args){
             }
 
             if(auto ec = archive.dtor()) {
-                log_error(debug::category::main, ec.message());
+                log_error(debug::category::main, errmsg(ec));
                 return -1;
             }
         }
