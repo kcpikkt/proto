@@ -12,7 +12,7 @@
 
 using namespace proto;
 
-int opt_input_proc(Array<StringView>& args){
+Err opt_input_proc(Array<StringView>& args){
     if(args.count() == 0) {
         log_error(debug::category::main, "-input option requires one or more arguments.");
         return -1;
@@ -42,38 +42,41 @@ int opt_input_proc(Array<StringView>& args){
     }
 
     if(ar_flags.at(verbose_bit)) println();
-    return 0;
+    return SUCCESS;
 } 
 
-int opt_output_proc(Array<StringView>& args) {
+Err opt_output_proc(Array<StringView>& args) {
     if(args.count() != 1) {
         log_error(debug::category::main, "Option -output expects one argument.");
-        return -1;
+        return INVALID_ARG_ERR;
     }
 
-    ser::Archive archive;
+    Archive archive;
     auto outpath = args[0];
 
     if(ar_flags.at(verbose_bit)) println("Writing to archive: ", outpath);
 
+    u64 blk_sz = Archive::_def_block_size;
+
     u64 ar_data_size_acc = 0;
     for(auto asset : loaded_assets)
-        ar_data_size_acc += INVOKE_FTEMPL_WITH_ASSET_REF(ser::serialized_size, asset);
+        ar_data_size_acc +=
+            mem::align(INVOKE_FTEMPL_WITH_ASSET_REF(serialization::serialized_size, asset), blk_sz);
 
-    ECSTreeMemLayout layout;
-    if(auto ec = calc_ecs_tree_memlayout(layout, loaded_ents)) {
-        log_error(debug::category::data, "Computing ECS Tree memory layout failed: ");
-        return -1;
-    }
+    //ECSTreeMemLayout layout;
+    //if(auto ec = calc_ecs_tree_memlayout(layout, loaded_ents)) {
+    //    log_error(debug::category::data, "Computing ECS Tree memory layout failed: ");
+    //    return -1;
+    //}
 
-    ar_data_size_acc += layout.size;
+    //ar_data_size_acc += layout.size;
 
     if(auto ec = archive.create(outpath,
                                 loaded_assets.size() + 2, // root + ecs_tree
-                                ar_data_size_acc))
+                                2*ar_data_size_acc))
     {
         log_error(debug::category::main, errmsg(ec));
-        return -1;
+        return ec;
     }
 
     defer {
@@ -89,46 +92,15 @@ int opt_output_proc(Array<StringView>& args) {
         }
     }
 
-    if(auto ec = archive.store(loaded_ents, &layout)) {
-        log_error(debug::category::data, "Archiving ECS Tree failed: ", errmsg(ec));
-    }
-
-        //    for(auto& [mesh, metadata] : ctx.meshes.values) {
-        //        // make them look like they are not in memory,
-        //        // we want to load them from just written archive for test
-        //        mesh.flags.unset(Mesh::cached_bit);
-        //        metadata.archive_hash = archive.superblock->hash;
-        //    }
-        //
-        //    u64 ar_size = archive.superblock->archive_size;
-        //    const char * ar_size_unit;
-        //    //
-        //    u64 kb = 1024, mb = 1024 * 1024, gb = 1024 * 1024 * 1024;
-        //
-        //    if(ar_size < kb) {
-        //        ar_size_unit = "bytes";
-        //    } else if(ar_size < 1024 * 1024) {
-        //        ar_size_unit = "kilobytes";
-        //        ar_size /= kb;
-        //    } else if(ar_size < gb) {
-        //        ar_size_unit = "megabytes";
-        //        ar_size /= mb;
-        //    }
-        //
-        //    println_fmt("Parsed % meshes, % textures and % materials. Written to % (% %).",
-        //                mesh_count, tex_count, mat_count, outpath, ar_size, ar_size_unit);
-        //
-        //
-        //    #if 0
-        //    #endif
-        //
-        //    return 0;
+    //if(auto ec = archive.store(loaded_ents, &layout)) {
+    //    log_error(debug::category::data, "Archiving ECS Tree failed: ", errmsg(ec));
+    //}
 
     if(ar_flags.at(verbose_bit)) println();
-    return 0;
+    return SUCCESS;
 }
 
-int opt_search_proc(Array<StringView>& args){
+Err opt_search_proc(Array<StringView>& args){
     for(auto path : args) {
         if(!sys::is_directory(path)) {
             log_error(debug::category::main, path, " is not a directory.");
@@ -137,34 +109,34 @@ int opt_search_proc(Array<StringView>& args){
             search_paths.store(path); 
         }
     }
-    return 0;
+    return SUCCESS;
 } 
 
-int opt_verbose_proc(Array<StringView>& args){
+Err opt_verbose_proc(Array<StringView>& args){
     ar_flags.toggle(verbose_bit);
-    return 0;
+    return SUCCESS;
 } 
 
-int opt_preview_proc(Array<StringView>& args){
+Err opt_preview_proc(Array<StringView>& args){
     ar_flags.toggle(preview_bit);
-    return 0;
+    return SUCCESS;
 } 
 
-int opt_list_proc(Array<StringView>& args){
+Err opt_list_proc(Array<StringView>& args){
     if(!args.count()) {
         log_error(debug::category::main, "Option -list expects one or more arguments.");
         return -1;
     }
 
     for(auto arg : args) {
-        using Node = serialization::Archive::Node;
-        ser::Archive archive;
+        using Node = Archive::Node;
+        Archive archive;
         if(auto ec = archive.open(arg)) {
             log_error(debug::category::main, errmsg(ec));
-            return -1;
+            return ec;
 
         } else {
-            println(archive.superblock->name);
+            println(archive.sblk->name);
             for(auto& node : archive.nodes) {
                 switch(node.type) {
                 case Node::free:
@@ -191,7 +163,7 @@ int opt_list_proc(Array<StringView>& args){
     }
     
     println();
-    return 0;
+    return SUCCESS;
 } 
 
 

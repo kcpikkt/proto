@@ -25,7 +25,7 @@ int calc_ecs_tree_memlayout(ECSTreeMemLayout& layout, Array<Entity>& ents)
     }
     assert(mem::is_aligned(layout.comp_arr_arena_sz_algn, 16));
 
-    layout.comp_arrs_count = layout.comp_bits.bitcount();
+    layout.comp_arrs_count = layout.comp_bits.bitcount1();
 
     layout.comp_arrs_arr_sz      = layout.comp_arrs_count * sizeof(ArrayHeader);
     layout.comp_arrs_arr_sz_algn = mem::align(layout.comp_arrs_arr_sz);
@@ -84,9 +84,9 @@ int serialize_ecs_tree (MemBuffer buf, Array<Entity>& ents, ECSTreeMemLayout& la
     u64 comp_arena_off = header.comp_arena_offset;
     auto comps_bitset = header.comp_bits;
 
-    auto comp_types_cnt = comps_bitset.bitcount();
+    auto comp_types_cnt = comps_bitset.bitcount1();
     for(u32 i=0; i<comp_types_cnt; ++i) {
-        u64 bit = comps_bitset.lsb();
+        u64 bit = comps_bitset.lsb1();
 
         auto comp_arr_header = (ArrayHeader *)
             (buf.data8 + header.comp_arrs.offset + i * sizeof(ArrayHeader));
@@ -113,7 +113,7 @@ int serialize_ecs_tree (MemBuffer buf, Array<Entity>& ents, ECSTreeMemLayout& la
     comps_bitset = header.comp_bits;
     for(u32 i=0; i<comp_types_cnt; ++i) {
         // bit being comp type index
-        u64 bit = comps_bitset.lsb();
+        u64 bit = comps_bitset.lsb1();
         // we should not run out of bits before this loop terminates
         assert(bit != comps_bitset.bitsize);
         // how many comps of given type we serialized already
@@ -178,7 +178,7 @@ int deserialize_ecs_tree (MemBuffer buf)
         auto new_ent = create_entity();
 
         auto comps = mdata.comps;
-        auto bitcount = comps.bitcount();
+        auto bitcount = comps.bitcount1();
 
         for(u64 k=0; k<bitcount; ++k) {
             auto bit = comps.lsb();

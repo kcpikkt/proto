@@ -131,7 +131,7 @@ namespace proto {
         char ** argv;
         s32 argc;
 
-        ArrayMap<u32, serialization::Archive> open_archives;
+        ArrayMap<u32, Archive> open_archives;
 
         // preservation of client data when hot-swapping
         void ** client_preserved; 

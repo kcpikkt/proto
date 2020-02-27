@@ -1,7 +1,6 @@
 #pragma once
 #include "proto/core/graphics/common.hh"
 #include "proto/core/common/types.hh"
-#include "proto/core/util/Range.hh"
 #include "proto/core/containers/Array.hh"
 #include "proto/core/util/Bitfield.hh"
 #include "proto/core/asset-system/common.hh"
@@ -14,14 +13,8 @@ struct Mesh : Asset{
     MemBuffer cached;
 
     enum {
-        on_gpu_bit = 0,
-        cached_bit,
-        archived_bit,
-        indexed_bit,
-        /////////////////////
-        _bitset_size
+        indexed_bit = asset_free_flags_bit,
     };
-    Bitset<_bitset_size> flags;
 
     u64 vertices_count;
     u64 indices_count;

@@ -41,6 +41,7 @@ enum : Err {
     AR_ERR,
     AR_INVALID_ERR,
     AR_NO_FREE_NODES_ERR,
+    AR_NO_BLOCK_SPAN_ERR,
     /////////////////////
     _err_count
 };
@@ -109,6 +110,8 @@ constexpr static _ErrMessage _err_msg_map[] =
                       "Archive file is invalid or corrupted."),
     _PROTO_DEF_ERRMSG(AR_NO_FREE_NODES_ERR,
                       "No free nodes left in an archive."),
+    _PROTO_DEF_ERRMSG(AR_NO_BLOCK_SPAN_ERR,
+                      "No sufficient free blocks span left in an archive."),
 };
 
 constexpr static const char * errmsg(Err code) { 

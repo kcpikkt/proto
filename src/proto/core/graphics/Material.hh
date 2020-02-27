@@ -28,6 +28,10 @@ struct GLSLMaterialFieldRefl {
 };
 
 struct Material : Asset {;
+    // since Material is its own serialized header and it does not hold any data
+    constexpr static u32 signature = AssetType<Material>::hash;
+    u32 sig = signature;
+
     Material() {}
 
     enum Type : u8 {
@@ -67,6 +71,10 @@ struct Material : Asset {;
         PBR pbr;
         Trad trad;
     };
+
+    MemBuffer get_cached() {
+        return { {this}, sizeof(Material) };
+    }
 };
 
 template<>

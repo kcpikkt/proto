@@ -42,4 +42,40 @@ namespace proto {
     using mat4x4 = glm::mat4x4;
 
     using quat = glm::quat;
-}
+
+    template<typename T = u64> struct Span {
+        T begin = 0;
+        T size = 0;
+
+        Span() {}
+        Span(T _begin, T _size) : begin(_begin), size(_size) {}
+    };
+
+    template<typename T = u64>
+    struct Range {
+        T begin = 0;
+        T end = 0;
+
+        Range() {};
+        Range(T _begin, T _end) : begin(_begin), end(_end) {}
+    };
+
+    template<typename T>
+    struct Buffer {
+        union {
+            T * data = nullptr;
+            u8   * data8;
+            u16  * data16;
+            u32  * data32;
+            u64  * data64;
+        };
+        size_t size = 0;
+
+        operator bool() {
+            return (bool)data;
+        }
+    };
+
+    using MemBuffer = Buffer<void>;
+    using StrBuffer = Buffer<char>;
+} // namespace proto

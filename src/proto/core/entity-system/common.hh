@@ -10,10 +10,15 @@
 namespace proto {
 
 struct Component;
-struct InvalidComp;
+struct InvalidComp : Component{};
+
 struct TransformComp;
 struct RenderMeshComp;
 struct PointlightComp;
+
+using CompTList = meta::typelist<InvalidComp, TransformComp, RenderMeshComp, PointlightComp>;
+
+// Below is the main components typelist, based on it components arrays are created
     
 using CompTypeIndex = u8;
 
@@ -26,23 +31,18 @@ template<u8 _index, const char * _name> struct _CompType {
 struct RuntimeCompType {};
 template<typename = RuntimeCompType> struct CompType;
 
-#define PROTO_COMPONENT_TYPE(TYPE, INDEX)                     \
+#define PROTO_COMPONENT_TYPE(TYPE)                     \
     template<> struct CompType<TYPE> {                   \
         using type = TYPE;                                    \
-        constexpr static CompTypeIndex index = INDEX;    \
+        constexpr static CompTypeIndex index = CompTList::index_of<TYPE>::value; \
         constexpr static const char * name = PROTO_STR(TYPE); \
     };
  
-PROTO_COMPONENT_TYPE(InvalidComp, 0);
-PROTO_COMPONENT_TYPE(TransformComp, 1);
-PROTO_COMPONENT_TYPE(RenderMeshComp, 2);
-PROTO_COMPONENT_TYPE(PointlightComp, 3);
 
-// Below is the main components typelist, based on it components arrays are created
-using CompTList = meta::typelist<TransformComp, RenderMeshComp, PointlightComp>;
-
-// for runtime index based typeinfo
-// default for runtime typeinfo
+PROTO_COMPONENT_TYPE(InvalidComp);
+PROTO_COMPONENT_TYPE(TransformComp);
+PROTO_COMPONENT_TYPE(RenderMeshComp);
+PROTO_COMPONENT_TYPE(PointlightComp);
 
 template<typename T = RuntimeCompType> using CompT = CompType<T>;
 
@@ -56,7 +56,6 @@ struct _CompTypeData {
         CompTypeIndex index;
         u64 size;
     };
-
 
     template<typename...> struct _Lookup;
     template<size_t...Is> struct _Lookup<meta::sequence<Is...>> {

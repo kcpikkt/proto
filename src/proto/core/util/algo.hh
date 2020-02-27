@@ -1,5 +1,4 @@
 #pragma once
-#include "proto/core/util/Buffer.hh"
 #include "proto/core/meta.hh"
 
 namespace proto {

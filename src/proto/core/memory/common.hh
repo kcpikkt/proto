@@ -21,16 +21,16 @@ namespace memory{
 
     static constexpr u64 max_alignment = alignof(long double);
 
-    static constexpr u64 kilobytes(u64 bytes) {
-        return 1024ull * bytes;
-    }
-    static constexpr u64 megabytes(u64 bytes) {
-        return 1024ull * kilobytes(bytes);
-    }
-    static constexpr u64 gigabytes(u64 bytes) {
-        return 1024ull * megabytes(bytes);
-    }
-    static constexpr bool is_power_of_two(u64 n) {
+    static constexpr inline u64 kilobytes(u64 bytes) { return 1024ull * bytes; }
+    static constexpr inline u64 kb       (u64 bytes) { return 1024ull * bytes; }
+
+    static constexpr inline u64 megabytes(u64 bytes) { return 1024ull * kb(bytes); }
+    static constexpr inline u64 mb       (u64 bytes) { return 1024ull * kb(bytes); }
+
+    static constexpr inline u64 gigabytes(u64 bytes) { return 1024ull * mb(bytes); }
+    static constexpr inline u64 gb       (u64 bytes) { return 1024ull * mb(bytes); }
+
+    static constexpr bool is_pow2(u64 n) {
         return (n != 0) && !(n & (n-1));
     }
 
@@ -44,29 +44,29 @@ namespace memory{
 
 
     // alginoff
-    static inline u64 align_back(u64 offset, u64 alignment = _def_align) {
-        assert(is_power_of_two(alignment));
+    constexpr static inline u64 align_back(u64 offset, u64 alignment = _def_align) {
+        assert(is_pow2(alignment));
         return offset & ~(alignment - 1);
     }
 
-    static inline u64 align_forw(u64 offset, u64 alignment = _def_align) {
+    constexpr static inline u64 align_forw(u64 offset, u64 alignment = _def_align) {
         return align_back(offset + alignment - 1, alignment);
     }
 
-    static inline u64 align(u64 offset, u64 alignment = _def_align) {
+    constexpr static inline u64 align(u64 offset, u64 alignment = _def_align) {
         return align_forw(offset, alignment);
     }
 
     template<typename T>
     static void * align_forw(T * addr, u64 alignment = _def_align) {
-        assert(is_power_of_two(alignment));
+        assert(is_pow2(alignment));
         return (void *)(  (u64)((byte*)addr + (alignment - 1)) &
                         ~((u64)(alignment - 1)) );
     }
 
     template<typename T>
     static void * align_back(T * addr, u64 alignment = _def_align) {
-        assert(is_power_of_two(alignment));
+        assert(is_pow2(alignment));
         return align_forw((void*)((byte*)addr - (alignment - 1)),
                           alignment);
     }

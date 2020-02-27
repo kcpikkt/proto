@@ -69,6 +69,31 @@ namespace proto {
         INVOKE_FTEMPL_WITH_ASSET(ftempl, get_asset, handle)
 
 
+    MemBuffer get_asset_cached(AssetHandle handle);
+
+    template<typename T>
+    static MemBuffer get_asset_cached(AssetHandle handle) {
+        assert(AssetType<T>::index == handle.type);
+
+        if(auto asset = get_asset<T>(handle))
+            return asset->cached;
+
+        return {};
+    }
+
+    template<>
+    MemBuffer get_asset_cached<Material>(AssetHandle handle) {
+        assert(AssetType<Material>::index == handle.type);
+
+        if(auto mat = get_asset<Material>(handle))
+            return { {mat}, sizeof(Material)};
+
+        return {};
+    }
+
+
+
+
 
 
      //#define INVOKE_FTEMPL_WITH_ASSET_H(function_templ, handle)       \

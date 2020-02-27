@@ -1,6 +1,6 @@
 #pragma once
 #include "proto/core/platform/File.hh"
-#include "proto/core/util/Buffer.hh"
+#include "proto/core/util/Bitset.hh"
 #include "proto/core/containers/Array.hh"
 #include "proto/core/util/namespace-shorthands.hh"
 #include "proto/core/error-handling.hh"
@@ -11,81 +11,51 @@
 #include "proto/core/entity-system/common.hh"
 
 namespace proto {
-namespace serialization {
+    //namespace serialization {
 
 u64 calc_flat_asset_archive_size(Array<AssetHandle>& assets);
 
 #define PROTO_ARCHIVE_MAX_NAME_LEN 255
 #define PROTO_ARCHIVE_MAX_PATH_LEN 255
 
-    //struct ArchiveErrCategory : ErrCategoryCRTP<ArchiveErrCategory> {
-    //    enum : u32 { success = 0,
-    //                 out_of_memory,
-    //                 invalid_archive,
-    //                 file_open_fail,
-    //                 file_write_fail,
-    //                 file_read_fail,
-    //                 file_resize_fail,
-    //                 file_mapping_fail,
-    //                 header_alloc_fail,
-    //                 no_free_nodes,
-    //                 asset_not_cached,
-    //                 invalid_argument,
-    //    };
-    //
-    //    static ErrMessage message(ErrCode code) {
-    //        switch(code) {
-    //        case success:
-    //            return "Success";
-    //        case out_of_memory:
-    //            return "Implement archive resize";
-    //        case invalid_archive:
-    //            return "The archive is corrupted.";
-    //        case file_write_fail:
-    //            return "Failed to write to archive file.";
-    //        case file_read_fail:
-    //            return "Failed to read archive file.";
-    //        case file_resize_fail:
-    //            return "Failed to resize archive file.";
-    //        case file_mapping_fail:
-    //            return "Failed to map archive file to memory.";
-    //        case file_open_fail:
-    //            return "Failed to open archive file.";
-    //        case header_alloc_fail:
-    //            return "Failed to allocate memory for archive file header cache.";
-    //        case no_free_nodes:
-    //            return "No free nodes left in the archive.";
-    //            // perhaps last block of node table could be pointer to block of
-    //            // more nodes? that would be kinda cool, no restriction on number of nodes
-    //            // though it would be more tidious to implement
-    //        case asset_not_cached:
-    //            return "Could not obtain cached memory of an asset.";
-    //        case invalid_argument:
-    //            return "Argument passed to a function was invalid.";
-    //        default:
-    //            return "Unknown error.";
-    //        }
-    //    }
-    //};
-
-    //using ArchiveErr = Err<ArchiveErrCategory>;
-
+    // TODO(kacper): perhaps non mapped header mode
 struct Archive : StateCRTP<Archive> {
     
+    constexpr static u64 ar_superblock_signature = 0x70726172;
     struct Superblock {
-        constexpr static u64 signature = 0x70726172;
-        u64 sig = signature;
+        u64 signature = ar_superblock_signature;
         u32 hash;
 
+        // should to be the same (or at least less) as file size
         u64 archive_size;
-        u32 node_count;
-        u32 free_node_count;
+        u64 header_sz;
 
-        u64 node_table_size;
+        // bitmap telling us about arena block being or not being free
+        u64 arena_bitmap_offset;
+        u64 arena_bitmap_size;
+        u64 arena_bitmap_bitsize;
+
+        // bitmap telling us about node being or not being free
+        u64 node_bitmap_offset;
+        u64 node_bitmap_size;
+        u64 node_bitmap_bitsize;
+
+        // node table
         u64 node_table_offset;
+        u64 node_table_count;
+        u64 node_table_free;
+        u64 node_table_size;
 
-        u64 data_size;
-        u64 data_offset;
+        // block size
+        u64 block_size;
+
+        // should be arena_bitmap_bitsize * block_size?
+        u64 arena_cap;
+        // actual filled size
+        u64 arena_size;
+        // superblock itself, bitmaps and node table comes before it
+        u64 arena_offset;
+
         char name[PROTO_ARCHIVE_MAX_NAME_LEN];
     };
 
@@ -100,9 +70,8 @@ struct Archive : StateCRTP<Archive> {
                          ecs_tree
         } type;
 
-        u64 block_size;
-        u64 block_offset;
-
+        u64 blk_idx;
+        u64 blk_cnt;
         u64 parent_index;
 
         inline bool is_free() {return type == free;}
@@ -111,16 +80,50 @@ struct Archive : StateCRTP<Archive> {
     };
 
     // MemBuffer cached_header;
-    Superblock * superblock;
+    Superblock * sblk;
+    Bitset<0> arena_bitmap;
+    Bitset<0> node_bitmap;
     Array<Node> nodes;
 
-    sys::File file;
+    // superblock and nodes are memory mapped
+    // so there is no need to commit any edits?
     MemBuffer mapping;
-    u64 cursor;
+    sys::File file;
 
-    u8 * _data_off2addr(u64 offset);
+    constexpr static u64 _def_arena_cap = mem::gb(1);
+    constexpr static u64 _def_block_size = mem::kb(1);
+    static_assert(_def_arena_cap % _def_block_size == 0);
 
-    u64 _addr2data_off(void * addr);
+    constexpr static u64 _def_node_count = _def_arena_cap / _def_block_size;
+
+    constexpr static u64 _def_init_arena_size = 0;
+
+    Err create(StringView filepath,
+               u64 node_cnt = _def_node_count,
+               u64 arena_cap  = _def_arena_cap,
+               u64 block_size = _def_block_size);
+
+    Err open(StringView filepath ,
+             sys::File::Mode filemode = sys::File::read_mode);
+
+    Err store(AssetHandle handle);
+    // You precalculated the layout? great!
+    Err store(Array<Entity>&, ECSTreeMemLayout * const layout = nullptr);
+ 
+    Err _node_sanity_check();
+
+    u64 _alloc_node();
+    Err _free_node(u64 idx);
+
+    Err _arena_alloc(u64 node_idx, u64 bsize);
+
+    void set_name(StringView name);
+
+    Err dtor_deep();
+
+    #if 0 
+    u8 * _off2addr(u64 offset);
+    u64  _addr2off(void * addr);
 
     inline u64 size() const {
         return superblock->archive_size; }
@@ -202,7 +205,8 @@ struct Archive : StateCRTP<Archive> {
     AssetHandle load_asset(u32 index);
 
     u64 _find_free_node();
+    #endif
 };
 
-} // namespace serialization
+    //} // namespace serialization
 } // namespace proto

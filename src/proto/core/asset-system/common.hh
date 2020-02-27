@@ -20,6 +20,7 @@ namespace proto {
     struct ShaderProgram;
 
     using AssetTypeIndex = u8;
+    using AssetTList = meta::typelist<InvalidAsset, Mesh, Texture2D, Cubemap, Material, ShaderProgram>;
 
     template<u8 _index, const char * _name> struct _AssetType {
         constexpr static AssetTypeIndex index = _index;
@@ -29,20 +30,22 @@ namespace proto {
     struct RuntimeAssetType {};
     template<typename = RuntimeAssetType> struct AssetType;
 
-    #define PROTO_ASSET_TYPE(TYPE, INDEX)                         \
-        template<> struct AssetType<TYPE> {                       \
-            using type = TYPE;                                    \
-            constexpr static AssetTypeIndex index = INDEX;        \
-            constexpr static const char * name = PROTO_STR(TYPE); \
+    #define PROTO_ASSET_TYPE(TYPE)                               \
+        template<> struct AssetType<TYPE> {                             \
+            using type = TYPE;                                          \
+            constexpr static AssetTypeIndex index = AssetTList::index_of<TYPE>::value; \
+            constexpr static const char * name = PROTO_STR(TYPE);       \
             constexpr static const u32 hash = hash::crc32( {name, sizeof(PROTO_STR(TYPE)) - 1} ); \
         };
      
-    PROTO_ASSET_TYPE(InvalidAsset, 0);
-    PROTO_ASSET_TYPE(Mesh,         1);
-    PROTO_ASSET_TYPE(Material,     2);
-    PROTO_ASSET_TYPE(Texture2D,    3);
-    PROTO_ASSET_TYPE(Cubemap,      4);
-    PROTO_ASSET_TYPE(ShaderProgram,5);
+    PROTO_ASSET_TYPE(InvalidAsset);
+    PROTO_ASSET_TYPE(Mesh);
+    PROTO_ASSET_TYPE(Material);
+    PROTO_ASSET_TYPE(Texture2D);
+    PROTO_ASSET_TYPE(Cubemap);
+    PROTO_ASSET_TYPE(ShaderProgram);
+
+    static_assert(AssetTList::size < 256);
 
 #pragma pack(push, 1)
     struct AssetHandle {
@@ -60,39 +63,45 @@ namespace proto {
 #pragma pack(pop)
     static_assert(sizeof(AssetHandle) == 8);
 
+    // Runtype type information lookup table for O(1) comptypeinfo
+    struct _AssetTypeData {
+        template<size_t I>
+        using AssetAt = typename AssetTList::template at_t<I>;
+
+        struct Data {
+            const char * name;
+            AssetTypeIndex index;
+        };
+
+        template<typename...> struct _Lookup;
+        template<size_t...Is> struct _Lookup<meta::sequence<Is...>> {
+            template<size_t I> constexpr static Data make_data() {
+                return { AssetType<AssetAt<I>>::name, AssetType<AssetAt<I>>::index };
+            }
+
+            static_assert(sizeof...(Is) == AssetTList::size);
+            inline static Data table[sizeof...(Is)] = { make_data<Is>()...};
+        };
+        using Lookup = _Lookup<meta::make_sequence<0,AssetTList::size>>;
+
+        static constexpr Data& at(u64 i) {
+            return Lookup::table[i];
+        }
+    };
+
     // default for runtime typeinfo
     template<typename T>
     struct AssetType {
-        const char * name;
-        AssetTypeIndex index;
-        
-    private:
-        template<typename U>
-        void map_type_info(){
-            name = AssetType<U>::name;
-            index = AssetType<U>::index;
-        }
-    public:
-        AssetType(AssetTypeIndex index){
-            switch(index){
-            case AssetType<Mesh>::index:
-                map_type_info<Mesh>();          break;
-            case AssetType<Material>::index:
-                map_type_info<Material>();      break;
-            case AssetType<Texture2D>::index:
-                map_type_info<Texture2D>();     break;
-            case AssetType<Cubemap>::index:
-                map_type_info<Cubemap>();       break;
-            case AssetType<ShaderProgram>::index:
-                map_type_info<ShaderProgram>(); break;
-            default:
-                map_type_info<InvalidAsset>();  break;
-            }
-        }
+        u8 idx;
 
-        AssetType(AssetHandle handle)
-            : AssetType(handle.type)
-        {}
+        constexpr auto name() {
+            return _AssetTypeData::at(idx).name; }
+
+        constexpr auto index() {
+            return _AssetTypeData::at(idx).index; }
+
+        AssetType(AssetHandle handle) : idx(handle.type) {}
+        AssetType(u8 type) : idx(type) {}
     };
 
     //template<typename T> struct AssetTypeId;
@@ -101,6 +110,15 @@ namespace proto {
 
     struct Asset {
         AssetHandle handle;
+        MemBuffer cached;
+        enum {
+              on_gpu_bit = 0,
+              cached_bit,
+              archived_bit,
+              asset_free_flags_bit
+        };
+        Bitset<8> flags;
+
         bool operator==(const Asset& other) const {
             return handle == other.handle;
         }

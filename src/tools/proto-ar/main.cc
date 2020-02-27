@@ -39,7 +39,7 @@ CmdOpt opts[] = {
     {"list",    "ls", "List contents of an archive."},
 };
 
-using OptProc = int (*)(Array<StringView>&);
+using OptProc = Err (*)(Array<StringView>&);
 
 void print_help() {
     println("Options are processed in sequence,"
@@ -68,7 +68,7 @@ OptProc opt_proc_switch(StringView opt) {
         return opt_list_proc;
 
     log_error(debug::category::main, "Option ", opt," is unimplemented.");
-    auto opt_unimpl_proc = [](Array<StringView>&){ return -1; };
+    auto opt_unimpl_proc = [](Array<StringView>&) -> Err { return DBG_ERR; };
     return opt_unimpl_proc;
 }
 

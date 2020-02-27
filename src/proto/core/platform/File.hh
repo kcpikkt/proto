@@ -1,8 +1,7 @@
 #pragma once
+#include "proto/core/common.hh"
 #include "proto/core/error-handling.hh"
 #include "proto/core/util/Bitfield.hh"
-#include "proto/core/util/Buffer.hh"
-#include "proto/core/util/Range.hh" 
 #include "proto/core/util/StringView.hh" 
 
 #if defined(PROTO_PLATFORM_WINDOWS)
@@ -58,7 +57,7 @@ struct File {
 
     s64 cursor();
 
-    MemBuffer map(Mode mode, Range range = {0,0});
+    MemBuffer map(Mode mode, Span<u64> span = {0,0});
     void unmap(MemBuffer mem);
 
     Err resize(u64 size);

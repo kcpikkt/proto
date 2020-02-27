@@ -1,6 +1,7 @@
 #include "proto/core/platform/File.hh"
 #include "proto/core/util/defer.hh"
 #include "proto/core/debug/logging.hh"
+#include "proto/core/common/types.hh"
 
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -94,18 +95,19 @@ namespace platform {
         return SUCCESS;
     }
 
-    MemBuffer File::map(File::Mode mode, Range range) {
+    MemBuffer File::map(File::Mode mode, Span<u64> span) {
         s32 map_prot, map_flags, fd;
 
-        if(range.size == 0) {
-            assert(range.begin == 0);
-            range.size = size();
+        // default mapping whole file
+        if(span.size == 0) {
+            assert(span.begin == 0);
+            span.size = size();
         }
 
-        assert(range.begin <= size());
+        assert(span.begin <= size());
 
-        if(range.size + range.begin > size())
-            if(resize(range.size + range.begin)) return {};
+        if(span.size + span.begin > size())
+            if(resize(span.size + span.begin)) return {};
 
         if(flags.check(mapped_bit)) {
             debug_warn(debug::category::main,
@@ -131,11 +133,11 @@ namespace platform {
             return {};
         }
 
-        void * mapping = mmap(NULL, range.size, map_prot, map_flags, fd, range.begin);
+        void * mapping = mmap(NULL, span.size, map_prot, map_flags, fd, span.begin);
 
         if(mapping != MAP_FAILED) {
             flags.set(mapped_bit);
-            return {{mapping}, range.size};
+            return {{mapping}, span.size};
         }
 
         return {};

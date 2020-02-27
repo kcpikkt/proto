@@ -14,17 +14,14 @@ struct Texture2D : Asset{
     u32 format;
     u32 gpu_format;
 
-    MemBuffer cached;
-
     u32 gl_id;
     s32 bound_unit = -1;
     ivec2 size;
 
-    constexpr static u8 on_gpu_bit = BIT(0);
-    constexpr static u8 cached_bit = BIT(1);
-    constexpr static u8 bound_bit  = BIT(2);
-    constexpr static u8 mipmap_bit  = BIT(3);
-    Bitfield<u8> flags = 0;
+    enum {
+        bound_bit = asset_free_flags_bit,
+        mipmap_bit = asset_free_flags_bit,
+    };
 
     // batch id?
     // batch start index

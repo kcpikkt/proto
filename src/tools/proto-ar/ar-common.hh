@@ -1,7 +1,6 @@
 #pragma once
-#include "proto/core/common/types.hh"
+#include "proto/core/common.hh"
 #include "proto/core/containers/StringArena.hh"
-#include "proto/core/util/Buffer.hh"
 #include "proto/core/util/Bitset.hh"
 #include "proto/core/asset-system/common.hh"
 #include "proto/core/entity-system/common.hh"

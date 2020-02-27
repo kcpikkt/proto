@@ -10,8 +10,7 @@ namespace proto {
 
 AssetHandle make_handle(StringView name, AssetTypeIndex type){
     // TODO(kacper): salt hash depending on type
-    return AssetHandle{.hash = hash::crc32(name),
-                       .type = type };
+    return AssetHandle{.hash = hash::crc32(name), .type = type };
 }
 
     //void add_dependency(AssetMetadata * dependant, AssetHandle dependency)
@@ -52,7 +51,7 @@ static ArrayMap<AssetHandle, Pair<T, AssetMetadata>> * _get_asset_map(AssetConte
 
 template<typename T>
 static Pair<T, AssetMetadata> * _get_pair(AssetHandle& handle, AssetContext * asset_context) {
-    if(AssetType<T>::index != AssetType(handle.type).index) return nullptr;
+    if(AssetType<T>::index != handle.type) return nullptr;
 
     // cannot fail
     ArrayMap<AssetHandle, Pair<T, AssetMetadata>> * map = _get_asset_map<T>(asset_context);
@@ -132,7 +131,7 @@ AssetHandle create_asset(StringView name, AssetTypeIndex type, AssetContext * as
     }
 
     debug_error(debug::category::data,
-                "Cannot create asset of type ", AssetType(type).name);
+                "Cannot create asset of type ", AssetType(type).name() );
     return invalid_asset_handle;
 }
 
@@ -239,7 +238,7 @@ AssetMetadata * get_metadata(AssetHandle& handle, AssetContext * asset_context)
     case AssetType<ShaderProgram>::index: return _get_metadata<ShaderProgram>(handle, asset_context);
     default:
         debug_warn(debug::category::data,
-                   "Requested metadata of asset of unsupported type ", AssetType(handle.type).name);
+                   "Requested metadata of asset of unsupported type ", AssetType(handle.type).name() );
         return nullptr;
     }
 
@@ -266,6 +265,43 @@ INSTANTIATE_CREATE_ASSET_FUNCTIONS_FOR(Material);
 INSTANTIATE_CREATE_ASSET_FUNCTIONS_FOR(Texture2D);
     //INSTANTIATE_CREATE_ASSET_FUNCTIONS_FOR(Cubemap);
 INSTANTIATE_CREATE_ASSET_FUNCTIONS_FOR(ShaderProgram);
+
+
+
+// for doing things, that are usually done compile time, runtime
+// i.e. type erasure at its best 
+struct _RuntimeAsset {
+    template<size_t I>
+    using AssetAt = typename AssetTList::template at_t<I>;
+
+    // get
+    template<typename...> struct _get_cached_switch;
+    template<size_t...Is> struct _get_cached_switch<meta::sequence<Is...>> {
+        AssetHandle _h;
+        MemBuffer _ret = {};
+
+        template<size_t I> inline void _get_cached_case() {
+            if(_ret) return;
+            // we assetare runtime index with static I,
+            if(I == _h.type) 
+                _ret = get_asset_cached<AssetAt<I>>(_h);
+        }
+
+        // go through all the cases
+        _get_cached_switch(AssetHandle h) : _h(h) {
+            ((_get_cached_case<Is>()),...);
+        }
+    };
+
+    static MemBuffer get_asset_cached_at(AssetHandle h) {
+        if(h.type >= AssetTList::size) return {};
+        return _get_cached_switch< meta::make_sequence<0, AssetTList::size> >(h)._ret;
+    }
+};
+
+MemBuffer get_asset_cached(AssetHandle handle) {
+    return _RuntimeAsset::get_asset_cached_at(handle);
+}
 
 
 } // namespace proto

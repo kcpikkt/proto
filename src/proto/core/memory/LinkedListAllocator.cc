@@ -151,7 +151,7 @@ void * LinkedListAllocator::alloc(size_t requested_size, size_t alignment)
     // default max alignment
     alignment = max_alignment;
 
-    proto_assert(is_power_of_two(alignment));
+    proto_assert(is_pow2(alignment));
     proto_assert(_arena != nullptr);
     proto_assert(_first != nullptr);
     proto_assert(_size  != 0);

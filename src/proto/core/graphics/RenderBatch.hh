@@ -1,7 +1,6 @@
 #pragma once
 #include "proto/core/common.hh"
 #include "proto/core/debug.hh"
-#include "proto/core/util/Range.hh"
 #include "proto/core/context.hh"
 #include "proto/core/common/types.hh"
 #include "proto/core/graphics/Mesh.hh"
@@ -13,6 +12,7 @@
 namespace proto {
 
 struct RenderBatch {
+    #if 0
 
     u32 vertex_buffer, index_buffer, vertex_attrib, index_pointer; // sry, what is index pointer?
     u64 vertex_buffer_size;
@@ -25,8 +25,8 @@ struct RenderBatch {
 
     struct RenderBatchMesh : Mesh {
         // batch identification
-        Range batch_index_range;
-        Range batch_vertex_range;
+        Span<> batch_index_span;
+        Span<> batch_vertex_span;
 
         u32 ref_count = 0;
 
@@ -42,8 +42,8 @@ struct RenderBatch {
     Array<RenderBatchMesh> meshes;
     Array<RenderBatchMaterial> materials;
 
-    Array<Range> free_vertex_ranges;
-    Array<Range> free_index_ranges;
+    Array<Span<>> free_vertex_spans;
+    Array<Span<>> free_index_spans;
 
 
     void init(u64 _vertex_buffer_size, u64 _index_buffer_size) {
@@ -78,11 +78,11 @@ struct RenderBatch {
         glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(struct Vertex),
                               (void*) (offsetof(struct Vertex, uv)) );
 
-        free_vertex_ranges.init(1, &context->memory);
-        free_index_ranges.init(1, &context->memory);
+        free_vertex_spans.init(1, &context->memory);
+        free_index_spans.init(1, &context->memory);
 
-        free_vertex_ranges.push_back( Range{0, vertex_buffer_size} );
-        free_index_ranges.push_back( Range{0, index_buffer_size} );
+        free_vertex_spans.push_back( {0, vertex_buffer_size} );
+        free_index_spans.push_back( {0, index_buffer_size} );
 
         render_mesh_comps.init(&context->memory);
         meshes.init(&context->memory);
@@ -112,18 +112,18 @@ struct RenderBatch {
         }
 
         static auto alloc_range =
-            [](u64 size, Array<Range>& ranges) -> Optional<Range> {
+            [](u64 size, Array<Span<>>& spans) -> Optional<Span<>> {
 
-                for(u64 i=0; i<ranges.size(); ++i) {
-                    if(ranges[i].size >= size) {
+                for(u64 i=0; i<spans.size(); ++i) {
+                    if(spans[i].size >= size) {
                         defer {
-                            if(ranges[i].size == size)
-                                ranges.erase(i);
+                            if(spans[i].size == size)
+                                spans.erase(i);
                             else
-                                (ranges[i].begin += size, ranges[i].size -= size);
+                                (spans[i].begin += size, spans[i].size -= size);
                         };
 
-                        return Range{ ranges[i].begin, size };
+                        return Span{ spans[i].begin, size };
                     }
                 }       
                 return {};
@@ -153,7 +153,7 @@ struct RenderBatch {
             auto& archive = ctx.open_archives.at_idx(archive_idx);
 
             auto idx = metadata->archive_node_idx_hint =
-                archive.nodes.find_if( [&](ser::Archive::Node& node){ return node.handle.hash == h.hash; },
+                archive.nodes.find_if( [&](Archive::Node& node){ return node.handle.hash == h.hash; },
                                     metadata->archive_node_idx_hint );
 
             if(idx == archive.nodes.size())
@@ -183,41 +183,46 @@ struct RenderBatch {
         auto map_flags = GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT;
 
         if(header.vertices_size) {
-            if( auto range_opt = alloc_range(header.vertices_size, free_vertex_ranges) )
-                mesh.batch_vertex_range = range_opt.value;
+            if( auto range_opt = alloc_range(header.vertices_size, free_vertex_spans) )
+                mesh.batch_vertex_span = range_opt.value;
             else
-                return (void)debug_warn(debug::category::data, "Could not fit mesh into RenderBatch buffer");
+                return (void)debug_warn(debug::category::data,
+                                        "Could not fit mesh into RenderBatch buffer");
 
-            auto& [r_begin, r_size] = mesh.batch_vertex_range;
+            auto& [r_begin, r_size] = mesh.batch_vertex_span;
 
-            if(void * mapped_range = glMapBufferRange(GL_ARRAY_BUFFER, r_begin, r_size, map_flags) )
+            if(void * mapped_range = glMapBufferSpan(GL_ARRAY_BUFFER, r_begin, r_size, map_flags) )
                 memcpy(mapped_range, (u8*)&header + header.vertices_offset, r_size);
             else
-                return (void)debug_warn(debug::category::data, "glMapBufferRange failed");
+                return (void)debug_warn(debug::category::data,
+                                        "glMapBufferSpan failed");
         }
 
         if(header.indices_size) {
             mesh.flags.set(Mesh::indexed_bit);
-            if( auto range_opt = alloc_range(header.indices_size, free_index_ranges) )
-                mesh.batch_index_range = range_opt.value;
+            if( auto range_opt = alloc_range(header.indices_size, free_index_spans) )
+                mesh.batch_index_span = range_opt.value;
             else
-                return (void)debug_warn(debug::category::data, "Could not fit mesh into RenderBatch buffer");
+                return (void)debug_warn(debug::category::data,
+                                        "Could not fit mesh into RenderBatch buffer");
 
-            auto& [r_begin, r_size] = mesh.batch_index_range;
+            auto& [r_begin, r_size] = mesh.batch_index_span;
 
-            if(void * mapped_range = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, r_begin, r_size, map_flags) )
+            if(void * mapped_range = glMapBufferSpan(GL_ELEMENT_ARRAY_BUFFER, r_begin, r_size, map_flags) )
                 memcpy(mapped_range, (u8*)&header + header.indices_offset, r_size);
             else
-                return (void)debug_warn(debug::category::data, "glMapBufferRange failed");
+                return (void)debug_warn(debug::category::data, "glMapBufferSpan failed");
 
         }
 
         // FIXME(kcpiktk): do that once after buffer is ready to render?
         if(glUnmapBuffer(GL_ARRAY_BUFFER) != GL_TRUE)
-            return (void)debug_warn(debug::category::data, "glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER) failed");
+            return (void)debug_warn(debug::category::data,
+                                    "glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER) failed");
 
         if(glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER) != GL_TRUE)
-            return (void)debug_warn(debug::category::data, "glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER) failed");
+            return (void)debug_warn(debug::category::data,
+                                    "glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER) failed");
 
         // we have mesh in, now its time for our material
 
@@ -264,16 +269,17 @@ struct RenderBatch {
                 .$_set_vec3  ("u_color", &render_mesh.color);
 
             if(mesh.flags.at(Mesh::indexed_bit)){
-                auto& [r_begin, r_size] = mesh.batch_index_range;
-                u32 offset = mesh.batch_vertex_range.begin / sizeof(Vertex);
+                auto& [r_begin, r_size] = mesh.batch_index_span;
+                u32 offset = mesh.batch_vertex_span.begin / sizeof(Vertex);
                 glDrawElementsBaseVertex (GL_TRIANGLES, r_size / sizeof(u32), GL_UNSIGNED_INT,
                                           (void*)(r_begin), offset);   
             } else {
-                auto& [r_begin, r_size] = mesh.batch_vertex_range;
+                auto& [r_begin, r_size] = mesh.batch_vertex_span;
                 glDrawArrays (GL_TRIANGLES, r_begin / sizeof(Vertex), r_size / sizeof(Vertex));   
             }
         }
     }
+    #endif
 };
 
 

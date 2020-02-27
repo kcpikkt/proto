@@ -4,7 +4,6 @@
 #include "proto/core/context.hh"
 #include "proto/core/memory/common.hh"
 #include "proto/core/util/algo.hh"
-#include "proto/core/util/Buffer.hh"
 #include "proto/core/platform/api.hh"
 #include "proto/core/math/hash.hh"
 #include "proto/core/graphics/Cubemap.hh"

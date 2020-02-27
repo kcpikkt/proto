@@ -4,7 +4,6 @@
 #include "proto/core/debug/logging.hh"
 #include "proto/core/debug/markers.hh"
 #include "proto/core/memory/common.hh"
-#include "proto/core/util/Buffer.hh"
 #include "proto/core/meta.hh"
 
 namespace proto {

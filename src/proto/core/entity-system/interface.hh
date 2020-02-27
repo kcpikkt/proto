@@ -78,10 +78,11 @@ namespace {
     // create_comp_array 
     // Snake case since it is basically a function, name is subject to change, it is called only once anyway.
     // It takes Typelist as a parameter, then
-    template<typename TList> struct create_comp_arrays {
+    template<typename> struct create_comp_arrays {
         // size of array of any type should be the same
         // TODO(kacper): go and static_asset it somewhere
         constexpr static auto _arr_sz = sizeof(Array<int>);
+        using TList = typename CompTList::template prefix<CompTList::size - 1>::type;
         
         // initial cap for each of our components array
         // TODO(kacper): we may to be able to easily specify this one for each component
@@ -116,6 +117,7 @@ namespace {
             context->comp_arrs.init_resize(TList::size, &context->memory);
 
             // here is where cursed things happen
+            // index 0 is InvalidComp index, we don't want it
             (void) init_arrs<meta::make_sequence<0, TList::size>>(buf);
         }
     };
